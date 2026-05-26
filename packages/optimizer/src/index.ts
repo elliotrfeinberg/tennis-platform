@@ -4,13 +4,13 @@ export {
   type CourtKind,
   type CourtSlot,
   type MatchFormat,
-} from "./format.js";
+} from "./format";
 
 export {
   doublesWinProb,
   singlesWinProb,
   type Doubles,
-} from "./winprob.js";
+} from "./winprob";
 
 export {
   optimizeLineup,
@@ -24,4 +24,4 @@ export {
   type Lineup,
   type OptimizeOptions,
   type OptimizeResult,
-} from "./lineup.js";
+} from "./lineup";

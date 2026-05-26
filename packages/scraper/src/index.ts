@@ -3,16 +3,17 @@ export {
   type PoliteFetchOptions,
   type CachedFetchResult,
   type ConditionalHeaders,
-} from "./politeFetch.js";
+} from "./politeFetch";
 
 export {
   ratingSearchUrl,
+  ratingSearchUrlDesktop,
   playerHistoryUrl,
   teamUrl,
-  leagueIndexUrl,
-  seasonArchiveUrl,
+  teamTennisStatsUrl,
+  standingsSearchUrl,
   type SearchCriteria,
-} from "./tennislinkUrls.js";
+} from "./tennislinkUrls";
 
 export {
   parsePlayerSearch,
@@ -20,10 +21,10 @@ export {
   type PlayerSearchResultRow,
   type ParsedMatch,
   type ParsedPlayerHistory,
-} from "./parse.js";
+} from "./parse";
 
 export {
   parseRobots,
   isAllowed,
   type RobotsRules,
-} from "./robotsCheck.js";
+} from "./robotsCheck";

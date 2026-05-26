@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isAllowed, parseRobots } from "./robotsCheck.js";
+import { isAllowed, parseRobots } from "./robotsCheck";
 
 describe("robots.txt parsing", () => {
   it("parses standard format", () => {

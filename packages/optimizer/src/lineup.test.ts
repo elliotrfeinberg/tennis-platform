@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { newRating, type Rating } from "@tennis/ratings";
-import { FORMAT_ADULT_18, FORMAT_MIXED_5D } from "./format.js";
+import { FORMAT_ADULT_18, FORMAT_MIXED_5D } from "./format";
 import {
   evaluateLineup,
   optimizeLineup,
   teamWinProbability,
   type OpponentLineup,
   type RosterPlayer,
-} from "./lineup.js";
+} from "./lineup";
 
 function rating(r: number, rd = 60): Rating {
   return { rating: r, rd, vol: 0.06 };

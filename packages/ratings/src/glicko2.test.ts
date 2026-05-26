@@ -4,7 +4,7 @@ import {
   updateRating,
   winProbability,
   type Rating,
-} from "./glicko2.js";
+} from "./glicko2";
 
 describe("Glicko-2", () => {
   it("matches Glickman (2012) worked example within tolerance", () => {

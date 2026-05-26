@@ -59,24 +59,34 @@ sometimes serves cleaner HTML than the desktop site.
 
 ## Step 2: capture a few pages
 
-Grab one of each page type. Replace IDs with real ones from tennislink.
+We prefer the **mobile site** (`m.tennislink.usta.com`) wherever possible —
+it's what USTA's TennisLink iOS/Android app talks to, and tends to serve
+cleaner HTML than the desktop site.
+
+Look up a real player ID first: open the rating search in a browser, find a
+player you know, note the `par1=` value in the resulting URL (it's a
+numeric string like `2006671136`).
 
 ```bash
-# Player rating search results
+# Rating search (mobile)
 pnpm --filter @tennis/worker dev capture \
-  "https://tennislink.usta.com/leagues/reports/NTRP/AdvancedSearch.aspx?lastName=Federer" \
+  "https://m.tennislink.usta.com/ntrp/advancedsearch.aspx?lastName=Smith" \
   packages/scraper/src/__fixtures__/search.html
 
-# A player's history page
+# Player's match history (mobile) — replace par1 with a real id
 pnpm --filter @tennis/worker dev capture \
-  "https://tennislink.usta.com/leagues/main/statsandstandings.aspx?p=1&id=PLAYER_ID" \
+  "https://m.tennislink.usta.com/statsandstandings/statsandstandings.aspx?t=0&par1=2006671136" \
   packages/scraper/src/__fixtures__/player-history.html
 
-# A team page
+# Team page (desktop — no clean mobile equivalent)
+# TeamCode comes from the team's URL on tennislink; CYear is the league year.
 pnpm --filter @tennis/worker dev capture \
-  "https://tennislink.usta.com/leagues/Main/StatsAndStandings.aspx?t=TEAM_ID" \
+  "https://tennislink.usta.com/LEAGUES/Reports/TennisLinkReports.aspx?Level=T&TeamCode=YOUR_TEAM_CODE&CYear=2025" \
   packages/scraper/src/__fixtures__/team.html
 ```
+
+If you get a 404, the page genuinely doesn't exist for that ID — open the
+URL in a browser to verify, then adjust.
 
 ## Step 3: inspect + tune the parsers
 

@@ -11,8 +11,8 @@
 //    between a thrashing and a tiebreak, which is the most informative
 //    signal we have.
 
-import type { Outcome, Rating } from "./glicko2.js";
-import { updateRating } from "./glicko2.js";
+import type { Outcome, Rating } from "./glicko2";
+import { updateRating } from "./glicko2";
 
 export interface SetScore {
   player: number;

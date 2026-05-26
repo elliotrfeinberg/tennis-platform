@@ -21,12 +21,12 @@
 // (assign weakest court first, etc).
 
 import { winProbability, type Rating } from "@tennis/ratings";
-import type { CourtSlot, MatchFormat } from "./format.js";
+import type { CourtSlot, MatchFormat } from "./format";
 import {
   doublesWinProb,
   singlesWinProb,
   type Doubles,
-} from "./winprob.js";
+} from "./winprob";
 
 export interface RosterPlayer {
   id: string;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitCalibration, glickoToNtrp, predictLevel } from "./ntrp.js";
+import { fitCalibration, glickoToNtrp, predictLevel } from "./ntrp";
 
 describe("NTRP calibration", () => {
   it("recovers a known linear relationship", () => {

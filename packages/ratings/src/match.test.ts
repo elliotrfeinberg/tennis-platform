@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { setScoreToOutcome, applySingles } from "./match.js";
-import { newRating, type Rating } from "./glicko2.js";
+import { setScoreToOutcome, applySingles } from "./match";
+import { newRating, type Rating } from "./glicko2";
 
 describe("setScoreToOutcome", () => {
   it("6-0 win is decisive relative to 7-6", () => {

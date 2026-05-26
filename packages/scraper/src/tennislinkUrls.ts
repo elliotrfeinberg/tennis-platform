@@ -1,10 +1,14 @@
 // URL builders for tennislink.usta.com.
 //
-// These are the public-facing search and detail pages we'll crawl. URL
-// shapes will need verification against the live site during the first
-// real crawl; keeping them centralized here so changes are one-line.
+// We prefer the MOBILE site (m.tennislink.usta.com) wherever it has an
+// equivalent page — it's what the USTA TennisLink iOS/Android app talks
+// to, serves cleaner HTML, and has been more stable across redesigns.
+// Desktop builders are kept for pages without a mobile equivalent.
+//
+// URL shapes verified against live tennislink in 2025-05.
 
-const BASE = "https://tennislink.usta.com";
+const DESKTOP = "https://tennislink.usta.com";
+const MOBILE = "https://m.tennislink.usta.com";
 
 export interface SearchCriteria {
   firstName?: string;
@@ -15,7 +19,8 @@ export interface SearchCriteria {
   ntrpLevel?: number;
 }
 
-// Player rating search (the NTRP lookup page).
+// Player rating search — mobile.
+// e.g. https://m.tennislink.usta.com/ntrp/advancedsearch.aspx?lastName=Federer
 export function ratingSearchUrl(criteria: SearchCriteria): string {
   const params = new URLSearchParams();
   if (criteria.firstName) params.set("firstName", criteria.firstName);
@@ -24,34 +29,47 @@ export function ratingSearchUrl(criteria: SearchCriteria): string {
   if (criteria.state) params.set("state", criteria.state);
   if (criteria.gender) params.set("gender", criteria.gender);
   if (criteria.ntrpLevel) params.set("ntrpLevel", String(criteria.ntrpLevel));
-  return `${BASE}/leagues/reports/NTRP/AdvancedSearch.aspx?${params}`;
+  return `${MOBILE}/ntrp/advancedsearch.aspx?${params}`;
 }
 
-// Per-player detail (career match history with set scores).
+// Desktop equivalent of the rating search, in case mobile blocks us.
+export function ratingSearchUrlDesktop(criteria: SearchCriteria): string {
+  const params = new URLSearchParams();
+  if (criteria.firstName) params.set("firstName", criteria.firstName);
+  if (criteria.lastName) params.set("lastName", criteria.lastName);
+  if (criteria.section) params.set("section", criteria.section);
+  if (criteria.state) params.set("state", criteria.state);
+  if (criteria.gender) params.set("gender", criteria.gender);
+  if (criteria.ntrpLevel) params.set("ntrpLevel", String(criteria.ntrpLevel));
+  return `${DESKTOP}/leagues/reports/NTRP/AdvancedSearch.aspx?${params}`;
+}
+
+// Per-player match history. The mobile site uses `par1=<numeric player id>`
+// and `t=0` (which tab to show). The id is numeric, e.g. 2006671136.
+// e.g. https://m.tennislink.usta.com/statsandstandings/statsandstandings.aspx?t=0&par1=2006671136
 export function playerHistoryUrl(tennislinkId: string): string {
-  return `${BASE}/leagues/main/statsandstandings.aspx?p=1&id=${encodeURIComponent(
-    tennislinkId
-  )}`;
+  const params = new URLSearchParams({ t: "0", par1: tennislinkId });
+  return `${MOBILE}/statsandstandings/statsandstandings.aspx?${params}`;
 }
 
-// Team roster + season schedule.
-export function teamUrl(tennislinkId: string): string {
-  return `${BASE}/leagues/Main/StatsAndStandings.aspx?t=${encodeURIComponent(
-    tennislinkId
-  )}`;
+// Team page (roster + season schedule). Desktop endpoint:
+// https://tennislink.usta.com/LEAGUES/Reports/TennisLinkReports.aspx?Level=T&TeamCode=<code>&CYear=<year>
+export function teamUrl(teamCode: string, year: number): string {
+  const params = new URLSearchParams({
+    Level: "T",
+    TeamCode: teamCode,
+    CYear: String(year),
+  });
+  return `${DESKTOP}/LEAGUES/Reports/TennisLinkReports.aspx?${params}`;
 }
 
-// Section + league index used to enumerate teams. Real URL shape verified
-// during first crawl; keeping placeholder structure here.
-export function leagueIndexUrl(section: string, season: string): string {
-  return `${BASE}/leagues/Main/findLeague.aspx?section=${encodeURIComponent(
-    section
-  )}&season=${encodeURIComponent(season)}`;
+// Team Tennis stats search (junior team tennis flavor).
+export function teamTennisStatsUrl(): string {
+  return `${DESKTOP}/TeamTennis/Main/Stats.aspx?Load=AdvSearch`;
 }
 
-// Historical backfill: list of completed seasons by section.
-export function seasonArchiveUrl(section: string, year: number): string {
-  return `${BASE}/leagues/Main/archives.aspx?section=${encodeURIComponent(
-    section
-  )}&year=${year}`;
+// League / standings advanced search entry point.
+// Use to enumerate teams in a section / season.
+export function standingsSearchUrl(): string {
+  return `${MOBILE}/statsandstandings?SearchType=3`;
 }

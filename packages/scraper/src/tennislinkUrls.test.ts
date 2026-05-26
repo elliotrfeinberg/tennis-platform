@@ -3,7 +3,7 @@ import {
   playerHistoryUrl,
   ratingSearchUrl,
   teamUrl,
-} from "./tennislinkUrls.js";
+} from "./tennislinkUrls";
 
 describe("tennislink URL builders", () => {
   it("ratingSearchUrl encodes params", () => {
@@ -24,8 +24,10 @@ describe("tennislink URL builders", () => {
     expect(url).toContain("abc%2F123");
   });
 
-  it("teamUrl includes team id", () => {
-    const url = teamUrl("team-42");
-    expect(url).toContain("t=team-42");
+  it("teamUrl includes team code and year", () => {
+    const url = teamUrl("ABC123", 2025);
+    expect(url).toContain("TeamCode=ABC123");
+    expect(url).toContain("CYear=2025");
+    expect(url).toContain("Level=T");
   });
 });
