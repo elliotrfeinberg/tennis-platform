@@ -32,6 +32,7 @@ export interface CachedFetchResult {
   lastModified: string | undefined;
   contentHash: string;
   fetchedAt: Date;
+  finalUrl: string; // URL after any redirects
 }
 
 export interface ConditionalHeaders {
@@ -113,7 +114,14 @@ export class PoliteFetcher {
         const res: Dispatcher.ResponseData = await request(url, {
           method: "GET",
           headers,
+          maxRedirections: 5,
         });
+
+        // undici exposes the final URL after redirects on res.context (when
+        // maxRedirections > 0). If undefined, we never redirected.
+        const ctx = (res as unknown as { context?: { history?: URL[] } }).context;
+        const finalUrl =
+          ctx?.history?.[ctx.history.length - 1]?.toString() ?? url;
 
         if (res.statusCode === 304) {
           return {
@@ -123,6 +131,7 @@ export class PoliteFetcher {
             lastModified: cond.lastModified,
             contentHash: "",
             fetchedAt: new Date(),
+            finalUrl,
           };
         }
 
@@ -145,6 +154,7 @@ export class PoliteFetcher {
           lastModified: headerOf(res.headers, "last-modified"),
           contentHash,
           fetchedAt: new Date(),
+          finalUrl,
         };
       } catch (err) {
         lastErr = err;

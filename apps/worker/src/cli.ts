@@ -50,13 +50,20 @@ async function capture(url: string, outPath: string) {
   const fetcher = makeFetcher();
   console.error(`Fetching ${url}`);
   const result = await fetcher.fetch(url);
+  if (result.finalUrl !== url) {
+    console.error(`  redirected -> ${result.finalUrl}`);
+  }
   console.error(
     `  status=${result.status} bytes=${result.body?.length ?? 0} etag=${
       result.etag ?? "-"
     }`
   );
   if (!result.body) {
-    console.error("No body to write (304 Not Modified).");
+    if (result.status === 304) {
+      console.error("304 Not Modified — no body to write.");
+    } else {
+      console.error(`Status ${result.status}, no body to write.`);
+    }
     return;
   }
   await mkdir(dirname(outPath), { recursive: true });
