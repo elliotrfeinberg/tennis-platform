@@ -1,0 +1,26 @@
+{
+  "name": "@tennis/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "tennis-scrape": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@tennis/db": "workspace:*",
+    "@tennis/ratings": "workspace:*",
+    "@tennis/scraper": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
