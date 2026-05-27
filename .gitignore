@@ -32,9 +32,13 @@ pnpm-debug.*
 # typescript
 *.tsbuildinfo
 
-# scraper cache (local dev; keep raw HTML out of git)
+# scraper cache + ad-hoc capture output (local dev; keep raw HTML out of git)
 .cache/
 data/raw/
+captures/
+
+# USTA session cookies — sensitive, never commit
+usta-session.json
 
 # coverage
 coverage/

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@tennis/db": "workspace:*",
+    "@tennis/fixtures": "workspace:*",
     "@tennis/optimizer": "workspace:*",
     "@tennis/ratings": "workspace:*",
     "next": "^15.1.3",

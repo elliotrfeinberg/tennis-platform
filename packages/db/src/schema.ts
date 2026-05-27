@@ -1,21 +1,24 @@
 // Postgres schema for the tennis platform.
 //
-// Design notes:
+// Hierarchy mirrors USTA's structure:
 //
-// - tennislink uses opaque player IDs that we treat as the canonical
-//   identifier; we keep a separate internal UUID so we can support players
-//   who haven't been seen on tennislink yet (manual entry, self-rate).
+//   section -> district -> league (year+type) -> flight (gender+level)
+//      -> subflight (local cluster) -> team -> roster + schedule
+//      schedule = sequence of team_matches, each broken into court_matches
+//      court_matches store set-by-set scores
 //
-// - Match rows store both raw set scores (for re-running rating updates)
-//   and the resulting rating snapshot per player, so we can recompute
-//   without losing history.
+// Identifier strategy:
 //
-// - ratings_history is append-only: one row per (player, computed_at). We
-//   never UPDATE a rating; we INSERT a new one. This gives us match-by-match
-//   rating charts for free (the "how my rating moved this season" view).
-//
-// - Lineups are first-class: captains save them, share them, get win-prob
-//   re-scored when opponent rosters update.
+//   - Internal UUIDs are the joinable primary keys.
+//   - USTA's numeric ids (player member id, team id, match id) are the
+//     canonical external keys when we can get them — but USTA *redacts the
+//     team id* on team-profile pages ("Team ID: *****") and *omits the
+//     member id* on rendered HTML. We catch them only on player-detail
+//     pages, which we fetch lazily.
+//   - The URL-routable par1 hex token (e.g. "DB00637B...") is what we have
+//     immediately. The same team has multiple par1 encodings depending on
+//     entry point, so we store them as an array and dedupe teams by
+//     (name, season).
 
 import { sql } from "drizzle-orm";
 import {
@@ -43,19 +46,111 @@ export const matchTypeEnum = pgEnum("match_type", [
   "user_submitted",
 ]);
 export const genderEnum = pgEnum("gender", ["M", "F", "X"]);
+export const teamMatchStatusEnum = pgEnum("team_match_status", [
+  "scheduled",
+  "completed",
+  "default",
+  "not_played",
+]);
 
-// ---- core ----
+// ---- geographic hierarchy ----
+
+// USTA sections (17 nationally). Use the canonical code as PK so cross-
+// section references are stable; displayName for UI.
+export const sections = pgTable("sections", {
+  code: varchar("code", { length: 64 }).primaryKey(), // "USTA/NO. CALIFORNIA"
+  displayName: text("display_name").notNull(),
+});
+
+export const districts = pgTable(
+  "districts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sectionCode: varchar("section_code", { length: 64 })
+      .notNull()
+      .references(() => sections.code),
+    name: text("name").notNull(), // "NO. CALIFORNIA"
+  },
+  (t) => [uniqueIndex("districts_section_name_uq").on(t.sectionCode, t.name)]
+);
+
+// ---- league hierarchy ----
+
+// A league is the section+year+type tuple, e.g. "2026 ADULT 18&Over" in
+// USTA/NO. CALIFORNIA. formatKind is a coarse classifier; the exact court
+// layout lives on each flight.
+export const leagues = pgTable(
+  "leagues",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sectionCode: varchar("section_code", { length: 64 })
+      .notNull()
+      .references(() => sections.code),
+    districtId: uuid("district_id").references(() => districts.id),
+    year: integer("year").notNull(),
+    name: text("name").notNull(), // "2026 ADULT 18&Over"
+    formatKind: varchar("format_kind", { length: 32 }), // "adult", "mixed", "combo", "tri_level"
+    // USTA's leaked numeric id, e.g. "107456". Captured in ViewState; not
+    // visible in normal HTML. Optional until we wire ViewState extraction.
+    ustaLeagueId: varchar("usta_league_id", { length: 32 }),
+  },
+  (t) => [
+    uniqueIndex("leagues_section_year_name_uq").on(
+      t.sectionCode,
+      t.year,
+      t.name
+    ),
+  ]
+);
+
+// A flight is the NTRP+gender split within a league: "Women's 3.5".
+export const flights = pgTable(
+  "flights",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    leagueId: uuid("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    name: text("name").notNull(), // "Women's 3.5"
+    gender: genderEnum("gender").notNull(),
+    ntrpLevel: doublePrecision("ntrp_level").notNull(), // 3.5
+    ustaFlightId: varchar("usta_flight_id", { length: 32 }),
+  },
+  (t) => [uniqueIndex("flights_league_name_uq").on(t.leagueId, t.name)]
+);
+
+// A subflight is the local cluster within a flight: "Women's 3.5 - DN - 1".
+// One subflight is the unit a team's schedule round-robins through.
+export const subflights = pgTable(
+  "subflights",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    flightId: uuid("flight_id")
+      .notNull()
+      .references(() => flights.id, { onDelete: "cascade" }),
+    name: text("name").notNull(), // "Women's 3.5 - DN - 1"
+    ustaSubflightId: varchar("usta_subflight_id", { length: 32 }),
+  },
+  (t) => [uniqueIndex("subflights_flight_name_uq").on(t.flightId, t.name)]
+);
+
+// ---- players ----
 
 export const players = pgTable(
   "players",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    tennislinkId: varchar("tennislink_id", { length: 64 }).unique(),
+    // USTA's numeric member id (e.g. "2010673783"). Canonical cross-season
+    // identifier. NULL until we've fetched the player-detail page that
+    // exposes it; ingest uses (displayName, teamId, season) until then.
+    ustaMemberId: varchar("usta_member_id", { length: 32 }).unique(),
     displayName: text("display_name").notNull(),
-    section: varchar("section", { length: 32 }), // "Florida", "NorCal", etc.
-    district: varchar("district", { length: 64 }),
+    sectionCode: varchar("section_code", { length: 64 }).references(
+      () => sections.code
+    ),
+    districtId: uuid("district_id").references(() => districts.id),
     gender: genderEnum("gender"),
-    // Latest published year-end NTRP level. NULL if unrated.
+    // Most recent year-end published NTRP. NULL if unrated.
     publishedNtrp: doublePrecision("published_ntrp"),
     publishedNtrpYear: integer("published_ntrp_year"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -66,21 +161,34 @@ export const players = pgTable(
       .defaultNow(),
   },
   (t) => [
-    index("players_section_idx").on(t.section),
+    index("players_section_idx").on(t.sectionCode),
     index("players_display_name_idx").on(t.displayName),
   ]
 );
+
+// ---- teams ----
 
 export const teams = pgTable(
   "teams",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    tennislinkId: varchar("tennislink_id", { length: 64 }).unique(),
+    subflightId: uuid("subflight_id")
+      .notNull()
+      .references(() => subflights.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
-    section: varchar("section", { length: 32 }),
-    league: text("league"), // e.g. "Adult 40 & Over 4.0 Women"
-    season: varchar("season", { length: 16 }), // "2025-spring"
-    ntrpLevel: doublePrecision("ntrp_level"),
+    // Denormalized year for fast season-scoped queries. Always matches
+    // leagues.year via the subflight->flight->league chain.
+    year: integer("year").notNull(),
+    // USTA's leaked numeric id (e.g. "5083144154"). Redacted in rendered
+    // HTML, so usually NULL. Source of truth for dedup is (name, year).
+    ustaTeamId: varchar("usta_team_id", { length: 32 }),
+    // All par1 hex tokens we've seen for this team. Same team gets multiple
+    // depending on entry point (flight standings vs schedule vs share link).
+    // Used to recognize a team from any URL; not authoritative.
+    tennislinkPars: text("tennislink_pars")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     homeFacility: text("home_facility"),
     captainPlayerId: uuid("captain_player_id").references(() => players.id),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -88,8 +196,9 @@ export const teams = pgTable(
       .defaultNow(),
   },
   (t) => [
-    index("teams_section_season_idx").on(t.section, t.season),
-    index("teams_league_idx").on(t.league),
+    uniqueIndex("teams_name_year_uq").on(t.name, t.year),
+    index("teams_subflight_idx").on(t.subflightId),
+    index("teams_year_idx").on(t.year),
   ]
 );
 
@@ -109,57 +218,92 @@ export const teamMembers = pgTable(
   (t) => [primaryKey({ columns: [t.teamId, t.playerId] })]
 );
 
-// One row per court played in a team-match. For singles, side*Player1 is
-// set and side*Player2 is null; for doubles both are set.
-export const matches = pgTable(
-  "matches",
+// ---- matches ----
+
+// One row per scheduled meeting between two teams on a date. Carries the
+// summary status + denormalized court-win counts. Per-court detail lives
+// in court_matches.
+export const teamMatches = pgTable(
+  "team_matches",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    tennislinkId: varchar("tennislink_id", { length: 64 }).unique(),
+    // USTA's numeric match id (e.g. "1011875481"). Visible in the team
+    // profile's ViewScore() onclick handlers. Stable, unique.
+    ustaMatchId: varchar("usta_match_id", { length: 32 }).unique(),
+    homeTeamId: uuid("home_team_id")
+      .notNull()
+      .references(() => teams.id),
+    visitorTeamId: uuid("visitor_team_id")
+      .notNull()
+      .references(() => teams.id),
+    playedOn: timestamp("played_on", { withTimezone: true }).notNull(),
+    dateScheduled: timestamp("date_scheduled", { withTimezone: true }),
+    dateEntered: timestamp("date_entered", { withTimezone: true }),
+    status: teamMatchStatusEnum("status").notNull().default("scheduled"),
+    // Confirmation note like "Confirmed by Lisa Italia (V)".
+    confirmation: text("confirmation"),
+    // Denormalized court-win totals — kept in sync by the ingest job.
+    homeCourtsWon: integer("home_courts_won").notNull().default(0),
+    visitorCourtsWon: integer("visitor_courts_won").notNull().default(0),
+    sourceUrl: text("source_url"),
+    rawHash: varchar("raw_hash", { length: 64 }),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("team_matches_played_on_idx").on(t.playedOn),
+    index("team_matches_home_idx").on(t.homeTeamId),
+    index("team_matches_visitor_idx").on(t.visitorTeamId),
+  ]
+);
+
+// One row per court within a team-match. Line numbering is per-kind:
+// (kind=S, line=1) is S1; (kind=D, line=2) is D2. Sets are stored as
+// jsonb: [{ home: 6, visitor: 4 }, ...].
+export const courtMatches = pgTable(
+  "court_matches",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    teamMatchId: uuid("team_match_id")
+      .notNull()
+      .references(() => teamMatches.id, { onDelete: "cascade" }),
     matchType: matchTypeEnum("match_type").notNull().default("league"),
     courtKind: courtKindEnum("court_kind").notNull(),
-    playedOn: timestamp("played_on", { withTimezone: true }).notNull(),
-
-    homeTeamId: uuid("home_team_id").references(() => teams.id),
-    awayTeamId: uuid("away_team_id").references(() => teams.id),
-
-    // Court / line number (1, 2, ...).
-    line: integer("line"),
+    line: integer("line").notNull(),
 
     homePlayer1Id: uuid("home_player1_id")
       .notNull()
       .references(() => players.id),
     homePlayer2Id: uuid("home_player2_id").references(() => players.id),
-    awayPlayer1Id: uuid("away_player1_id")
+    visitorPlayer1Id: uuid("visitor_player1_id")
       .notNull()
       .references(() => players.id),
-    awayPlayer2Id: uuid("away_player2_id").references(() => players.id),
+    visitorPlayer2Id: uuid("visitor_player2_id").references(() => players.id),
 
-    // sets: [{ home: 6, away: 4 }, { home: 7, away: 5 }] — typed loosely
-    // since we serialize to jsonb; runtime validation handled in services.
     sets: jsonb("sets").notNull(),
-
     homeWon: boolean("home_won").notNull(),
-
-    // Where it came from in case we want to re-parse / debug.
-    sourceUrl: text("source_url"),
-    rawHash: varchar("raw_hash", { length: 64 }),
+    completed: boolean("completed").notNull().default(true),
 
     ingestedAt: timestamp("ingested_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (t) => [
-    index("matches_played_on_idx").on(t.playedOn),
-    index("matches_home_team_idx").on(t.homeTeamId),
-    index("matches_away_team_idx").on(t.awayTeamId),
-    index("matches_home_p1_idx").on(t.homePlayer1Id),
-    index("matches_away_p1_idx").on(t.awayPlayer1Id),
+    uniqueIndex("court_matches_team_match_kind_line_uq").on(
+      t.teamMatchId,
+      t.courtKind,
+      t.line
+    ),
+    index("court_matches_home_p1_idx").on(t.homePlayer1Id),
+    index("court_matches_visitor_p1_idx").on(t.visitorPlayer1Id),
   ]
 );
 
-// Append-only rating snapshots. One row per (player, match) AND one row
-// per nightly recompute even with no matches (to mark inactivity decay).
+// ---- ratings ----
+
+// Append-only rating snapshots. One row per (player, court_match) AND one
+// row per nightly recompute even with no matches (for inactivity decay).
 export const ratingsHistory = pgTable(
   "ratings_history",
   {
@@ -167,8 +311,7 @@ export const ratingsHistory = pgTable(
     playerId: uuid("player_id")
       .notNull()
       .references(() => players.id, { onDelete: "cascade" }),
-    // NULL means "scheduled recompute, no match"; non-null means "after this match"
-    matchId: uuid("match_id").references(() => matches.id, {
+    courtMatchId: uuid("court_match_id").references(() => courtMatches.id, {
       onDelete: "cascade",
     }),
     rating: doublePrecision("rating").notNull(),
@@ -181,12 +324,10 @@ export const ratingsHistory = pgTable(
   },
   (t) => [
     index("ratings_player_computed_idx").on(t.playerId, t.computedAt),
-    uniqueIndex("ratings_player_match_unique").on(t.playerId, t.matchId),
+    uniqueIndex("ratings_player_match_uq").on(t.playerId, t.courtMatchId),
   ]
 );
 
-// Current rating cache. Updated by the same job that writes ratings_history.
-// Lets the player-search page skip the per-player ORDER BY computed_at DESC.
 export const currentRatings = pgTable("current_ratings", {
   playerId: uuid("player_id")
     .primaryKey()
@@ -202,7 +343,6 @@ export const currentRatings = pgTable("current_ratings", {
     .defaultNow(),
 });
 
-// NTRP calibration is fit nightly. Keep history so we can audit shifts.
 export const calibrations = pgTable("calibrations", {
   id: uuid("id").defaultRandom().primaryKey(),
   slope: doublePrecision("slope").notNull(),
@@ -214,7 +354,8 @@ export const calibrations = pgTable("calibrations", {
     .defaultNow(),
 });
 
-// Captain-saved lineups. One row per draft/version.
+// ---- captain workspace ----
+
 export const lineups = pgTable(
   "lineups",
   {
@@ -222,14 +363,17 @@ export const lineups = pgTable(
     teamId: uuid("team_id")
       .notNull()
       .references(() => teams.id, { onDelete: "cascade" }),
-    label: text("label").notNull(), // "vs. Riverside Tennis Club, 4/13"
-    formatName: text("format_name").notNull(), // "USTA Adult League (2S + 3D)"
-    // courts: [{ slot: {index, kind}, playerIds: [uuid] }]
+    // Optionally tied to a specific team-match (e.g. "vs Round Hill, 5/11").
+    teamMatchId: uuid("team_match_id").references(() => teamMatches.id, {
+      onDelete: "set null",
+    }),
+    label: text("label").notNull(),
+    formatName: text("format_name").notNull(),
     assignments: jsonb("assignments").notNull(),
-    opponent: jsonb("opponent"), // OpponentLineup if known
+    opponent: jsonb("opponent"),
     teamWinProb: doublePrecision("team_win_prob"),
     notes: text("notes"),
-    createdBy: uuid("created_by"), // future: users table
+    createdBy: uuid("created_by"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -237,7 +381,8 @@ export const lineups = pgTable(
   (t) => [index("lineups_team_idx").on(t.teamId)]
 );
 
-// Scraper bookkeeping: per-source-URL, what we last fetched and when.
+// ---- scraper bookkeeping ----
+
 export const crawlState = pgTable(
   "crawl_state",
   {

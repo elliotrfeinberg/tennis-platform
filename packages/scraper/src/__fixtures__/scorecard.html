@@ -1,0 +1,3410 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:fb="https://www.facebook.com/2008/fbml">
+<head id="ctl00_Head1">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0,minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="description" content="Track your team's standings and review your play history. Stay updated on league rankings and match stats." />
+<meta name="robots" content="NOODP" /><meta name="Title" content="League" /><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><link rel="image_src" href="/Dashboard/Common/images/SocialMedia/USTA_Logo.jpg" /><title>
+	USTA Leagues
+</title>
+    <link type="text/css" href="/Dashboard/Content/bootstrap.min.css" rel="stylesheet" /> 
+<link href="../Common/css/screen.css" type="text/css" rel="stylesheet" media="screen" />
+    <!--[if IE]>
+    <link rel="stylesheet" href="../Common/css/ie.css" type="text/css" media="screen, projection" />
+  <![endif]-->
+    <link href="../Common/css/usta-master.css?id=8186" type="text/css" rel="stylesheet" />
+<style>
+    #usntA42Toggle {
+        bottom: 70px !important;
+        left: 1% !important;
+        opacity: 1;
+    }
+</style>
+<script id='usntA42start' src='https://a42cdn.usablenet.com/a42/usta/default/prod/cs-start' async data-rapid='true'></script>
+    <script type="text/javascript" src="/Leagues/Common/js/jquery-1.7.2.min.js" ></script>
+    <script type="text/javascript" src="/Leagues/Common/js/jquery.tools.min.js"></script>
+    <script type="text/javascript" src="/Dashboard/Common/js/tl.jscommon.js?v=8380"></script>
+    <!-- Navigation part -->
+    <link href=/Dashboard/Common/css/navigation.css?v=8380 type="text/css" rel="stylesheet" />
+    <script src="/Dashboard/common/js/json2.js" type="text/javascript"></script>
+    <script src="/Dashboard/common/js/jstorage.js" type="text/javascript"></script>
+    <script src="/Dashboard/common/js/navigation.js?v=8380" type="text/javascript"></script>
+    <script type="text/javascript" src="/Leagues/Common/js/common.js" language="javascript"></script>
+    
+    
+    <script type="text/javascript">
+
+        function pageLoad() {
+
+            // pageLoad from social media
+            if (typeof contentPageLoad == 'function') {
+                contentPageLoad();
+            }
+
+            // pageLoad for content pages
+            if (typeof contentPageLoad2 == 'function') {
+                contentPageLoad2();
+            }
+        }
+    
+    </script>
+
+    
+    
+    
+    <script type="text/javascript" src="../Common/js/jquery.ui.core.js"></script>
+
+    <script type="text/javascript" src="../Common/js/jquery.ui.widget.js"></script>
+
+    <script type="text/javascript" src="../Common/js/jquery.ui.accordion.js"></script>
+
+    <script type="text/javascript" src="../Common/js/jquery.qtip.min.js" language="javascript"></script>
+
+    <link id="ctl00_headEmbeds_lnkCssType" href="../Common/css/printC.css" type="text/css" rel="stylesheet" media="print"></link>
+
+    <link href="../Common/css/jquery.qtip.min.css" type="text/css" rel="Stylesheet" />
+
+    <script type="text/javascript" src="../Common/js/jquery.ui.core.js"></script>
+
+    
+    <script type="text/javascript" src="/Dashboard/Scripts/bootstrap.bundle.min.js"></script>
+
+    <script type="text/javascript">
+        
+        $(function() {
+            if (window.location.href.indexOf("SearchType=") > 0) {
+                $("#accordion").accordion({
+                    collapsible: true,
+                    active: eval(window.location.href.charAt(window.location.href.indexOf("SearchType=") + 11))
+                });
+            }
+            else {
+                $("#accordion").accordion({
+                    collapsible: true,
+                    active: 3
+                });
+            }
+            SetupShareLink();
+           
+            PrintWithoutHeader();
+        });
+        function SetupShareLink() {
+            $(".share-link").click(function() {
+                $(".share-link-div").remove();
+                var url = this.href;
+                var div = $("<div class='share-link-div'>Paste this link in Address Bar<br/><input type='text' value='" + url + "'/><input type='button' class='button' value='Close'></div>");
+                var a = $(this);
+                a.after(div);
+                div.css("left", a.offset().left + a.width() - div.width());
+                div.css("top", a.offset().top + a.height());
+
+                $(".share-link-div>input[type='text']").focus(function() {
+                    this.select();
+                }).focus();
+                $(".share-link-div>input[type='button'][value='Close']").click(function() {
+                    $(".share-link-div").remove();
+                });
+                return false;
+            });
+        }
+          
+        function SearchChampion(NodeID, ddlLevel) {
+            var CYear = $('[id$=ddlCYear]').val().split(",");
+            var divisionType = $('[id$=ddlDivision]').val();
+            var NTRP = $('[id$=ddlNTRPlevelChampionlevel]').val();
+            var Gender = $('[id$=ddlGenderChampion]').val();
+            if ($('[id$=ddlClevel]').val() == "") {
+                return false;
+            }
+            else if ($('[id$=ddlClevel]').val() == ddlLevel) {
+                if (ddlLevel == "0") {
+                    var sData = "?TLNodeID=" + CYear[1] + "&TargetLevel=" + ddlLevel + "&CYear=" + CYear[0] + "&Level=X" + "&divisionType=" + divisionType + "&NTRP=" + NTRP + "&Gender=" + Gender;
+                }
+                else {
+                    var sData = "?TLNodeID=" + NodeID + "&TargetLevel=" + ddlLevel + "&CYear=" + CYear[0] + "&Level=X" + "&divisionType=" + divisionType + "&NTRP=" + NTRP + "&Gender=" + Gender;
+                }
+                var sURL = "../Reports/Championship/TennisLinkReports.aspx" + sData;
+                var newWin = window.open(sURL, 'TennisLinkReports', 'width=1010,height=675,resizable=yes,toolbar=no,status=yes');
+                newWin.focus();
+                return false;
+            }
+            else {
+                return true;
+            }
+        }
+
+        function SearchChampionByButton(NodeID, Clevel) {
+            if (NodeID == "0") {
+                alert("You must select a championship item");
+                return false;
+            }
+            else {
+                var CYear = $('[id$=ddlCYear]').val().split(",");
+                var divisionType = $('[id$=ddlDivision]').val();
+                var NTRP = $('[id$=ddlNTRPlevelChampionlevel]').val();
+                var Gender = $('[id$=ddlGenderChampion]').val();
+                if (Clevel == "0") {
+                    var sData = "?TLNodeID=" + CYear[1] + "&TargetLevel=" + Clevel + "&CYear=" + CYear[0] + "&Level=X" + "&divisionType=" + divisionType + "&NTRP=" + NTRP + "&Gender=" + Gender;
+                }
+                else {
+                    var sData = "?TLNodeID=" + NodeID + "&TargetLevel=" + Clevel + "&CYear=" + CYear[0] + "&Level=X" + "&divisionType=" + divisionType + "&NTRP=" + NTRP + "&Gender=" + Gender;
+                }
+                var sURL = "../Reports/Championship/TennisLinkReports.aspx" + sData;
+                var newWin = window.open(sURL, 'TennisLinkReports', 'width=1010,height=675,resizable=yes,toolbar=no,status=yes');
+                newWin.focus();
+                return false;
+            }
+        }
+        // TL-9855 Remove the table that has no subelement. Because this may generate problem in FireFox browser print function. 2011-09-27 by Aaron Jee.
+        $(document).ready(function() {
+            $("table.CommonTable.Segmented").each(function() {
+                if ($(this).children().length == 0) {
+                    $(this).remove();
+                }
+            });
+
+           var matchScore = $(".MatchScore");
+           AdjustDDLLeagueStyle();
+           AdjustTeamSummaryByMatchWinCriteria();
+           AdjustTeamLevelStatsUI();
+           AdjustTeamStandingsForLeagueLevelUI();
+           //USTA-17802
+            AdjustTeamStandingsForChampionship();
+            //USTA-27991
+            AdjustCPScoreCardFooter();
+            AddPercentageDescription();            
+            $("#divSubFlightsForTeamStandings").css("overflow-x", "auto");
+            AdjustCPMatchSummaryUI();
+            //USTA-29870
+            DisplayTeamMatchDefaultingStatus();
+        });
+
+        function AdjustCPScoreCardFooter() {
+            if (window.location.hostname.toLowerCase().startWith("m.")) return;    
+            $("#CPScoreResultWrapper").width($("#CPScoreResult").width() + 10);
+        }
+
+        //Call this at the very last.
+        //If had been called earlier, this might break the ancient column processing.
+        function AddPercentageDescription() {
+            var desriptionRow = '<tr class="test"><td class="top" style="text-align:left" |colspan|>* Calculation of game-winning percentage does not include defaulted matches.</td></tr>';
+            
+            //uncommenting this can resolve the visual issue in 28092, but cannot resolve the root cause.
+            //$('tr.test').remove();
+            var tableIdArray = ['tblLeagueTeamStanding','TeamSummary','tblCPTeamStandingOld','tblCPTeamStanding'];
+            tableIdArray.forEach(function(tableId){
+                var tables = $('[id="'+tableId+'"]');
+                tables.each(function(){
+                    var colCount = CalculateColumnCount($(this)[0]);
+                    if (colCount >= 0) {
+                        desriptionRow = desriptionRow.replace('|colspan|','colspan="' + colCount + '"');
+                        $(desriptionRow).insertBefore($(this).find('tr:first'));
+                    }
+                });
+            });
+        }
+        
+
+        //Calculate the real column count of the table's first row, get the colspan sum result.
+        function CalculateColumnCount(table) {
+            var cellsArray = [];
+            if (table.rows.length > 0){
+                var cells = table.rows[0].cells;
+                for(var i=-1, l=cells.length; ++i!==l; cellsArray[i]=cells[i]);
+
+                //reducing.
+                return cellsArray.reduce(function(cols,cell){
+                    return (cell.offsetParent !== null) ? cols += cell.colSpan : cols;
+                }, 0);
+            }else{
+                return -1; //no row in the table.
+            }
+        }
+
+        function AdjustDDLLeagueStyle() {
+            if (!$.isEmptyObject($("#ctl00_mainContent_ddlLeague > option"))) {
+                if ($.browser.msie && $.browser.version >= 8 && $.browser.version < 9) {
+                    var maxWidth = 0;
+                    $("#ctl00_mainContent_ddlLeague > option").each(function() {
+                        var tmp = $(this).text().length;
+                        if (tmp > maxWidth) {
+                            maxWidth = tmp;
+                            $("#sTmp").text($(this).text());
+                        }
+                    });
+                    maxWidth = parseInt($("#sTmp").attr("offsetWidth"), 10);
+                    maxWidth = maxWidth + 40;
+                    if (maxWidth > 240) {
+                        $("#ctl00_mainContent_ddlLeague").bind({
+                            focus: function() {
+                                if (maxWidth <= 388)
+                                    //$(this).css("width", maxWidth + "px");
+                                    $(this).css("width", "auto");
+                                else
+                                    $(this).css("width", "388px");
+                            },
+                            blur: function() {
+                                $(this).css("width", "240px");
+                            }
+                        });
+                    }
+                }
+            }
+        }
+
+        function AdjustCPMatchSummaryUI() {
+            var MatchWinCriteria = $("#ctl00_mainContent_hdnCPMatchSummaryMatchWincriteria").val();
+            if (MatchWinCriteria == 3) {
+                $(".CPMatchScore").text('Match Points');
+                $(".tblCPMatchSummary").each(function () {
+                    $(this).find('tr').find('td.tdCP:eq(7)').hide();
+                    $(this).find('tr').not(':eq(0)').find('td.tdCP:eq(8)').hide();
+                    $(this).find('tr').eq(1).find(':lt(2)').hide();
+                });
+            }
+            else if (MatchWinCriteria == 2) {
+                $(".CPTeamWins").text('Games Won');
+                $(".tblCPMatchSummary").each(function () {
+                    $(this).find('tr').eq(0).find('td.tdCP:eq(8)').hide();
+                    $(this).find('tr').eq(1).find('td.tdCP:gt(1)').hide();
+                    $(this).find('tr').not(':lt(2)').find('td.tdCP:eq(7)').hide();
+                    $(this).find('tr').not(':lt(2)').find('td.tdCP:eq(8)').hide();
+                });
+            }
+            else {
+            }
+        }
+
+        function AdjustTeamLevelStatsUI()
+        {
+
+            var MatchWinCriteria = $("#ctl00_mainContent_hdnMatchSummaryMatchWincriteria").val();
+
+            //Point per position.
+            if (MatchWinCriteria == 3) {
+                $(".MatchScore").text('Match Points');
+                //TL-19195
+                $('.tblMatchSummarySearch').each(function () {
+                    $(this).find('tr').find('td.tdTss:eq(7)').hide();
+                    $(this).find('tr').not(':eq(0)').find('td.tdTss:eq(8)').hide();
+                    $(this).find('tr').eq(1).find(':lt(2)').hide();
+                });
+                $(".Result").text('Points');
+            }
+
+            if (MatchWinCriteria == 2) {
+                $(".TeamWins").text('Games Won');
+                $('.tblMatchSummarySearch').each(function () {
+                    $(this).find('tr').eq(0).find('td.tdTss:eq(8)').hide();
+                    $(this).find('tr').eq(1).find('td.tdTss:gt(1)').hide();
+                    $(this).find('tr').not(':lt(2)').find('td.tdTss:eq(9)').hide();
+                    $(this).find('tr').not(':lt(2)').find('td.tdTss:eq(10)').hide();
+                });
+            }
+
+            AdjustTeamSummaryByMatchWinCriteria();
+        }
+
+        function AdjustTeamStandingsForLeagueLevelUI()
+        {
+            var tdFlightMatchWinCriteriaList = $("[id='tdFlightMatchWinCriteria']");
+            var tableLeagueTeamStandingList = $("[id='tblLeagueTeamStanding']");
+            var MatchWinCriteriaText;
+            var cyear = parseInt($("#ctl00_mainContent_hdnChampionshipYear").val());
+            if (tdFlightMatchWinCriteriaList != undefined && tdFlightMatchWinCriteriaList.length > 0)
+            {
+                for(var i = 0; i< tdFlightMatchWinCriteriaList.length; i++)
+                {
+                    MatchWinCriteriaText = tdFlightMatchWinCriteriaList.eq(i).find("span:eq(0)").text();
+                    
+                    var trLeagueTeamStanding = tableLeagueTeamStandingList.eq(i).find("tr");
+                    switch (MatchWinCriteriaText)
+                    {
+                        case "Points per Position":
+                            //hide Team Score hide Indiv. Score
+                            trLeagueTeamStanding.eq(0).find("td:eq(5)").hide();
+                            trLeagueTeamStanding.eq(0).find("td:eq(6)").hide();
+                            trLeagueTeamStanding.eq(1).find('td:lt(4)').hide(); 
+                            trLeagueTeamStanding.not(':lt(2)').find('td:eq(5)').hide();
+                            trLeagueTeamStanding.not(':lt(2)').find('td:eq(6)').hide();
+                            trLeagueTeamStanding.not(':lt(2)').find('td:eq(7)').hide();
+                            trLeagueTeamStanding.not(':lt(2)').find('td:eq(8)').hide();                                                       
+                            //hide Games Won
+                            trLeagueTeamStanding.find("td:eq(3)").hide();
+                            //hide Sets Won, Sets Lost, hide Games Lost
+                            trLeagueTeamStanding.eq(0).find("td:eq(7)").hide();
+                            trLeagueTeamStanding.eq(0).find("td:eq(8)").hide();
+                            trLeagueTeamStanding.eq(0).find("td:eq(9)").hide();
+                            trLeagueTeamStanding.not(':lt(2)').find("td:eq(9)").hide();
+                            trLeagueTeamStanding.not(':lt(2)').find("td:eq(10)").hide();
+                            trLeagueTeamStanding.not(':lt(2)').find("td:eq(11)").hide();
+                            break;
+                        case "Total Games":
+                            //hide Team Score hide Indiv. Score
+                            trLeagueTeamStanding.find("td:eq(5)").hide();
+                            trLeagueTeamStanding.find("td:eq(6)").hide();
+                            trLeagueTeamStanding.not(':eq(0)').find('td:eq(7)').hide();
+                            trLeagueTeamStanding.not(':eq(0)').find('td:eq(8)').hide();
+                            trLeagueTeamStanding.eq(1).find('td').hide();
+                            //hide Points
+                            trLeagueTeamStanding.find("td:eq(4)").hide();
+                            //hide conbimed column Sets Won/Lost, Games Won/Lost
+                            trLeagueTeamStanding.eq(0).find("td:eq(10)").hide();
+                            trLeagueTeamStanding.eq(0).find("td:eq(11)").hide();                            
+                            trLeagueTeamStanding.not(':lt(2)').find("td:eq(12)").hide();
+                            trLeagueTeamStanding.not(':lt(2)').find("td:eq(13)").hide();
+                            trLeagueTeamStanding.not(':lt(2)').find("td:eq(14)").hide();
+                            trLeagueTeamStanding.not(':lt(2)').find("td:eq(15)").hide();
+                            break;
+                        default:
+                            //hide Matches Played, Games Won, Points
+                            trLeagueTeamStanding.not(':eq(1)').find("td:eq(2)").hide();
+                            trLeagueTeamStanding.not(':eq(1)').find("td:eq(3)").hide();
+                            trLeagueTeamStanding.not(':eq(1)').find("td:eq(4)").hide();
+                            if (cyear >= 2014) {
+                                //Add arterisk for Team Wins begin from 2014
+                                var tdTeamWin = trLeagueTeamStanding.eq(1).find("td:eq(0)");
+                                var textWin = tdTeamWin.text().substring(0, 4);
+                                tdTeamWin.text(textWin + "*");
+                            }
+                            //hide Sets Won, Sets Lost, hide Games Lost
+                            trLeagueTeamStanding.eq(0).find("td:eq(7)").hide();
+                            trLeagueTeamStanding.eq(0).find("td:eq(8)").hide();
+                            trLeagueTeamStanding.eq(0).find("td:eq(9)").hide();
+                            trLeagueTeamStanding.not(':lt(2)').find("td:eq(9)").hide();
+                            trLeagueTeamStanding.not(':lt(2)').find("td:eq(10)").hide();
+                            trLeagueTeamStanding.not(':lt(2)').find("td:eq(11)").hide();
+                            break;
+                    }
+                    
+                    IsGamesLostFirst = tdFlightMatchWinCriteriaList.eq(i).find("span:eq(1)").text();
+                    tdFlightMatchWinCriteriaList.eq(i).find("span:eq(1)").hide(); //hide IsGamesLostFirst span.
+                    if (IsGamesLostFirst == "True")
+                    {
+                        if (MatchWinCriteriaText == "Total Games") {
+                            //Switch Sets Lost and Games Lost
+                            //swap header
+                            var tdHeaderList = tableLeagueTeamStandingList.eq(i).find("tr:eq(0)").children();
+                            if (tdHeaderList.length > 1) {
+                                swap(tdHeaderList[8], tdHeaderList[9]);
+                                swap(tdHeaderList[7], tdHeaderList[8]);
+                            }
+
+                            //swap content
+                            var trContents = tableLeagueTeamStandingList.eq(i).find("tr:gt(1)");
+                            trContents.each(function () {
+                                var tdlist = $(this).children();
+                                if (tdlist.length > 1) {
+                                    swap(tdlist[10], tdlist[11]);
+                                    swap(tdlist[9], tdlist[10]);
+                                }                                    
+                            })
+                        }
+                        else {
+                            //Team Wins & Points per Position
+                            //Switch Sets Won/Lost and Games Won/Lost
+                            //swap header
+                            var tdHeaderList = tableLeagueTeamStandingList.eq(i).find("tr:eq(0)").children();
+                            if (tdHeaderList.length > 1) {
+                                swap(tdHeaderList[10], tdHeaderList[11]);
+                            }
+
+                            //swap content
+                            var trContents = tableLeagueTeamStandingList.eq(i).find("tr:gt(1)");
+                            trContents.each(function () {
+                                var tdlist = $(this).children();
+                                if (tdlist.length > 1) {
+                                    swap(tdlist[12], tdlist[14]);
+                                    swap(tdlist[13], tdlist[15]);
+                                }                                
+                            })
+                        }
+                    }
+
+                    tdFlightMatchWinCriteriaList.eq(i).find("span:eq(2)").hide(); //hide IndivScoreSwapIndex span;
+                    if (MatchWinCriteriaText == "Team Wins") {
+                        //Adjust Indiv. Score columns position (available for 2014 and later.)
+                        //Only "Team Wins" need to adjust because only this case has column "Indiv. Score" displayed
+                        var IndivScoreSwapIndex = parseInt(tdFlightMatchWinCriteriaList.eq(i).find("span:eq(2)").text());                       
+
+                        if (cyear >= 2014 && IndivScoreSwapIndex > 0) {
+                            //Swap Indiv. Score header
+                            var tdHeaderList = tableLeagueTeamStandingList.eq(i).find("tr:eq(0)").children();
+                            if (tdHeaderList.length > 1) {                                
+                                swap(tdHeaderList[6], tdHeaderList[9 + IndivScoreSwapIndex]);
+                                if (IndivScoreSwapIndex > 1) {
+                                    swap(tdHeaderList[6], tdHeaderList[8 + IndivScoreSwapIndex]);
+                                }
+                            }
+                            //Swap Indiv. Score Sub-header:Wins, Losses
+                            var tdSubHeaderList = tableLeagueTeamStandingList.eq(i).find("tr:eq(1)").children();
+                            if (tdSubHeaderList.length > 1) {
+                                swap(tdSubHeaderList[2], tdSubHeaderList[2*IndivScoreSwapIndex + 2]);
+                                swap(tdSubHeaderList[3], tdSubHeaderList[2 * IndivScoreSwapIndex + 3]);
+                                if(IndivScoreSwapIndex > 1)
+                                {
+                                    swap(tdSubHeaderList[2], tdSubHeaderList[2*IndivScoreSwapIndex]);
+                                    swap(tdSubHeaderList[3], tdSubHeaderList[2 * IndivScoreSwapIndex + 1]);
+                                }
+                            }
+                            //swap content
+                            var trContents = tableLeagueTeamStandingList.eq(i).find("tr:gt(1)");
+                            trContents.each(function () {
+                                var tdlist = $(this).children();
+                                if (tdlist.length > 1) {
+                                    swap(tdlist[7], tdlist[2*IndivScoreSwapIndex + 10]);
+                                    swap(tdlist[8], tdlist[2 * IndivScoreSwapIndex + 11]);
+                                    if(IndivScoreSwapIndex > 1) {
+                                        swap(tdlist[7], tdlist[2*IndivScoreSwapIndex + 8]);
+                                        swap(tdlist[8], tdlist[2 * IndivScoreSwapIndex + 9]);
+                                    }
+                                }                                
+                            })
+                        }
+                    }
+                }
+                //Hide the match win criteria td and tr before 2014
+                if (cyear < 2014) {
+                    tdFlightMatchWinCriteriaList.each(function () {
+                        //Set bottom class for previouse tr
+                        $(this).parent().prev().find("td").removeClass("top").addClass("bottom");
+                        //Hide this tr
+                        $(this).parent().hide();
+                    });
+                }
+                
+            }
+        }
+
+        //----USTA-17802 by Aaron Jee Begin----
+
+        function AdjustTeamStandingsForChampionship() {
+            var tdFlightMatchWinCriteriaList = $("[id='tdFlightMatchWinCriteria']");
+            var tableCPTeamStandingList = $("[id='tblCPTeamStanding']");
+            var cyear = parseInt($("#ctl00_mainContent_hdnCPChampionshipYear").val());
+            var IsGamesLostFirst = $("#ctl00_mainContent_hdnCPIsGamesLostFirst").val();
+            var IndivScoreSwapIndex = parseInt($("#ctl00_mainContent_hdnCPTeamWinsSwapIndivWinsIndex").val());
+            var MatchWinCriteriaText = "";
+            if (tdFlightMatchWinCriteriaList != undefined && tdFlightMatchWinCriteriaList.length > 0) {
+                MatchWinCriteriaText = tdFlightMatchWinCriteriaList.eq(0).find("span:eq(0)").text();
+            }
+            if (MatchWinCriteriaText == "Team Wins" || MatchWinCriteriaText == "Points per Position" || MatchWinCriteriaText == "Total Games") {
+                if (tableCPTeamStandingList != undefined && tableCPTeamStandingList.length > 0) {
+                    for (var i = 0; i < tableCPTeamStandingList.length; i++) {
+                        var currentCPTeamStandingTable = tableCPTeamStandingList.eq(i)
+                        var trCPTeamStandingList = currentCPTeamStandingTable.find("tr");
+
+                        switch (MatchWinCriteriaText)
+                        {
+                            case "Points per Position":
+                                //hide Team Score hide Indiv. Score
+                                trCPTeamStandingList.eq(0).find("td:eq(5)").hide();
+                                trCPTeamStandingList.eq(0).find("td:eq(6)").hide();
+                                trCPTeamStandingList.eq(1).find('td:lt(4)').hide(); 
+                                trCPTeamStandingList.not(':lt(2)').find('td:eq(5)').hide();
+                                trCPTeamStandingList.not(':lt(2)').find('td:eq(6)').hide();
+                                trCPTeamStandingList.not(':lt(2)').find('td:eq(7)').hide();
+                                trCPTeamStandingList.not(':lt(2)').find('td:eq(8)').hide();                                                       
+                                //hide Games Won
+                                trCPTeamStandingList.find("td:eq(3)").hide();
+                                //hide Sets Won, Sets Lost, hide Games Lost
+                                trCPTeamStandingList.eq(0).find("td:eq(7)").hide();
+                                trCPTeamStandingList.eq(0).find("td:eq(8)").hide();
+                                trCPTeamStandingList.eq(0).find("td:eq(9)").hide();
+                                trCPTeamStandingList.not(':lt(2)').find("td:eq(9)").hide();
+                                trCPTeamStandingList.not(':lt(2)').find("td:eq(10)").hide();
+                                trCPTeamStandingList.not(':lt(2)').find("td:eq(11)").hide();
+                                break;
+                            case "Total Games":
+                                //hide Team Score hide Indiv. Score
+                                trCPTeamStandingList.find("td:eq(5)").hide();
+                                trCPTeamStandingList.find("td:eq(6)").hide();
+                                trCPTeamStandingList.not(':eq(0)').find('td:eq(7)').hide();
+                                trCPTeamStandingList.not(':eq(0)').find('td:eq(8)').hide();
+                                trCPTeamStandingList.eq(1).find('td').hide();
+                                //hide Points
+                                trCPTeamStandingList.find("td:eq(4)").hide();
+                                //hide conbimed column Sets Won/Lost, Games Won/Lost
+                                trCPTeamStandingList.eq(0).find("td:eq(10)").hide();
+                                trCPTeamStandingList.eq(0).find("td:eq(11)").hide();                            
+                                trCPTeamStandingList.not(':lt(2)').find("td:eq(12)").hide();
+                                trCPTeamStandingList.not(':lt(2)').find("td:eq(13)").hide();
+                                trCPTeamStandingList.not(':lt(2)').find("td:eq(14)").hide();
+                                trCPTeamStandingList.not(':lt(2)').find("td:eq(15)").hide();
+                                break;
+                            default:
+                                //Team Wins
+                                //hide Matches Played, Games Won, Points
+                                trCPTeamStandingList.not(':eq(1)').find("td:eq(2)").hide();
+                                trCPTeamStandingList.not(':eq(1)').find("td:eq(3)").hide();
+                                trCPTeamStandingList.not(':eq(1)').find("td:eq(4)").hide();
+                                if (cyear >= 2014) {
+                                    //Add arterisk for Team Wins begin from 2014
+                                    var tdTeamWin = trCPTeamStandingList.eq(1).find("td:eq(0)");
+                                    var textWin = tdTeamWin.text().substring(0, 4);
+                                    tdTeamWin.text(textWin + "*");
+                                }
+                                //hide Sets Won, Sets Lost, hide Games Lost
+                                trCPTeamStandingList.eq(0).find("td:eq(7)").hide();
+                                trCPTeamStandingList.eq(0).find("td:eq(8)").hide();
+                                trCPTeamStandingList.eq(0).find("td:eq(9)").hide();
+                                trCPTeamStandingList.not(':lt(2)').find("td:eq(9)").hide();
+                                trCPTeamStandingList.not(':lt(2)').find("td:eq(10)").hide();
+                                trCPTeamStandingList.not(':lt(2)').find("td:eq(11)").hide();
+                                break;
+                        }
+
+                        //Swap Sets Lost & Games Lost                
+                        if (IsGamesLostFirst == "True")
+                            {
+                                if (MatchWinCriteriaText == "Total Games") {
+                                    //Switch Sets Lost and Games Lost
+                                    //swap header
+                                    var tdHeaderList = tableCPTeamStandingList.eq(i).find("tr:eq(0)").children();
+                                    if (tdHeaderList.length > 1) {
+                                        swap(tdHeaderList[8], tdHeaderList[9]);
+                                        swap(tdHeaderList[7], tdHeaderList[8]);
+                                    }
+
+                                    //swap content
+                                    var trContents = tableCPTeamStandingList.eq(i).find("tr:gt(1)");
+                                    trContents.each(function () {
+                                        var tdlist = $(this).children();
+                                        if (tdlist.length > 1) {
+                                            swap(tdlist[10], tdlist[11]);
+                                            swap(tdlist[9], tdlist[10]);
+                                        }                                    
+                                    })
+                                }
+                                else {
+                                    //Team Wins & Points per Position
+                                    //Switch Sets Won/Lost and Games Won/Lost
+                                    //swap header
+                                    var tdHeaderList = tableCPTeamStandingList.eq(i).find("tr:eq(0)").children();
+                                    if (tdHeaderList.length > 1) {
+                                        swap(tdHeaderList[10], tdHeaderList[11]);
+                                    }
+
+                                    //swap content
+                                    var trContents = tableCPTeamStandingList.eq(i).find("tr:gt(1)");
+                                    trContents.each(function () {
+                                        var tdlist = $(this).children();
+                                        if (tdlist.length > 1) {
+                                            swap(tdlist[12], tdlist[14]);
+                                            swap(tdlist[13], tdlist[15]);
+                                        }                                
+                                    })
+                                }
+                            }
+
+                        //Swap indiv Wins & Losses together                
+                        if (MatchWinCriteriaText == "Team Wins") {
+                                //Adjust Indiv. Score columns position (available for 2014 and later.)
+                                //Only "Team Wins" need to adjust because only this case has column "Indiv. Score" displayed                     
+                                if (cyear >= 2014 && IndivScoreSwapIndex > 0) {
+                                    //Swap Indiv. Score header
+                                    var tdHeaderList = tableCPTeamStandingList.eq(i).find("tr:eq(0)").children();
+                                    if (tdHeaderList.length > 1) {                                
+                                        swap(tdHeaderList[6], tdHeaderList[9 + IndivScoreSwapIndex]);
+                                        if (IndivScoreSwapIndex > 1) {
+                                            swap(tdHeaderList[6], tdHeaderList[8 + IndivScoreSwapIndex]);
+                                        }
+                                    }
+                                    //Swap Indiv. Score Sub-header:Wins, Losses
+                                    var tdSubHeaderList = tableCPTeamStandingList.eq(i).find("tr:eq(1)").children();
+                                    if (tdSubHeaderList.length > 1) {
+                                        swap(tdSubHeaderList[2], tdSubHeaderList[2*IndivScoreSwapIndex + 2]);
+                                        swap(tdSubHeaderList[3], tdSubHeaderList[2 * IndivScoreSwapIndex + 3]);
+                                        if(IndivScoreSwapIndex > 1)
+                                        {
+                                            swap(tdSubHeaderList[2], tdSubHeaderList[2*IndivScoreSwapIndex]);
+                                            swap(tdSubHeaderList[3], tdSubHeaderList[2 * IndivScoreSwapIndex + 1]);
+                                        }
+                                    }
+                                    //swap content
+                                    var trContents = tableCPTeamStandingList.eq(i).find("tr:gt(1)");
+                                    trContents.each(function () {
+                                        var tdlist = $(this).children();
+                                        if (tdlist.length > 1) {
+                                            swap(tdlist[7], tdlist[2*IndivScoreSwapIndex + 10]);
+                                            swap(tdlist[8], tdlist[2 * IndivScoreSwapIndex + 11]);
+                                            if(IndivScoreSwapIndex > 1) {
+                                                swap(tdlist[7], tdlist[2*IndivScoreSwapIndex + 8]);
+                                                swap(tdlist[8], tdlist[2 * IndivScoreSwapIndex + 9]);
+                                            }
+                                        }                                
+                                    })
+                                }
+                            }
+                    }
+                }
+
+                //Hide the match win criteria td and tr before 2014
+                if (cyear < 2014) {
+                    tdFlightMatchWinCriteriaList.each(function () {
+                        //Set bottom class for previouse tr
+                        $(this).parent().prev().find("td").removeClass("top").addClass("bottom");
+                        //Hide this tr
+                        $(this).parent().hide();
+                    });
+                }
+            }
+            
+        }
+
+
+        
+        //----USTA-17802 by Aaron Jee End  ----
+
+
+        function AdjustTeamSummaryByMatchWinCriteria()
+        {
+            SwitchTieBreakerRule();
+            HideTeamLevelColumns();
+        }
+
+        function SwitchTieBreakerRule() {
+            
+            //Swap Sets Lost & Games Lost
+            var IsGamesLostFirst = $("#ctl00_mainContent_hdnIsGamesLostFirst").val();
+            if (IsGamesLostFirst == "True") {
+                $('#TeamSummary tr').each(function () {
+                    var tdlist = $(this).children();
+                    if (tdlist.length > 1) {
+                        swap(tdlist[8], tdlist[10]);
+                        swap(tdlist[9], tdlist[10]);
+                    }
+                });
+            }
+
+            //Swap Games Won - for "Team Wins" and "Points per Position"
+            var MatchWinCriteria = $("#ctl00_mainContent_hdnMatchWinCriteria").val();
+            if (MatchWinCriteria == 1 || MatchWinCriteria == 3) {
+                //remove the "*" of column header
+                var $header = $('#TeamSummary').find('tr:eq(0)').find('td:eq(3)');
+                $header.text($header.text().replace(/\*/, ''));
+                //switch column
+                $('#TeamSummary tr').each(function () {
+                    var $tr = $(this);
+                    var addIdx = IsGamesLostFirst == "True" ? 0 : 2;
+                    $tr.find("td:eq(3)")
+                        .clone()
+                        .insertAfter($tr.find("td:eq(" + (7 + addIdx) + ")"));
+                });
+                //Hide original column
+                 $('#TeamSummary tr').find('td:eq(3)').hide();
+            }
+
+            //Swap Indiv.Wins and Indiv.Lost - Only for "Team Wins"
+            if(MatchWinCriteria == 1) {
+                var IndivScoreSwapIndex = parseInt($("#ctl00_mainContent_hdnTeamWinsSwapIndivWinsIndex").val());
+                if (IndivScoreSwapIndex > 0 && MatchWinCriteria == 1 ) {
+                    $('#TeamSummary tr').each(function () {
+                        var tdlist = $(this).children();
+                        if (tdlist.length > 1) {
+                            swap(tdlist[6], tdlist[2*IndivScoreSwapIndex + 6]);
+                            swap(tdlist[7], tdlist[2*IndivScoreSwapIndex + 7]);
+
+                            if (IndivScoreSwapIndex > 1) {
+                                swap(tdlist[6], tdlist[2*IndivScoreSwapIndex + 4]);
+                                swap(tdlist[7], tdlist[2*IndivScoreSwapIndex + 5]);
+                            }
+                        }                        
+                    });
+                }
+            }            
+        }
+
+         function swap(obj1,obj2)
+         {
+            var temp = obj1.textContent;
+            obj1.textContent = obj2.textContent;
+            obj2.textContent = temp;
+         }
+
+        function HideTeamLevelColumns()
+        {
+            var MatchWinCriteria = $("#ctl00_mainContent_hdnMatchWinCriteria").val();
+            // Teams Win
+            if (MatchWinCriteria == 1) {
+                // Matches Played
+                $('#TeamSummary tr').find('td:eq(2)').hide();
+                // Points
+                $('#TeamSummary tr').find('td:eq(4)').hide();
+
+                var cyear = parseInt($("#ctl00_mainContent_hdnCyear").val());
+                if (cyear >= 2014) {
+                    $(".Wins").text('Wins*');
+                }
+            }
+                // Total Games 
+            else if (MatchWinCriteria == 2) {
+                // Wins
+                $('#TeamSummary tr').find('td:eq(1)').hide();
+                // Points
+                $('#TeamSummary tr').find('td:eq(4)').hide();
+                // Losses
+                $('#TeamSummary tr').find('td:eq(5)').hide();
+                // Indiv. Wins
+                $('#TeamSummary tr').find('td:eq(6)').hide();
+                // Indiv. Losses
+                $('#TeamSummary tr').find('td:eq(7)').hide();
+            }
+                // Points Per Position
+            else if (MatchWinCriteria == 3) {
+                // Wins 
+                $('#TeamSummary tr').find('td:eq(1)').hide();
+                // Losses 
+                $('#TeamSummary tr').find('td:eq(5)').hide();
+                // Indiv.Wins
+                $('#TeamSummary tr').find('td:eq(6)').hide();
+                // Indiv.Losses
+                $('#TeamSummary tr').find('td:eq(7)').hide();
+
+                $(".Result").text('Points');
+            }
+        }
+
+        function ClearHiddenValuesBeforeSaveDataForExportExcel() {
+            $("#ctl00_mainContent_hdnTeamSummaryHTMLContent").val("");
+            $("#ctl00_mainContent_hdnTeamSummaryTeamMatchesHTMContent").val("");
+            $("#ctl00_mainContent_hdnSubFlightListMatchSummaryHTMLContent").val("");
+        }
+        function RemoveHiddlenTDForHTMLTable(tbl) {
+            if (tbl != undefined && $(tbl) != null) {
+                $(tbl).find('td').each(function () {
+                    if ($(this).css("display") == 'none') {
+                        //console.log($(this).text()); TL-18636 Remove this code as it will cause error in IE.
+                        $(this).remove();
+                    }
+                });
+            }
+            return tbl;
+        }
+        function SaveTeamSummaryHTMLContent() {
+            ClearHiddenValuesBeforeSaveDataForExportExcel();
+
+            var TeamSummaryTable = RemoveHiddlenTDForHTMLTable($('#TeamSummary').clone());
+            if (TeamSummaryTable.length != 0) {
+                $("#ctl00_mainContent_hdnTeamSummaryHTMLContent").val($(TeamSummaryTable)[0].outerHTML);
+            }
+
+            var TeamMatchesTable = $('#TeamSummaryTeamStandings').clone();
+            if (TeamMatchesTable.length != 0) {
+                $("#ctl00_mainContent_hdnTeamSummaryTeamMatchesHTMContent").val($(TeamMatchesTable)[0].outerHTML);
+            }
+
+            var MatchSummaryTableHeader = $('#tblSubFlightForMatchSummaryHeader').clone();
+            var MatchSummaryTable = RemoveHiddlenTDForHTMLTable($('#tblMatchSummarySearch').clone());
+            if (MatchSummaryTable.length != 0) {
+                $("#ctl00_mainContent_hdnSubFlightListMatchSummaryHTMLContent").val($(MatchSummaryTableHeader)[0].outerHTML + $(MatchSummaryTable)[0].outerHTML);
+            }
+        }
+
+        function SaveTeamStandingsHTMLContentForLeagueLevel() {
+            ClearHiddenValuesBeforeSaveDataForExportExcel();
+            var htmlContent = null;
+            if ($("#divSubFlightsForTeamStandings").css("display") == "block") {
+                htmlContent = RemoveHiddlenTDForHTMLTable($("#divSubFlightsForTeamStandings").clone());
+                $(htmlContent).find("table").each(function () {
+                    RemoveHiddlenTDForHTMLTable($(this));
+                });
+                $("#ctl00_mainContent_hdnTeamStandingsForLeagueLevelHTMLContent").val($(htmlContent)[0].outerHTML);
+            }
+
+            if ($("#divSubFlightListForMatchSummary").css("display") == "block") {
+                htmlContent = RemoveHiddlenTDForHTMLTable($("#divSubFlightListForMatchSummary").clone());
+                $(htmlContent).find("table").each(function () {
+                    RemoveHiddlenTDForHTMLTable($(this));
+                });
+                $("#ctl00_mainContent_hdnSubFlightListMatchSummaryHTMLContent").val($(htmlContent)[0].outerHTML);
+            }
+            return true;
+        }
+
+        function SaveTeamStandingAndMatchSummary()
+        {
+            SaveTeamSummaryHTMLContent();
+            SaveTeamStandingsHTMLContentForLeagueLevel();
+        }
+
+        //----USTA-17802 by Aaron Jee Begin----
+        function SaveCPTeamStandingHTMLContent() {
+            //Clear hdnCPTeamStandingHTMLContent
+            $("#ctl00_mainContent_hdnCPTeamStandingHTMLContent").val("");
+            //Get all tables' HTML content of the repeater. 
+            var htmlContent = null;
+            if ($("#divCPSubFlightsForTeamStandings").css("display") == "block") {
+                htmlContent = RemoveHiddlenTDForHTMLTable($("#divCPSubFlightsForTeamStandings").clone());
+                htmlContent = RemoveMouseoverTips(htmlContent);
+                htmlContent = RemoveEmptyTable(htmlContent);
+                $(htmlContent).find("table").each(function () {
+                    RemoveHiddlenTDForHTMLTable($(this));
+                });
+                $("#ctl00_mainContent_hdnCPTeamStandingHTMLContent").val($(htmlContent)[0].outerHTML);
+            }
+
+            if ($("#divCPSubFlightsForMatchSummary").css("display") == "block") {
+                htmlContent = RemoveHiddlenTDForHTMLTable($("#divCPSubFlightsForMatchSummary").clone());
+                htmlContent = RemoveMouseoverTips(htmlContent);
+                htmlContent = RemoveEmptyTable(htmlContent);
+                $(htmlContent).find("table").each(function () {
+                    RemoveHiddlenTDForHTMLTable($(this));
+                });
+                $("#ctl00_mainContent_hdnCPMatchSummaryHTMLContent").val($(htmlContent)[0].outerHTML);
+            }
+
+            return true;
+        }
+
+        function RemoveEmptyTable(htmlContent) {
+            if (htmlContent != undefined && $(htmlContent) != null) {
+                $(htmlContent).find('table').each(function () {
+                    if ($(this).length == 0) {
+                        $(this).remove();
+                    }
+                });
+            }
+            return htmlContent;
+        }
+
+        function RemoveMouseoverTips(htmlContent) {
+            if (htmlContent != undefined && $(htmlContent) != null) {
+                $(htmlContent).find('.tooltiptext').each(function () {
+                    $(this).remove();
+                });
+            }
+            return htmlContent;
+        }
+        //----USTA-17802 by Aaron Jee End  ----
+
+
+    </script>
+
+    <style type="text/css">
+        label 
+        {
+            width: 120px !important;
+            float: left;
+            padding:0;
+        }
+        .TennisLinkWrapper input, .TennisLinkWrapper select
+        {
+            float: left;
+            margin: 0px;
+            width:auto;
+        }
+        .share-link
+        {
+            font-size: 11px;
+            margin: 0 4px;
+            padding: 0 4px;
+        }
+        .back-link
+        {
+            font-size: 11px;
+            margin: 0 4px;
+            padding: 0 4px;
+        }
+        .share-link-div
+        {
+            position: absolute;
+            border: #e5e5e5 2px solid;
+            padding: 10px;
+            background-color: #f2f2f2;
+            font-size: 12px;
+        }
+        .tableHeader
+        {
+            background: url("../../Common/images/blue-gradient-short.jpg") repeat-x scroll center top transparent;
+            border: 1px solid #E5E5E5;
+            color: black;
+            font-family: arial,arial,sans-serif;
+            font-size: 8pt;
+            font-weight: bolder;
+            height: 20px;
+            margin: 0;
+            padding: 0;
+        }
+        .dropdownlist
+        {
+            width: 240px !important;
+            height: 20px;
+        }
+        .CommonTable
+        {
+            border-left: 1px solid #e5e5e5;
+            border-bottom: 1px solid #fff;
+        }
+        .CommonTable td
+        {
+            border-right: 1px solid #e5e5e5;
+            border-bottom: 1px solid #fff;
+            padding: 3px 6px;
+            vertical-align: middle;
+            text-align: center;
+        }
+        .BracketBottom
+        {
+            border-bottom: 1px solid #000000;
+        }
+        .BracketRight
+        {
+            border-right: 1px solid #000000;
+        }
+        .BracketRightBottom
+        {
+            border-right: 1px solid #000000;
+            border-bottom: 1px solid #000000;
+        }
+        .MatchSummaryth
+        {
+            background: #f2f2f2;
+            font-weight: bold;
+            border-right: 1px solid #e5e5e5;
+            border-bottom: 1px solid #fff;
+            padding: 3px 6px;
+        }
+        .CommonTable blue_grad normal
+        {
+            height: 10px;
+        }
+        .spefic-error
+        {
+            background: #ed2117 url(../Common/images/icon_error_small.gif) 5px top no-repeat;            
+            line-height: 20px;
+            height: 20px;
+            width: 350px;
+            color: White;
+            background-color: #ed2117;
+            padding:1px 0 0 25px !important;
+        }
+        .TeamSummaryDetailShort
+        {
+            min-height: 120px;
+        }
+        .RoundTable td
+        {
+            height: 35px;
+            font-size: 11px;
+        }
+        .CommonTable.Segmented td
+        {
+            vertical-align: middle;
+        }
+        .CommonTable.Segmented td.winner
+        {
+            background: url(../Common/images/mark.gif) right no-repeat;
+        }
+        .serverHead
+        {
+            color: #000000;
+            font-size: 14px;
+            font-weight: bold;
+            line-height: 14px;
+            padding: 10px 0 12px 6px;
+            background: url("../Common/images/blue-gradient-short.jpg") repeat-x scroll center top transparent;
+        }
+        .trHead
+        {
+            background: url("../Common/images/blue-gradient-short.jpg") repeat-x scroll center top transparent;
+            color: #666666;
+            font-size: 11px;
+            font-weight: bold;
+            margin: 0;
+            padding: 0;
+        }
+        .CommonTable td.bottomLine
+        {
+            border-top: 2px solid #E5E5E5;
+        }
+        .UserNav
+        {
+            text-align: right;
+        }
+        .BlankScorecardTable
+        {
+            font-size: 16px;
+        }
+    
+        /* TL-17581 Tooltip Popup */
+        .tooltiptext{
+            display: none;
+        }
+        .qtip-content {
+            margin: 0;
+            padding: 0;
+        }
+        .myCustomClass{
+            border-color: black;
+            background-color: white;
+        }
+        .myCustomClass .qtip-content tr td a{
+           display:block;
+           height:20px;
+           color:#1f65d9
+        }
+        .myCustomClass table{
+          border-spacing: 0;
+          border-collapse: collapse;
+        }
+        .myCustomClass .qtip-content td{
+            font-size: 12px;
+            font-family:Arial;
+            padding:5px;
+            vertical-align:top 
+        }
+        .myCustomClass .qtip-content tr td:first-child{
+            font-weight:bold;
+            background:#f2f2f2;
+            text-align:right;
+            padding-left:15px;
+        }
+        .myCustomClass .qtip-content tr td:last-child{
+            padding-right:15px;
+        }
+        .myCustomClass .qtip-content tr:first-child td{
+           padding-top:10px;
+        }
+        .myCustomClass .qtip-content tr:last-child td{
+           padding-bottom:15px;
+        }
+       
+         /* TL-17581 Tooltip Popup */
+        .CPFooter{
+            display:block;
+            border: none !important;
+            line-height:normal;
+        }
+</style>
+
+    <script  id="seajsnode" src="/Dashboard/Common/js/sea.js"></script>
+
+    <link href="../Common/css/print.css" type="text/css" rel="stylesheet" media="print" />
+
+    <!--USTA-20221-->
+    <script type="text/javascript" src="/Dashboard/Common/js/TLWidgetTracking.js"></script>
+    
+     
+<!-- OneTrust Cookies Consent Notice start for usta.com -->
+<script type="text/javascript" src="https://cdn.cookielaw.org/consent/43383d2d-67e6-4d4a-99cb-3ff760b82737/OtAutoBlock.js" ></script>
+<script src="https://cdn.cookielaw.org/scripttemplates/otSDKStub.js"  type="text/javascript" charset="UTF-8" data-domain-script="43383d2d-67e6-4d4a-99cb-3ff760b82737" ></script>
+<script type="text/javascript">
+    function OptanonWrapper() { }
+</script>
+<!-- OneTrust Cookies Consent Notice end for usta.com -->
+
+<script type="text/javascript">
+    $(document).ready(function () {
+        try {
+            updateCookies();
+            if (OneTrust != null) {
+                OneTrust.OnConsentChanged(function () { updateCookies(); });
+            }
+        }
+        catch { }
+        finally {}
+        
+        function updateCookies() {
+            if (!OnetrustActiveGroups.includes('C0003')) {
+                document.cookie = "OtherPage=;max-age=0;path=/;";
+            }
+            if (!OnetrustActiveGroups.includes('C0002')) {
+                document.cookie = "_utmv#########=;max-age=0;path=/;";
+            }
+        }
+
+         setTimeout(function () {
+             if (!window.location.hostname.toLowerCase().startWith("m.") && $('meta[name="viewport"]').length > 0) {
+                                 
+            }           
+        }, 500);
+    });
+</script>
+
+</head>
+<body>
+    <script type="text/javascript">
+        
+    </script>
+
+    <form name="aspnetForm" method="post" action="./StatsAndStandings.aspx?t=7&amp;par1=1011875481&amp;par2=2026&amp;par3=0" id="aspnetForm">
+<div>
+<input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="" />
+<input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="" />
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="/wEPDwUKLTEyMTM3NjYzMg8WCh4EWWVhcgUEMjAyNh4SUmVwb3J0VHlwZUZvckV4Y2VsCylvTGVhZ3Vlcy5TdGF0c0FuZFN0YW5kaW5ncytTZWFyY2hSZXBvcnRUeXBlLCBMZWFndWVzLCBWZXJzaW9uPTEuMjYuNTEuODM4MCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1udWxsAB4aSGFzR3JpZXZhbmNlQWNjZXNzT25MZWFndWVoHhBTY29yZUNhcmRJc0Vrb2x1aB4TVmFsaWRhdGVSZXF1ZXN0TW9kZQIBFgJmD2QWBGYPZBYEAgsPFQEEODM4MGQCDA8VAQQ4MzgwZAIBD2QWHgIBDxYCHgRUZXh0BYwBPGRpdiBpZD0ndXN0YUhlYWRlcldyYXBwZXInPjwvZGl2PjxzY3JpcHQgdHlwZT0ndGV4dC9qYXZhc2NyaXB0Jz4kKCcjdXN0YUhlYWRlcldyYXBwZXInKS5sb2FkKCcvRGFzaGJvYXJkL1VTVEFIZWFkZXJXcmFwcGVyLmFzcHgnKTs8L3NjcmlwdD5kAgQPDxYCHgdWaXNpYmxlZ2RkAgYPDxYCHwZoZGQCBw8PFgIfBmdkZAIIDw8WAh4LTmF2aWdhdGVVcmwFCy9EYXNoYm9hcmQvZGQCCQ8PFgIfBwUCfi9kZAIKD2QWAgIBD2QWAmYPZBYCAgMPFgIfBQU2Jm5ic3A7PiZuYnNwOyBUZW5uaXNMaW5rIExlYWd1ZSBSZXBvcnRzIC0gTGVhZ3VlIE1hdGNoZAIMD2QWAmYPZBYCZg9kFhYCAw8PFgIfBmhkFgICAw8PFgIfBwVifi9NYWluL1N0YXRzQW5kU3RhbmRpbmdzLmFzcHg/dD03JnBhcjE9REIwMENFOTdFQzkwMUIwN0I0OTMyMjdBNTk1ODJGQUU2RDVDQjM2MkMxJnBhcjI9MjAyNiZwYXIzPTBkZAIFD2QWLgIBDxBkZBYAZAIHDxBkZBYAZAIJDxBkZBYBZmQCCw8QZGQWAWZkAg0PEGRkFgFmZAIRD2QWAgIBDxBkZBYAZAITD2QWAgIBDxBkZBYAZAIVD2QWAgIBDxBkZBYAZAIXD2QWAgIBDxBkZBYAZAIZD2QWAgIBDxBkZBYAZAIbD2QWAgIBDxBkZBYAZAIdD2QWAgIBDxBkZBYAZAInDxBkZBYAZAIrDxBkZBYAZAItDxBkZBYAZAIvD2QWAgIBDxBkZBYAZAIxD2QWAgIBDxBkZBYAZAIzD2QWAgIBDxBkZBYAZAI1D2QWAgIBDxBkZBYAZAI3D2QWAgIBDxBkZBYAZAI5D2QWAgIBDxBkZBYAZAI9DxBkZBYBZmQCPw8QZGQWAWZkAgcPZBYIAgEPFgIfBWVkAgcPFgIfBmhkAhMPFgIfBmhkAhUPFgIfBmhkAgkPDxYCHwZoZGQCDQ8PFgIfBmdkFhACAw9kFgICAQ9kFghmD2QWAgIBDxYCHwUFC1dvbWVuJ3MgMy41ZAIBD2QWAgIBDxYCHwUFE1VTVEEvTk8uIENBTElGT1JOSUFkAgIPZBYCAgEPFgIfBQUOTk8uIENBTElGT1JOSUFkAgMPZBYCAgEPDxYEHwUFEjIwMjYgQURVTFQgMTgmT3Zlch4PQ29tbWFuZEFyZ3VtZW50BQsxMDc0NTYsMjAyNmRkAgUPDxYEHwgFDzEwMTE4NzU0ODEsMjAyNh4LQ29tbWFuZE5hbWUFCVNjb3JlY2FyZGRkAgcPDxYEHwgFDzEwMTE4NzU0ODEsMjAyNh8JBQ1GbGlnaHRTdW1tYXJ5ZGQCCQ8PFgQfCAUPMTAxMTg3NTQ4MSwyMDI2HwkFDFRlYW1TdGFuZGluZ2RkAgsPDxYEHwgFDzEwMTE4NzU0ODEsMjAyNh8JBQpUZWFtQ291bnRzZGQCDQ8PFgQfCAUPMTAxMTg3NTQ4MSwyMDI2HwkFDE1hdGNoU3VtbWFyeWRkAg8PDxYEHwgFDzEwMTE4NzU0ODEsMjAyNh8JBQ1NYXRjaFNjaGVkdWxlZGQCEQ8PFgQfCAUPMTAxMTg3NTQ4MSwyMDI2HwkFDFBsYXllclJvc3RlcmRkAiUPDxYCHwZnZBYEAgEPZBYKAgEPZBYEZg9kFgJmD2QWAgIBDxYCHwUFtAI8Zm9udCBzaXplPSczJz48c3Ryb25nPlNjb3JlY2FyZCBmb3IgTWF0Y2ggIyAxMDExODc1NDgxIGluIDIwMjYgQURVTFQgMTgmT3Zlcjwvc3Ryb25nPjwvZm9udD48YnIvID48YnIgLz48c3Ryb25nPlN0YXR1czombmJzcDs8L3N0cm9uZz5Db25maXJtZWQgYnkgTGlzYSBJdGFsaWEgKFYpICZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwO1RvZGF5J3MgRGF0ZTogMDUvMjcvMjAyNiAxMjo0NCBBTUVTVDxicj48YnI+KiBDYWxjdWxhdGlvbiBvZiBnYW1lLXdpbm5pbmcgcGVyY2VudGFnZSBkb2VzIG5vdCBpbmNsdWRlIGRlZmF1bHRlZCBtYXRjaGVzLmQCAw9kFgYCAQ9kFgQCAQ8PFgQfBQUWUk9VTkQgSElMTCBDQyAxOEFXMy41Qh8IBQ81MDgzMTQ0MTUwLDIwMjZkZAIDDxYCHwUFBSoqKioqZAIDDxYCHwZoZAIFD2QWBAIBDw8WBB8FBShXQUxOVVQgQ1JFRUsgUkMvV2FsbnV0IENyZWVrIFRDIDE4QVczLjVBHwgFDzUwODMxNDQxNTQsMjAyNmRkAgMPFgIfBQUFKioqKipkAgMPZBYEZg9kFgJmD2QWAgIBD2QWAmYPZBYGZg9kFgICAQ8WAh8FBRE1LzExLzIwMjYgNjozMCBQTWQCAw9kFgICAQ8WAh8FBQk1LzExLzIwMjZkAgQPZBYCAgEPFgIfBQUJNS8yNS8yMDI2ZAIBD2QWAmYPZBYCAgEPFgIfBQUJVGVhbSBXaW5zZAIFD2QWAmYPZBYGAgIPFgIfBmhkAgYPFgIfBmhkAggPZBYCAgEPFgIfBQUcMzxzdXA+cmQ8L3N1cD4gU2V0IFRpZS1icmVha2QCBw8WAh4LXyFJdGVtQ291bnQCBRYMZg9kFiACAQ8WAh8GaBYEZg9kFgJmDxUBAGQCAQ8WAh4HY29sc3BhbgUBNhYCZg8VAQBkAgIPFQEXMSMgRG91YmxlczxiciAvPjY6MzAgUE1kAgUPDxYEHwUFDUthcmEgQ2hpemV2ZXIfCAUPMjAxODU5MTA4MSwyMDI2ZGQCBg8VAgAAZAIJDw8WBB8FBQtTaGF3biBZb3VuZx8IBQ8yMDEwNDAyNDQ0LDIwMjZkZAIKDxUDAAAJQ29tcGxldGVkZAILDxYCHwZoFgJmDxUBATBkAg0PFgIeA3NyYwU6aHR0cHM6Ly90ZW5uaXNsaW5rLnVzdGEuY29tL0xlYWd1ZXMvQ29tbW9uL0ltYWdlcy9tYXJrLmdpZmQCDw8WAh8FBQVGYWxzZWQCEw8PFgQfBQUOTG9yaSBHdWFyaWVudG8fCAUPMjAxMDc0Mjk3NCwyMDI2ZGQCFA8VAgAAZAIXDw8WBB8FBQ9XZW5keSBTY2hvZmllbGQfCAUPMjAwMzQ2MDg3MywyMDI2ZGQCGA8VAgAAZAIZDxYCHwZoFgJmDxUBATBkAhsPFgIfBmhkAhwPFQEWJm5ic3A7Ni0yPEJSPiZuYnNwOzYtMGQCAQ9kFiACAQ8WAh8GaBYEZg9kFgJmDxUBAGQCAQ8WAh8LBQE2FgJmDxUBAGQCAg8VARcxIyBTaW5nbGVzPGJyIC8+NjozMCBQTWQCBQ8PFgQfBQUMVG9yaSBEZUNvaXRlHwgFDzIwMTg1OTQzODEsMjAyNmRkAgYPFQIAAGQCCQ8PFgQfBWUfCAUFLDIwMjZkZAIKDxUDAAAJQ29tcGxldGVkZAILDxYCHwZoFgJmDxUBATBkAg0PFgIfBmhkAg8PFgIfBQUFRmFsc2VkAhMPDxYEHwUFDk1lbGFuaWUgRXNwZWpvHwgFDzIwMTA1MTYxMjUsMjAyNmRkAhQPFQIAAGQCFw8PFgQfBWUfCAUFLDIwMjZkZAIYDxUCAABkAhkPFgIfBmgWAmYPFQEBMGQCGw8WAh8MBTpodHRwczovL3Rlbm5pc2xpbmsudXN0YS5jb20vTGVhZ3Vlcy9Db21tb24vSW1hZ2VzL21hcmsuZ2lmZAIcDxUBFiZuYnNwOzYtMjxCUj4mbmJzcDs2LTJkAgIPZBYgAgEPFgIfBmgWBGYPZBYCZg8VAQBkAgEPFgIfCwUBNhYCZg8VAQBkAgIPFQEXMiMgRG91YmxlczxiciAvPjY6MzAgUE1kAgUPDxYEHwUFDkFuZHJlYSBFdWJhbmtzHwgFDzIwMDcxNzk5MDMsMjAyNmRkAgYPFQIAAGQCCQ8PFgQfBQUSQ2hyaXN0aW5lIEJyYXNoZWFyHwgFDzIwMTkwMzA5MDksMjAyNmRkAgoPFQMAAAlDb21wbGV0ZWRkAgsPFgIfBmgWAmYPFQEBMGQCDQ8WAh8GaGQCDw8WAh8FBQVGYWxzZWQCEw8PFgQfBQUKTGluZGEgQ2hvaR8IBQ8yMDEwNjM5NTA2LDIwMjZkZAIUDxUCAABkAhcPDxYEHwUFEUlzYWJlbGxhIEZlaW5iZXJnHwgFDzIwMTA2NzM3ODMsMjAyNmRkAhgPFQIAAGQCGQ8WAh8GaBYCZg8VAQEwZAIbDxYCHwwFOmh0dHBzOi8vdGVubmlzbGluay51c3RhLmNvbS9MZWFndWVzL0NvbW1vbi9JbWFnZXMvbWFyay5naWZkAhwPFQEWJm5ic3A7Ni0xPEJSPiZuYnNwOzYtMWQCAw9kFiACAQ8WAh8GaBYEZg9kFgJmDxUBAGQCAQ8WAh8LBQE2FgJmDxUBAGQCAg8VARcyIyBTaW5nbGVzPGJyIC8+NjozMCBQTWQCBQ8PFgQfBQURQ2hyaXN0aW5lIFJlaW5lcnMfCAUPMjAxOTAxODc2MiwyMDI2ZGQCBg8VAgAAZAIJDw8WBB8FZR8IBQUsMjAyNmRkAgoPFQMAAAlDb21wbGV0ZWRkAgsPFgIfBmgWAmYPFQEBMGQCDQ8WAh8GaGQCDw8WAh8FBQVGYWxzZWQCEw8PFgQfBQUJU3RlbGxhIFNvHwgFDzIwMTAyMDA2NzMsMjAyNmRkAhQPFQIAAGQCFw8PFgQfBWUfCAUFLDIwMjZkZAIYDxUCAABkAhkPFgIfBmgWAmYPFQEBMGQCGw8WAh8MBTpodHRwczovL3Rlbm5pc2xpbmsudXN0YS5jb20vTGVhZ3Vlcy9Db21tb24vSW1hZ2VzL21hcmsuZ2lmZAIcDxUBFiZuYnNwOzYtMjxCUj4mbmJzcDs2LTNkAgQPZBYgAgEPFgIfBmgWBGYPZBYCZg8VAQBkAgEPFgIfCwUBNhYCZg8VAQBkAgIPFQEXMyMgRG91YmxlczxiciAvPjY6MzAgUE1kAgUPDxYEHwUFDFN1c2llIEhhbnNlbh8IBQ8yMDE3MTc2NDgxLDIwMjZkZAIGDxUCAABkAgkPDxYEHwUFDExhdXJhIERvbW1lcx8IBQ8yMDE3MTczODk5LDIwMjZkZAIKDxUDAAAJQ29tcGxldGVkZAILDxYCHwZoFgJmDxUBATBkAg0PFgIfDAU6aHR0cHM6Ly90ZW5uaXNsaW5rLnVzdGEuY29tL0xlYWd1ZXMvQ29tbW9uL0ltYWdlcy9tYXJrLmdpZmQCDw8WAh8FBQVGYWxzZWQCEw8PFgQfBQUNS2VsbHkgQ29wbGFuZB8IBQ8yMDE3MDM0ODgzLDIwMjZkZAIUDxUCAABkAhcPDxYEHwUFD1NoYXJvbiBTaW50Y2hhax8IBQ8yMDEwMDcyODg2LDIwMjZkZAIYDxUCAABkAhkPFgIfBmgWAmYPFQEBMGQCGw8WAh8GaGQCHA8VARYmbmJzcDs2LTI8QlI+Jm5ic3A7Ny01ZAIFD2QWAgIBDxYCHwsFATZkAgkPZBYGZg9kFgJmD2QWAgIBDxYCHwUFFjxociBjb2xvcj0nc2lsdmVyJy8+DQpkAgIPZBYCZg9kFgICAQ8WAh8FBZYBUk9VTkQgSElMTCBDQyAxOEFXMy41QiA8Zm9udCBzaXplPS0xPihIb21lIFRlYW0pPC9mb250PiAyIFdJTlM8QlI+V0FMTlVUIENSRUVLIFJDL1dhbG51dCBDcmVlayBUQyAxOEFXMy41QSA8Zm9udCBzaXplPS0xPihWaXNpdGluZyBUZWFtKTwvZm9udD4gMyBXSU5TZAIED2QWAmYPZBYCAgEPFgIfBQWWAVJPVU5EIEhJTEwgQ0MgMThBVzMuNUIgPGZvbnQgc2l6ZT0tMT4oSG9tZSBUZWFtKTwvZm9udD4gNDQuNDQlPEJSPldBTE5VVCBDUkVFSyBSQy9XYWxudXQgQ3JlZWsgVEMgMThBVzMuNUEgPGZvbnQgc2l6ZT0tMT4oVmlzaXRpbmcgVGVhbSk8L2ZvbnQ+IDU1LjU2JWQCAw8WAh8GaGQCKw8PFgIfBmhkZAIvDw8WAh8GaGRkAjEPDxYCHwZoZGQCMw8PFgIfBmhkZAI/D2QWAgIBD2QWAgIDD2QWAgIBD2QWBGYPZBYCAgEPDxYCHwUFCTUvMTEvMjAyNmRkAgEPZBYCAgEPDxYCHwUFCTUvMTEvMjAyNmRkAg0PFCsAAmQQFgAWABYAZAIODxYCHwUFxw4NCjxzY3JpcHQgdHlwZT0ndGV4dC9qYXZhc2NyaXB0Jz4NCiAgICB2YXIgZ29vZ2xldGFnID0gZ29vZ2xldGFnIHx8IHt9Ow0KICAgIGdvb2dsZXRhZy5jbWQgPSBnb29nbGV0YWcuY21kIHx8IFtdOw0KICAgIChmdW5jdGlvbiAoKSB7DQogICAgICAgIHZhciBnYWRzID0gZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnc2NyaXB0Jyk7DQogICAgICAgIGdhZHMuYXN5bmMgPSB0cnVlOw0KICAgICAgICBnYWRzLnR5cGUgPSAndGV4dC9qYXZhc2NyaXB0JzsNCiAgICAgICAgdmFyIHVzZVNTTCA9ICdodHRwczonID09IGRvY3VtZW50LmxvY2F0aW9uLnByb3RvY29sOw0KICAgICAgICBnYWRzLnNyYyA9ICh1c2VTU0wgPyAnaHR0cHM6JyA6ICdodHRwOicpICsNCiAgICAgICAgJy8vd3d3Lmdvb2dsZXRhZ3NlcnZpY2VzLmNvbS90YWcvanMvZ3B0LmpzJzsNCiAgICAgICAgdmFyIG5vZGUgPSBkb2N1bWVudC5nZXRFbGVtZW50c0J5VGFnTmFtZSgnc2NyaXB0JylbMF07DQogICAgICAgIG5vZGUucGFyZW50Tm9kZS5pbnNlcnRCZWZvcmUoZ2Fkcywgbm9kZSk7DQogICAgfSkoKTsNCjwvc2NyaXB0Pg0KPHNjcmlwdCB0eXBlPSd0ZXh0L2phdmFzY3JpcHQnPg0KICAgIGdvb2dsZXRhZy5jbWQucHVzaChmdW5jdGlvbiAoKSB7DQogICAgICAgIGdvb2dsZXRhZy5kZWZpbmVTbG90KCcvNTY4MS9VU1RBL0xlYWd1ZXMvMzAweDI1MF9MZWZ0JywgWzMwMCwgMjUwXSwgJ0xlYWd1ZXNfMzAweDI1MF9MZWZ0JykuYWRkU2VydmljZShnb29nbGV0YWcucHViYWRzKCkpOw0KICAgICAgICBnb29nbGV0YWcuZGVmaW5lU2xvdCgnLzU2ODEvVVNUQS9MZWFndWVzLzMwMHgyNTBfTWlkZGxlJywgWzMwMCwgMjUwXSwgJ0xlYWd1ZXNfMzAweDI1MF9NaWRkbGUnKS5hZGRTZXJ2aWNlKGdvb2dsZXRhZy5wdWJhZHMoKSk7DQogICAgICAgIGdvb2dsZXRhZy5kZWZpbmVTbG90KCcvNTY4MS9VU1RBL0xlYWd1ZXMvMzAweDI1MF9SaWdodCcsIFszMDAsIDI1MF0sICdMZWFndWVzXzMwMHgyNTBfUmlnaHQnKS5hZGRTZXJ2aWNlKGdvb2dsZXRhZy5wdWJhZHMoKSk7DQogICAgICAgIGdvb2dsZXRhZy5wdWJhZHMoKS5lbmFibGVTaW5nbGVSZXF1ZXN0KCk7DQogICAgICAgIGdvb2dsZXRhZy5lbmFibGVTZXJ2aWNlcygpOw0KICAgIH0pOw0KPC9zY3JpcHQ+DQo8c3R5bGU+DQojTGVhZ3Vlc18zMDB4MjUwX0xlZnQNCnsNCiAgICBmbG9hdDpsZWZ0Ow0KICAgIHBhZGRpbmc6IDEwcHggMCAwIDBweDsNCn0NCiNMZWFndWVzXzMwMHgyNTBfTWlkZGxlLCAjTGVhZ3Vlc18zMDB4MjUwX1JpZ2h0DQp7DQogICAgZmxvYXQ6bGVmdDsNCiAgICBwYWRkaW5nOiAxMHB4IDAgMCA1MHB4Ow0KfQ0KPC9zdHlsZT4NCg0KPGRpdiBpZD0nTGVhZ3Vlc18zMDB4MjUwX0xlZnQnPg0KPHNjcmlwdCB0eXBlPSd0ZXh0L2phdmFzY3JpcHQnPg0KICAgIGdvb2dsZXRhZy5jbWQucHVzaChmdW5jdGlvbiAoKSB7IGdvb2dsZXRhZy5kaXNwbGF5KCdMZWFndWVzXzMwMHgyNTBfTGVmdCcpOyB9KTsNCjwvc2NyaXB0Pg0KPC9kaXY+DQoNCjxkaXYgaWQ9J0xlYWd1ZXNfMzAweDI1MF9NaWRkbGUnPg0KPHNjcmlwdCB0eXBlPSd0ZXh0L2phdmFzY3JpcHQnPg0KICAgIGdvb2dsZXRhZy5jbWQucHVzaChmdW5jdGlvbiAoKSB7IGdvb2dsZXRhZy5kaXNwbGF5KCdMZWFndWVzXzMwMHgyNTBfTWlkZGxlJyk7IH0pOw0KPC9zY3JpcHQ+DQo8L2Rpdj4NCg0KPGRpdiBpZD0nTGVhZ3Vlc18zMDB4MjUwX1JpZ2h0JyA+DQo8c2NyaXB0IHR5cGU9J3RleHQvamF2YXNjcmlwdCc+DQogICAgZ29vZ2xldGFnLmNtZC5wdXNoKGZ1bmN0aW9uICgpIHsgZ29vZ2xldGFnLmRpc3BsYXkoJ0xlYWd1ZXNfMzAweDI1MF9SaWdodCcpOyB9KTsNCjwvc2NyaXB0Pg0KPC9kaXY+DQpkAhAPFgIfBQVWPHNjcmlwdCBzcmM9J2h0dHBzOi8vd3d3LnVzdGEuY29tL3RoaXJkcGFydHkvaW5jbHVkZV9zaXRlZm9vdGVyLmpzLmFzcHg/ZD0xJz48L3NjcmlwdD5kAhEPDxYEHwUFClBST0RVQ1RJT04fBmhkZAISDw8WAh8FBRJDb2RlIDEuMjYuMDUxLjgzODBkZAITDw8WAh8FBQ0xLjI2LjA1MS44MzgwZGQCFA8WAh8FBfUCPCEtLSBTdGFydCBRdWFudGNhc3QgdGFnIC0tPiA8c2NyaXB0IHR5cGU9InRleHQvamF2YXNjcmlwdCI+IF9xb3B0aW9ucz17IHFhY2N0OiJwLTc0dUQta2dtdnA4M3ciIH07IDwvc2NyaXB0PiA8c2NyaXB0IHR5cGU9InRleHQvamF2YXNjcmlwdCIgc3JjPSIvL3NlY3VyZS5xdWFudHNlcnZlLmNvbS9xdWFudC5qcyI+PC9zY3JpcHQ+IDxub3NjcmlwdD4gPGltZyBzcmM9Ii8vc2VjdXJlLnF1YW50c2VydmUuY29tL3BpeGVsL3AtNzR1RC1rZ212cDgzdy5naWYiIHN0eWxlPSJkaXNwbGF5OiBub25lOyIgYm9yZGVyPSIwIiBoZWlnaHQ9IjEiIHdpZHRoPSIxIiBhbHQ9IlF1YW50Y2FzdCIvPiA8L25vc2NyaXB0PiA8IS0tIEVuZCBRdWFudGNhc3QgdGFnIC0tPmRk4BuJw13vwOZhioeibWsjUGdJuvkySSYi0y4Tczq6lMQ=" />
+</div>
+
+<script type="text/javascript">
+//<![CDATA[
+var theForm = document.forms['aspnetForm'];
+if (!theForm) {
+    theForm = document.aspnetForm;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+//]]>
+</script>
+
+
+<script src="/Leagues/WebResource.axd?d=pcB6JlNPW_IMQAKhbSW0ZLhG8DLeEIWpNylQ4iJL63X-66rapkndSN6GwbaF0265B25WlUcExyHbk9T1QyWBImf2jduuUO5RVM3684qQHuI1&amp;t=638901382200000000" type="text/javascript"></script>
+
+
+<script src="/Leagues/ScriptResource.axd?d=0HdNXRw3iBMwJaGoOHDICjvMpm136cfAjoKRMJDA8JLi0CXV2QFAthbBVNyA37rNdN9pUC4IHIjQsHsB_D4CQfyDJU0jCHlt8Z5-ujEZmgPuTL-DZLpPLqk9T6k3wwHPSHpixnAkBSFqeRi1TNLT_UTV1X1YBJqPL6gHFLKC4oU1&amp;t=345ad968" type="text/javascript"></script>
+<script src="/Leagues/ScriptResource.axd?d=jPmT2p3Y0ruViD87TGmLI-MOrWvKpMTsTSFIYSPFL-OCqO4MQEW13-3ARUv8VaBDj9CuqQxru7-OnShDsyOXUFACkU1OmOE64HPfe_sfLqYnRTCz_TGe6NJ97PIEabE3UcvacndVBiLG7k6PEysu4ToAIPE0RfrwPVt7g1XiRVYwAl3RGWzJ5oPQpp3vIGMj0&amp;t=345ad968" type="text/javascript"></script>
+<div>
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="FAFE42EE" />
+</div>
+        <link href="/Dashboard/Common/lib/element-ui-2.15.14/theme-chalk/index.css" rel="stylesheet" />
+<link href="/Dashboard/Common/lib/element-ui-2.15.14/theme-chalk/display.css" rel="stylesheet" />
+<script type="text/javascript" src="/Dashboard/Common/lib/vue-2.7.16/vue.min.js"></script>
+<script type="text/javascript" src="/Dashboard/Common/lib/element-ui-2.15.14/index.js"></script>
+<script type="text/javascript" src="/Dashboard/Common/lib/element-ui-2.15.14/umd/locale/en.js"></script>
+<style type="text/css">
+    #csrfNoteVueApp {
+        font-family: Arial, Helvetica, sans-serif;
+        line-height: 1.5;
+    }
+    #csrfNoteVueApp p {
+        margin: 0 0 1.5em;
+    }
+    #csrfNoteVueApp .el-dialog__body {
+        word-break: break-word !important;
+    }
+    #csrfNoteVueApp input.button {
+        background: url(/Dashboard/Common/images/button-back.jpg) repeat-x;
+        color: #fff;
+        height: 22px;
+        border: 1px solid #255fa8;
+        display: inline;
+        text-align: center;
+        text-transform: capitalize;
+        font-size: 12px;
+        padding: 0px 10px 3px 10px;
+        text-shadow: #000 1px 1px 1px;
+        margin-left: 3px;
+        font-family: Arial, Helvetica, sans-serif;
+    }
+    #csrfNoteVueApp input.button:hover {
+        background: url(/Dashboard/Common/images/button-back.jpg) repeat-x 0px -22px;
+        color: #fff;
+        border: 1px solid #bb0000;
+        cursor: pointer;
+        text-decoration: none;
+    }
+    .csrfNoticeWidth {
+        width: 40% !important;
+        min-width: 420px !important;
+    }
+</style>
+<div id="csrfNoteVueApp"></div>
+<script type="text/javascript">
+    var csrfVueLoadingObject = null;
+    var csrfLoadingOption = {
+        lock: true,
+        text: '',
+        spinner: 'el-icon-loading',
+        background: 'rgba(0, 0, 0, 0.7)'
+    };
+
+    var csrfPriorRequest = {
+        formId: null,
+        elementId: null,
+        eventTarget: null,
+        eventArgument: null,
+    };
+
+    if (typeof Sys != 'undefined') {
+        //handle the async post back for controls in UpdatePanel.
+        Sys.WebForms.PageRequestManager.getInstance().add_initializeRequest(CSRFInitRequestHandler);
+        function CSRFInitRequestHandler(sender, args) {
+            if (sender._postBackSettings && sender._postBackSettings.async) {
+                csrfPriorRequest.formId = sender._form.id;
+                csrfPriorRequest.elementId = args.get_postBackElement().id;
+                csrfPriorRequest.eventTarget = sender._form.__EVENTTARGET.value;
+                csrfPriorRequest.eventArgument = sender._form.__EVENTARGUMENT.value;
+            }
+        }
+
+        Sys.WebForms.PageRequestManager.getInstance().add_endRequest(CSRFEndRequestHandler);
+        function CSRFEndRequestHandler(sender, args) {
+            var csrfLogIdElement = document.getElementById('hdnCSRFLogId');
+            if (csrfLogIdElement) {
+                csrfLogIdElement.value = '';
+            }
+
+            var csrfCookieRefreshed = document.getElementById('hdnCSRFCookieRefreshed');
+            if (csrfCookieRefreshed) {
+                csrfCookieRefreshed.value = 'false';
+            }
+
+            if (csrfVueLoadingObject) {
+                csrfVueLoadingObject.close();
+                csrfVueLoadingObject = null;
+            }
+
+            var error = args.get_error();
+            if (error != undefined && error.httpStatusCode == 500) {
+                var jsonStr = error.message.replace(error.name + ": ", "");
+                if (jsonStr && jsonStr.length > 0) {
+                    try {
+                        var errorObject = JSON.parse(jsonStr);
+                        if (errorObject && errorObject.msg == "CSRF token is invalid") {
+                            args.set_errorHandled(true);
+
+                            if (errorObject.forceBlocked) {
+                                displayCSRFNotice();
+                                return;
+                            }
+
+                            if (errorObject.logId && csrfLogIdElement) {
+                                csrfLogIdElement.value = errorObject.logId;
+                            }
+
+                            if (!errorObject.cookieIsValid) {
+                                refreshCSRFCookie(retryCSRFPriorRequest);
+                                return;
+                            }
+                            else if (errorObject.token) {
+                                var csrfTokenElement = document.getElementById('hdnCSRFToken');
+                                if (csrfTokenElement) {
+                                    csrfTokenElement.value = errorObject.token;
+                                }
+                                retryCSRFPriorRequest();
+                                return;
+                            }
+                            displayCSRFNotice();
+                        }
+                    } catch (e) {
+                        args.set_errorHandled(false);
+                    }
+                }
+            }
+        }
+
+        function refreshCSRFCookie(callback) {
+            var xhr = new XMLHttpRequest();
+            var url = "https://" + window.location.hostname + "/Dashboard/Common/CSRFRefresh.aspx";
+
+            xhr.open('GET', url, false);
+            xhr.withCredentials = true;
+            xhr.onreadystatechange = function () {
+                if (this.readyState === this.DONE) {
+                    if (this.status == 200) {
+                        var csrfCookieRefreshed = document.getElementById('hdnCSRFCookieRefreshed');
+                        if (csrfCookieRefreshed) {
+                            csrfCookieRefreshed.value = 'true';
+                        }
+                        callback();
+                    }
+                    else {
+                        displayCSRFNotice();
+                    }
+                }                
+            }
+            xhr.send();
+        }
+    }
+
+    function retryCSRFPriorRequest() {
+        var controlElement = document.getElementById(csrfPriorRequest.elementId);
+        if (controlElement && controlElement.type == 'submit') {
+            csrfVueLoadingObject = csrfNoteVueObj.$loading(csrfLoadingOption);
+            setTimeout(function () {
+                var form = document.getElementById(csrfPriorRequest.formId);
+                var submitter = document.getElementById(csrfPriorRequest.elementId);
+                if (form && submitter) {
+                    csrfNoteVueObj.$loading(csrfLoadingOption);
+                    submitter.click();
+                }
+                else {
+                    displayCSRFNotice();
+                }
+            }, 0);
+        }
+        else if (csrfPriorRequest.eventTarget) {
+            csrfVueLoadingObject = csrfNoteVueObj.$loading(csrfLoadingOption);
+            setTimeout(__doPostBack(csrfPriorRequest.eventTarget, csrfPriorRequest.eventArgument != null ? csrfPriorRequest.eventArgument : ''), 0);
+        }
+        else {
+            displayCSRFNotice();
+        }
+    }
+
+    function displayCSRFNotice() {
+        
+    }
+
+    var csrfNoteVueObj = new Vue({
+        el: '#csrfNoteVueApp',
+        template: '<el-dialog title="Form Security Token Is Invalid"' +
+                ':modal="true"' +
+                ':show-close="false"' +
+                ':close-on-click-modal="false"' +
+                ':close-on-press-escape="false"' +
+                ':visible.sync="csrfNoticeVisible"' +
+                ':lock-scroll="true"' +
+                'customClass="csrfNoticeWidth">' +
+                '<p>TennisLink could not complete this action due to invalid form token.</p>' +
+                '<p>You may have cleared your browser cookies or been staying on this page for a too long time, which could have resulted in the missing or expiry of your current form token.</p>' +
+                '<p>A new form token has been reissued. Please refesh the current page and try your action again.</p>' +
+                '<span slot="footer" class="dialog-footer">' +
+                '<input id="btnCsrfRefreshPage" type="button" class="button" value="Refresh Page" @click="refreshPage()" />' +
+                '</span>' +
+        '</el-dialog>',
+        data() {
+            return {
+                csrfNoticeVisible: false,
+                doRefresh: function () { window.location.reload();}
+            };
+        },
+        methods: {
+            refreshPage: function () {
+                this.$loading(csrfLoadingOption);
+                this.doRefresh();
+            },
+            customizeRefreshPage(action) {
+                if (action && typeof action == "function") {
+                    this.doRefresh = action;
+                }
+            }
+        }
+    });
+
+    
+</script>
+        <input type="hidden" name="hdnCSRFToken" id="hdnCSRFToken" value="k9XrYCy03yW43r0kSza_vNdxGw4ALmqqtKlCoQmsL4500vH37zToZmSWriCTLRPTv_HPnDVo1XCnpgCavsN7dCWcVvzmkteqZ360Ptp-UCheuJlnWq4pJbUdUyZcYVdLv0gVhiFxC3q5mk2rlM5X1Dth1ETD6UhhebGVpczEaKc1" />
+        <input type="hidden" name="hdnCSRFLogId" id="hdnCSRFLogId" value="" />
+        <input type="hidden" name="hdnCSRFCookieRefreshed" id="hdnCSRFCookieRefreshed" value="false" />
+        <script type="text/javascript">
+//<![CDATA[
+Sys.WebForms.PageRequestManager._initialize('ctl00$ScriptManager1', 'aspnetForm', ['fctl00$breadcrumbs$UpdatePanelBreadcrumb','','tctl00$SocialMediaPanel$updatePnlSocialMedia','','tctl00$mainContent$UpdatePanel1',''], ['ctl00$ScriptManager1',''], ['ctl00$mainContent$lnkMatchAnchorSendToExcel',''], 600, 'ctl00');
+//]]>
+</script>
+<input type="hidden" name="ctl00$ScriptManager1" id="ctl00_ScriptManager1" />
+<script type="text/javascript">
+//<![CDATA[
+Sys.Application.setServerId("ctl00_ScriptManager1", "ctl00$ScriptManager1");
+Sys.Application._enableHistoryInScriptManager();
+//]]>
+</script>
+    
+    <div class="container wrapper">
+       
+        <div class="usta_header">
+            <div id='ustaHeaderWrapper'></div><script type='text/javascript'>$('#ustaHeaderWrapper').load('/Dashboard/USTAHeaderWrapper.aspx');</script>
+        </div>
+        
+        
+        
+        <a id="ctl00_lnkbutLogout" class="logout" href="javascript:__doPostBack(&#39;ctl00$lnkbutLogout&#39;,&#39;&#39;)"></a>
+        <script type="text/javascript">
+            setNavigationConfig({
+                isLogin: 'True',
+                currentProject: 'leagues',
+                yearNow: '2026',
+                urls: {
+                    linkJoinUstaUrl: 'https://www.usta.com/en/home/myaccount/choose-account-type.html',
+                    TL_Leagues_AppealInfo: 'https://support.activenetwork.com/usta/articles/en_US/Article/Appeal-NTRP-Rating',
+                    TL_MenuLink_USTA_LocalLeagueCoordinators: 'https://www.usta.com/en/home/play/play-as-a-member/national/usta-league--section-coordinators-.html',
+                    TL_MenuLink_USTA_LeaguesNatlChampionships: 'https://www.usta.com/en/home/play/adult-tennis/programs/national/about-usta-league-national-championships.html',
+                    TL_MenuLink_USTA_NTRPRatings: 'https://www.usta.com/en/home/play/play-as-a-member/national/usta-league-faqs.html',
+                    TL_MenuLink_USTA_LeagueTennisRules: 'https://www.usta.com/en/home/play/adult-tennis/programs/national/usta-league-resources.html',
+                    TL_MenuLink_USTA_LeaguesFAQ: 'https://assets.usta.com/assets/1/USTA_Import/dps/usta_master/sitecore_usta/USTA/Document%20Assets/Leagues_and_Tournaments/Leagues/NTRP_FAQ.pdf',
+                    TL_MenuLink_USTA_About_Leagues: 'https://www.usta.com/en/home/play/adult-tennis/programs/national/usta-league.html'
+                },
+                rootUrl: {
+                    dashboard: '/Dashboard/',
+                    tournaments: '/Tournaments/',
+                    teamTennis: '/TeamTennis/',
+                    flexLeagues: '/FlexLeagues/',
+                    leagues: '/Leagues/'
+                },
+                userInfo: {
+                    ustaNumberEncrypt: '1WNze/7m/XcGDJzVmkmQWQ==',
+                    personIdEncrypt: 'E+hmjVjj8tA=',
+                    personIdKey: 'pid',
+                    ustaNumberKey: 'unum',
+                    ustaNumber: '920522940',
+                    userIdKey: 'uid',
+                    userIdEncrypt: 'xb4HT6qWLmU=',
+                    ustaNumberUrlParamEncrypt:'1WNze_7m_XcGDJzVmkmQWQ2'
+                }
+            });
+        </script>
+        
+    <div class="d-none d-lg-block">
+     <div id="favicon"></div>
+<script type="text/javascript">
+    $("#favicon").load('/Dashboard/Common/TennisLinkRootIcon.html');
+    $(function () {
+        isProgressionTurnedOff(function (ret) {
+            if (ret) {
+                $("#divProgressionTourn").remove();
+                $("#divProgressionTT").remove();
+            }
+        });
+    });
+</script>
+<div class="TennisLinkTopNewNav">
+    <div id="navheader">
+        <script type="text/html" id="navigation_tmpl">
+            <div id="navbar">
+                <div class="new-active-logo"></div>
+                <ul>
+                    <li data-href="<#=rootUrl.leagues#>" class="<#= currentProject === 'leagues' ? 'default': ''#>">
+                        <div>USTA LEAGUE</div>
+                    </li>
+                    <li data-href="<#=rootUrl.tournaments#>" class="<#= currentProject === 'tournaments' ? 'default': ''#>">
+                        <div>TOURNAMENTS</div>
+                    </li>
+                    <li data-href="<#=rootUrl.teamTennis#>" class="<#= currentProject === 'teamTennis' ? 'default': ''#>">
+                        <div>JUNIOR TEAM TENNIS</div>
+                    </li>
+                    <li data-href="<#=rootUrl.flexLeagues#>" class="<#= currentProject === 'flexLeagues' ? 'default': ''#>">
+                        <div>USTA FLEX LEAGUES</div>
+                    </li>
+                    <li data-href="<#=rootUrl.dashboard#>/Main/Home.aspx">
+                        <div>MY TENNIS</div>
+                    </li>
+                    <# if(!isLogin) { #>
+                    <li class="login">
+                        <div>
+                            <a href="javascript:logIn();">LOGIN</a>
+                        </div>
+                    </li>
+                    <#}else{#>
+                    <li>
+                        <div>
+                            <a href="javascript:void(0);" onclick="return logOut()">LOGOUT</a>
+                        </div>
+                    </li>
+                    <#}#>
+                </ul>
+            </div>
+        </script>
+    </div>
+    <div class="quickPanel_Error hidden" id="quickPanelErrorContainer"></div>
+    <div class="quickPanel hidden">
+        <div id="q1" class="hidden">
+            <script type="text/html" id="leagues_tmpl">
+                <ul>
+                    <li>
+                        <div class="block" id="divNewLeagueRegFlowEntry">
+                            <span class="subhead">START PLAYING</span>
+                            <br />
+                            <br />
+                            <span class="normalDesciption">Have a Team Number?</span>
+                            <br />
+                            <span class="normalDesciption">If you already have a team number, you can register with it.</span>
+                            <a class="btn" style="width:180px; margin-bottom:0" href="<#=rootUrl.leagues#>TLRegistration/Registration.aspx">Register with a Team #</a>
+                            <br />
+                            <span class="normalDesciption">Seeking a Team? </span>
+                            <br />
+                            <# if(!isLogin) { #>
+                                <span class="normalDesciption">We are so excited that you want to find a place to play with USTA! The next step is to create an account and self-rate (both easy and free), or login to allow us to provide perfect matches for you!</span>
+                                <#}else{#>
+                                    <span class="normalDesciption">Click below to find leagues that fit you.</span>
+                                    <#}#>
+                                        <a class="btn" style="width:180px;margin-bottom:0" href="javascript:TL.JSCommon.RegistrationUtil.goRegistration();">Find & Sign up for a League</a>
+                                        <br />
+                                        <p><a href="<#=urls.linkJoinUstaUrl#>">Join USTA Membership</a></p>
+</div>
+                    </li>
+                <li>
+                    <div class="block">
+                        <span class="subhead">STATS & STANDINGS</span>
+                        <br />
+                        <br />
+                        <img id="ss_icon_simple_search_help" src="/Dashboard/common/Images/help2.png" style="cursor:help;position:relative;left:2px; top:5px;" title="Click for more information" onclick="openSimpleSearchHelp();"></img> 
+                        <span class="normalDesciption">
+                            Enter player name, USTA Account, team # or match #
+                        </span>
+                        <br />
+                        <input type="text" id="q_stats-standings-input"/>
+                        <button id="btnSearchStatsStanding" type="button">Search</button>
+                        <br />
+                        <br />
+                        <a href="<#=rootUrl.leagues#>Main/StatsAndStandings.aspx?SearchType=3">League Advanced Search</a>
+                        <br />
+                        <a href="<#=rootUrl.leagues#>Main/StatsAndStandings.aspx?SearchType=0">Championship Advanced Search</a>
+                        <br />                      
+                        <span class="normalDesciption" style="display:inline-block;margin-top:5px;">Need to enter or confirm scores?</span>
+                        <br />
+                        <a class="btn" style="width:100px;height:25px;vertical-align:central;line-height:25px;" href="javascript:void(0);" id="btnLinkToRecordAScore">Enter Score</a>
+                    </div>
+                </li>
+                <li>
+                    <div class="block">
+                        <span class="subhead">FIND NTRP RATING INFO</span>
+                        <br />
+                        <br />
+                        <span class="normalDesciption">Enter USTA Account, team # or player name</span>
+                        <br />
+                        <input type="text" id="q_ntrp_input"/>
+                        <button id="btnSearchNTRP" type="button">Search</button>
+                        <br />
+                        <br />
+                        <a href="<#=rootUrl.leagues#>reports/NTRP/AdvancedSearch.aspx">Advanced Search</a>
+                        <br />
+                        <a href="javascript:void(0);" id="q_self_rate">Self-Rate</a>
+                        <br />
+                        <a href="<#=rootUrl.leagues#>reports/NTRP/FacilitySearch.aspx">Facility Search</a>
+                    </div>
+                </li>
+                <li>
+                    <div class="block last">
+                        <span class="subhead">USTA LEAGUE INFO</span>
+                        <br />
+                        <br />
+                        <a href="<#=urls.TL_MenuLink_USTA_About_Leagues#>">About USTA League</a>
+                        <br />
+                        <!--<a href="<#=rootUrl.leagues#>HelpTutorials/Mentor_Terminal.aspx?screen=ab050000.html" onclick="openPopUpSelfRate(this.href); return false;">About Self-Rate</a>
+                        <br />-->
+                        <!--<a href="<#=urls.TL_MenuLink_USTA_LeaguesFAQ#>">USTA League FAQ</a>
+                        <br />-->
+                        <a href="<#=urls.TL_MenuLink_USTA_LeagueTennisRules#>">USTA League Tennis Rules</a>
+                        <br />
+                        <a href="<#=urls.TL_MenuLink_USTA_NTRPRatings#>">About NTRP Ratings</a>
+                        <br />
+                        <a href="<#=urls.TL_MenuLink_USTA_LeaguesNatlChampionships#>">National Championships</a>
+                        <br />
+                        <a href="<#=urls.TL_MenuLink_USTA_LocalLeagueCoordinators#>">Local League Coordinators</a>
+                        <br />
+                        <a href="<#=urls.TL_Leagues_AppealInfo#>">About Auto-Appeals</a>
+                        <br />
+                        <a href="<#=rootUrl.leagues#>RegistrationNew/Registration.aspx">Browse Leagues</a>
+                    </div>
+                </li>
+            </ul>
+            </script>
+        </div>
+        <div id="q2" class="hidden">
+            <script type="text/html" id="tournament_tmpl">
+     
+            </script>
+        </div>
+        <div id="q3" class="hidden">
+            <script type="text/html" id="team_tennis_tmpl">
+            <ul>
+                <li>
+                    <div class="block" style="height:270px;">
+                        <span class="subhead">START PLAYING</span>
+                        <br />
+                        <br />
+                        <a style="width:150px;" href="<#=rootUrl.teamTennis#>Main/Registration.aspx" class="btn">Have a Team ID?</a>
+                        <span class="normalDesciption">Click Here to Get Playing!</span>
+                        <br />
+                        <br />
+                        <a style="width:150px;" href="<#=rootUrl.teamTennis#>Main/ProgramSearch.aspx" class="btn">Find a Program</a>
+                        <span class="normalDesciption">Win or Lose we play as one.</span>
+                        <br />
+                        <br />
+                        <a href="<#=rootUrl.teamTennis#>Main/LearnMore.aspx">Learn More</a>
+                    </div>
+                </li>
+                <li>
+                    <div class="block">
+                        <span class="subhead">FIND RECORDS</span>
+                        <br />
+                        <br />
+                        <span class="normalDesciption">By Player Name:</span>
+                        <br />
+                        <input  id="q_tt_first_name" placeholder="First Name" type="text" />
+                        <br />
+                        <input id="q_tt_last_name" placeholder="Last Name" type="text"  />
+                        <button id="btnFindByPlayerName" type="button">Find</button>
+                        <div id="divProgressionTT" style="margin-top:10px;">
+                            <span class="subhead">Find a Youth Progression Level</span>
+                            <div class="margin-bottom5">
+                                <span class="normalDesciption">Enter a USTA Account #, TT ID or player name</span>
+                            </div>
+                            <div>
+                                <input id="RatingInputTT" type="text"/>
+                                <button id="btnFindRatingTT" type="button">Find</button>
+                            </div>
+                        </div>
+                        <span class="normalDesciption">By Team Name:</span>
+                        <br />
+                        <input id="q_tt_team_name" type="text" />
+                        <button id="btnFindByTeamName" type="button">Find</button>
+                        <br />
+                        <a href="javascript:tt_findbyTeamName_help(\'<#=rootUrl.teamTennis#>Main/hlp_TeamSearch.htm\')">Help</a>
+                    </div>
+                </li>
+                <li>
+                    <div class="block" style="height:270px;">
+                        <span class="subhead">STATS & STANDINGS</span>
+                        <br />
+                        <br />
+                        <span class="normalDesciption">USTA/Team Tennis Number:</span>
+                        <br />
+                        <input type="text" id="q_tt_personId"/>
+                        <button id="btnPersonGO" type="button">GO</button>
+                        <br />
+                        <span class="normalDesciption">Team Number:</span>
+                        <br />
+                        <input type="text" id="q_tt_team_number"/>
+                        <button id="btnTeamNumberGO" type="button">GO</button>
+                        <br />
+                        <span class="normalDesciption">Match Number:</span>
+                        <br />
+                        <input type="text" id="q_tt_match_number"/>
+                        <button id="btnMatchGO" type="button">GO</button>
+                    </div>
+                </li>
+                <li>
+                    <div class="block last">
+                        <span class="subhead">OPTIONS</span>
+                        <br />
+                        <br />
+                        <a href="<#=rootUrl.teamTennis#>Main/Stats.aspx?Load=AdvSearch&Search=">League Advanced Search</a>
+                        <br />
+                        <a href="<#=rootUrl.teamTennis#>Main/Stats.aspx?Load=AdvSearch&Search=">Championship Advanced Search</a>
+                        <br />
+                        <a href="<#=rootUrl.teamTennis#>Main/Stats.aspx">View Team Tennis Stats & Standings</a>
+                        <br />
+                        <a href="<#=rootUrl.teamTennis#>Main/Stats.aspx">My Teams</a>
+                        <br />
+                        <a href="<#=rootUrl.teamTennis#>/Main/CreateOnlineAccount.aspx?Caller=Captain">Become a Coach/Manager</a>
+                        <br />
+                        <a href="<#=rootUrl.teamTennis#>/Main/CreateOnlineAccount.aspx?Caller=Coordinator">Become a Coordinator</a>
+                        <br />
+                        <a href="<#=rootUrl.teamTennis#>Main/ChampRegistration.aspx">Championship Registration</a>
+                    </div>
+                </li>
+            </ul>
+            </script>
+        </div>
+        <div id="q4" class="hidden">
+            <script type="text/html" id="flex_league_tmpl">
+            <ul>
+                <li>
+                    <div class="block">
+                        <span class="subhead">FIND A FLEX LEAGUE</span>
+                        <br />
+                        <br />
+                        <p>
+                            <label class="normalDesciption">Division:</label>
+                            <select id="q_sel_division">
+                                <option value="0">ALL</option>
+                            </select>
+                        </p>
+                        <p>
+                            <label class="normalDesciption">State:</label>
+                            <select id="q_sel_state1">
+                                <option value="0">ALL</option>
+                            </select>
+                        </p>
+                        <p>
+                            <label class="normalDesciption">Metro Area:</label>
+                            <select id="q_sel_metro_area1">
+                                    <option value="0">ALL</option>
+                            </select>
+                        </p>
+                        <p><button id="btnFindFlexLeague" type="button">Find</button></p>                                            
+                    </div>
+                </li>
+                <li>
+                    <div class="block">
+                        <span class="subhead">STATS & STANDINGS</span>
+                        <br />
+                        <br />
+                        <p>
+                            <label class="normalDesciption">Year:</label>
+                            <select id="q_fl_year">
+                                <option value="2008">2008</option>
+                                <option value="2009">2009</option>
+                                <option value="2010">2010</option>
+                                <option value="2011">2011</option>
+                                <option value="2012">2012</option>
+                                <option value="2013">2013</option>
+                                <option value="2014">2014</option>
+                                <option value="2015">2015</option>
+                                <option value="2016">2016</option>
+                                <option value="2017">2017</option>
+                                <option value="2018">2018</option>
+                                <option value="2019">2019</option>
+                                <option value="2020">2020</option>
+                            </select>
+                        </p>
+                        <p>
+                            <label class="normalDesciption">State:</label>
+                            <select id="q_sel_state2">
+                                <option value="0">ALL</option>
+                            </select>
+                        </p>
+                        <p>
+                            <label class="normalDesciption">Metro Area:</label>
+                            <select id="q_sel_metro_area2">
+                                <option value="0">ALL</option>
+                            </select>
+                        </p>
+                            <p>
+                            <label class="normalDesciption">Flex League:</label>
+                            <select id="q_sel_flex_league">
+                                <option value="0">-------------------</option>
+                            </select>
+                        </p>
+                            <p>
+                            <label class="normalDesciption">Flight:</label>
+                            <select id="q_sel_flight">
+                                <option value="0">-------------------</option>
+                            </select>
+                        </p>
+                        <p><button id="btnViewStatsAndStadings" type="button">View</button></p>      
+                    </div>
+                </li>
+                <li>
+                    <div class="block">
+                        <span class="subhead">FIND PLAYER RECORD</span>
+                        <br />
+                        <br />
+                        <p>
+                            <input type="text" id="q_fl_first_name" placeholder="First Name" style="width:200px"/>
+                        </p>
+                        <p>
+                            <input type="text" id="q_fl_last_name" placeholder="Last Name" style="width:200px"/>
+                        </p>
+                        <p>
+                            <input type="radio" name="q_player_record" checked="checked"/><span class="normalDesciption">Exact Match</span>
+                        </p>
+                        <p>
+                            <input type="radio" name="q_player_record" id="q_name_start_with"/><span class="normalDesciption">Name Starts With</span>
+                        </p>
+                        <p><button id="btnFindPlayerRecord" type="button">View</button></p>
+                    </div>
+                </li>
+                <li>
+                    <div class="block last">
+                        <span class="subhead">OPTIONS</span>
+                        <br />
+                        <br />
+                        <p class="fl-link" data-href="<#=rootUrl.flexLeagues#>PlayerRecord/Registrations.aspx">
+                            <a href="javascript:void(0);">My Registrations</a>
+                        </p>
+                        <p class="fl-link" data-href="<#=rootUrl.flexLeagues#>PlayerRecord/Matches.aspx">
+                            <a href="javascript:void(0);">My Matches</a>
+                        </p>
+                        <p class="fl-link" data-href="<#=rootUrl.dashboard#>Main/ManageAccount.aspx?App=2">
+                            <a href="javascript:void(0);">My Profile</a>
+                        </p>
+                        <p class="fl-link" data-href="<#=rootUrl.flexLeagues#>PlayerToPlayer/FLPlayerAvailability.aspx">
+                            <a href="javascript:void(0);">My Availability Calendar</a>
+                        </p>
+                    </div>
+                </li>
+            </ul>
+            </script> 
+        </div>
+        <div id="q5" style="display: none">
+            <script type="text/html" id="my_tennis_tmpl">
+            <ul>
+                <li style="width:280px;">
+                    <div class="block">
+                        <span class="subhead">WELCOME! <#=userName#></span>
+                        <br />
+                        <br />
+                        <img src="<#=imgUrl#>" style="width:60px; height:60px;float:left;margin-right:15px;border:1px solid white;">
+                        <span class="normalDesciption">
+                            <a href="<#=lnkSection.link#>"><#=lnkSection.text#></a> > <#=location#> 
+                            <br />
+                            Membership #: <#=ustaNumber#>
+                        </span>
+                        <br />
+                        <# if(!showWTNRatingLevel) { #>
+                        <span class="normalDesciption">NTRP Level:</span>
+                        <br />
+                        <div style="clear:both;margin-left:75px;">
+                            <div class="dyfirst">
+                                <#=ntrpLevel#>
+                            </div>
+                            <div style="clear:both;"></div>
+                            <# if(canUserAppeal) { #>
+                            <a href="#" onclick="window.open(\'<#=lnkAppealRatingLevel#>\', \'_blank\'); return false;">Appeal Rating Level</a>
+                            <#}#>
+                            <br />
+                            <a href="<#=lnkManageAccount#>">Manage Account</a>
+                            <br />
+                            <a href="javascript:void(0);"  onclick="logOut();">Logout</a>
+                        </div>
+                        <#} else {#>
+                        <span class="normalDesciption">WTN Rating Level:</span>
+                        <br />
+                        <div style="clear:both;margin-left:75px;">
+                            <div>
+                                <# if(juniorLevel.trim().length > 0) {#>
+                                <span class="wtnIntegerPart"><#=wtnLevelIntegerPart#></span>
+                                <span class="wtnDecimalPart">.<#=wtnLevelDecimalPart#></span>
+                                <#}#>
+                            </div>
+                            <div style="clear:both;"></div>
+                            <br />
+                            <a href="<#=lnkManageAccount#>">Manage Account</a>
+                            <br />
+                            <a href="javascript:void(0);"  onclick="logOut();">Logout</a>
+                        </div>
+                        <#}#>
+                    </div>
+                </li>
+                <li style="width:320px;">
+                    <div class="block">
+                        <span class="subhead">MY EVENTS</span>
+                            <br />
+                            <br />
+                        <#if(myEvent.canFindTournament){#>
+                        <span class="normalDesciption italic">TOURNAMENTS</span>
+                        <br />
+                        <#}#>                        
+                        <span class="normalDesciption">
+                            <# if(myEvent.tournament) { #>
+                            <a href="<#=myEvent.tournamentLink#>">
+                                <span class="truncate" style="width:150px;display:inline-block;" title="<#=myEvent.tournament#>"><#=myEvent.tournament#></span>
+                            </a>
+                            <span style="position:relative;top:-5px"><#=myEvent.tournamentDate#></span>
+                            <#}else if(myEvent.canFindTournament){#>
+                            <a href="<#=rootUrl.tournaments#>">Find a Tournament</a>
+                            <#}#>
+                        </span>
+                        <br />
+                        <#if(myEvent.canFindLeagues){#>
+                        <span class="normalDesciption italic">USTA LEAGUE</span>
+                        <br />
+                            <#}#>
+                            <# if(myEvent.leagues) { #>
+                            <a href="<#=myEvent.leaguesLink#>"><span class="truncate" style="width:250px;display:inline-block;" title="<#=myEvent.leagues#>"><#=myEvent.leagues#></span></a>
+                            <#}else if(myEvent.canFindLeagues){#>
+                            <span><a href="<#=rootUrl.leagues#>Common/Home.aspx">Find a League</a></span>
+                            <#}#>
+                        <br />
+                            <#if(myEvent.canFindTeamTennis){#>
+                        <span class="normalDesciption italic">JUNIOR TEAM TENNIS</span>
+                        <br />
+                            <#}#> 
+                            <# if(myEvent.teamTennis) { #>
+                            <a href="<#=myEvent.teamTennisLink#>"><span class="truncate" style="width:250px;display:inline-block;" title="<#=myEvent.teamTennis#>"><#=myEvent.teamTennis#></span></a>
+                            <#}else if(myEvent.canFindTeamTennis){#>
+                            <a href="<#=rootUrl.teamTennis#>Main/ProgramSearch.aspx">Find a Program</a>
+                            <#}#>
+                        <br />
+                        <#if(myEvent.canFindFlexLeagues){#>
+                        <span class="normalDesciption italic">USTA FLEX LEAGUES</span>
+                        <br />
+                        <#}#>
+                        <# if(myEvent.flexLeagues) { #>
+                        <a href="<#=myEvent.flexLeaguesLink#>"><span class="truncate" style="width:250px;display:inline-block;" title="<#=myEvent.flexLeagues#>"><#=myEvent.flexLeagues#></span></a>
+                        <#}else if(myEvent.canFindFlexLeagues){#>
+                        <a href="<#=rootUrl.flexLeagues#>FlightSettings/FLSearch.aspx">Find a Flex League</a>
+                        <#}#>                        
+                    </div>
+                </li>
+                <li style="width:320px;" style="display: none">
+                    <div class="block last">
+                            <span class="subhead hidden">RECENTLY VIEWED</span>
+                            <br />
+                            <br />
+                    </div>
+                </li>
+            </ul>
+            </script>
+        </div>  
+    </div>
+</div>
+
+<div id="divSSOAnnouncement" style="display:none;">
+    <script type="text/html" id="SSOAnnouncement_tmpl">
+        <div style="margin:10px;">
+            <div id="SSOAnnouncementContent">
+                <#=Content #>
+            </div><br />
+            <div>
+                <input data-id="Confirmed" name="chkConfirmed" type="checkbox" />
+                <label for="chkConfirmed"><#=ConfirmText #></label>
+                <input data-id="OK" type="button" class="button" value="<#=OkText #>" style="margin-left:50px;" />
+            </div>
+        </div>
+    </script>
+</div> 
+    </div>
+     <nav class="navbar navbar-expand-lg d-lg-none">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="#"></a>
+        <button class="navbar-toggler" type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#navbar-mobile-menu"
+                aria-controls="navbar-mobile-menu"
+                aria-expanded="false"
+                aria-label="Toggle navigation">
+            <span class="navbar-toggler-text">Menu</span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbar-mobile-menu">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" aria-expanded="false">USTA League</a>
+                    <ul class="dropdown-menu">
+                        <li class="dropdown-item"><a href="/Leagues/Common/Default.aspx">Leagues Home</a></li>
+                        <li class="dropdown-item"><a href="/Leagues/TLRegistration/Registration.aspx">Register with a Team #</a></li>
+                        <li class="dropdown-item"><a href="javascript:TL.JSCommon.RegistrationUtil.goRegistration();">Find &amp; Sign up for a League</a></li>
+                        <li class="dropdown-item"><a href="/Leagues/Scorecard/RecordAScore.aspx">Record a Score</a></li>
+                        <li class="dropdown-item"><a href="/Leagues/Main/StatsAndStandings.aspx?SearchType=3">Stats &amp; Standings</a></li>
+                        <li class="dropdown-item"><a href="/Leagues/reports/NTRP/AdvancedSearch.aspx">NTRP Rating Search</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/Tournaments/Common/Default.aspx">Tournaments</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/TeamTennis/Main/Home.aspx">Junior Team Tennis</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/FlexLeagues/Common/Home.aspx">USTA Flex Leagues</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/Dashboard/Main/Default.aspx">My Tennis</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+               
+        <div class="TennisLinkWrapper">
+            <div class="TennisLinkBody">
+                <div class="breadcrumb">
+                    <div style="float: left">
+                        <a href="https://www.USTA.com">Home</a> >
+                        <a id="ctl00_lnkTennisLink" href="/Dashboard/">TennisLink</a>
+                            >
+                        <a id="ctl00_lnkUSTALeague" href="../">USTA League &nbsp;</a>
+                    </div>
+                    
+   
+    
+    <div style="float: left; margin: 0px">
+        <div id="ctl00_breadcrumbs_UpdatePanelBreadcrumb">
+	
+                <a id="ctl00_breadcrumbs_lnbBtnBackToAdvancedSearch" href="javascript:__doPostBack(&#39;ctl00$breadcrumbs$lnbBtnBackToAdvancedSearch&#39;,&#39;&#39;)">> Stats & Standings</a>
+                &nbsp;>&nbsp; TennisLink League Reports - League Match
+                <!-- change this to "Stats and Standings > Advanced Search" when needed :) -->
+            
+</div>
+    </div>
+
+                </div>
+                <div id="ctl00_SocialMediaPanel_updatePnlSocialMedia">
+	
+        <script type="text/javascript" src="/Dashboard/Common/js/ga_social_tracking.js"
+            language="javascript"></script>
+        <input type="hidden" name="ctl00$SocialMediaPanel$isExistSocialMedia" id="ctl00_SocialMediaPanel_isExistSocialMedia" value="True" />
+        <div id="ctl00_SocialMediaPanel_pnlSocialMedia">
+		
+            <div style="float: right;height: 20px;" >
+                <div style="float: left; width: 60px">
+                    <div id="DEV1"></div>
+                    <div class="fb-like" data-href="https://tennislink.usta.com:443/Leagues/Main/StatsAndStandings.aspx?t=7&par1=DB00CE97EC901B07B493227A59582FAE6D5CB362C1&par2=2026&par3=0" data-send="false" data-layout="button_count" data-width="50" data-show-faces="true"></div>
+                </div>
+        
+                <div style="float: left; width: 70px">
+                    <a href="https://twitter.com/share" class="twitter-share-button" data-url="https://tennislink.usta.com:443/Leagues/Main/StatsAndStandings.aspx?t=7&par1=DB00CE97EC901B07B493227A59582FAE6D5CB362C1&par2=2026&par3=0" data-count="none" data-via="USTA">Tweet</a>
+                </div>
+        
+                <div style="float: left; width: 50px">
+
+                    <!-- Place this tag where you want the +1 button to render -->
+                    <div class="g-plusone" data-size="medium" data-annotation="none" data-href="https://tennislink.usta.com:443/Leagues/Main/StatsAndStandings.aspx?t=7&par1=DB00CE97EC901B07B493227A59582FAE6D5CB362C1&par2=2026&par3=0"></div>
+                </div>
+
+
+            </div>
+        
+	</div>
+    
+</div>
+<script type="text/javascript">
+    function contentPageLoad() {
+        var hasIcon = document.getElementById("ctl00_SocialMediaPanel_isExistSocialMedia")
+        if (hasIcon && hasIcon.value == "True") {
+            loadSocialMediaAsyn();
+        }
+    }
+
+
+</script>
+
+                <div style="clear: both">
+                </div>
+                
+    <style type="text/css">
+        .ss-search-member-name-year-btn {
+            height:25px;width:40px;border:#cccccc solid 1px;display:inline-block;line-height:25px;text-align:center;cursor:pointer;margin-right:5px;
+        }
+        .ss-search-member-name-year-btn.selected{
+            background-color:#accae6;font-weight:bold;border:#0b8ac2 solid 1px;
+        }
+    </style>
+  <script type="text/javascript">
+      (function () {
+          function addSelectOptions(arr, id, selVal, keyField, valueField, dataField) {
+              var $sel = $("#" + id);
+              if (!arr || arr.length == 0 || $sel.length == 0) return;
+              for (var i = 0; i < arr.length; i++) {
+                  var item = arr[i], str;
+                  var val = valueField ? item[valueField] : item;
+                  var key = keyField ? item[keyField] : item;
+
+                  if (selVal && selVal == val) {
+                      if (dataField) {
+                          str = String.format("<option value='{0}' data-{2}='{3}' selected='selected'>{1}</option>", key, val, dataField, item[dataField]);
+                      } else {
+                          str = String.format("<option value='{0}' selected='selected'>{1}</option>", key, val);
+                      }
+                  } else {
+                      if (dataField) {
+                          str = String.format("<option value='{0}' data-{2}='{3}'>{1}</option>", key, val, dataField, item[dataField]);
+                      } else {
+                          str = String.format("<option value='{0}'>{1}</option>", key, val);
+                      }
+                  }
+                  $sel.append(str);
+              }
+          }
+          function selectSearchMemberNameCriteriaYear() {
+              var $span = $(this), sYear = $span.text(),
+                  $yearAll = $(".ss-search-member-name-year-btn.all");
+              if (sYear != 'All') {
+                  if ($span.hasClass("selected")) {
+                      $span.removeClass("selected");
+                  } else {
+                      $span.addClass("selected");
+                      $yearAll.removeClass("selected");
+                  }
+              } else {
+                  $(".ss-search-member-name-year-btn").not(".all").removeClass("selected");
+                  $yearAll.addClass("selected");
+              }
+              updateCriteriaYearValue();
+          }
+
+          function updateCriteriaYearValue() {
+              var val = "", $criteriaYearHiddenField = $("#ss_search_member_name_criteria_year");
+              $(".ss-search-member-name-year-btn").not(".all").each(function () {
+                  if (!$(this).hasClass("selected")) return;
+                  if (val.length > 0) {
+                      val += "," + $(this).text();
+                  } else {
+                      val += $(this).text();
+                  }
+              });
+              $criteriaYearHiddenField.val(val);
+              if (val.length == 0) $(".ss-search-member-name-year-btn.all").addClass("selected");
+          }
+
+          function isArrayContain(item, arr) {
+              if (arr && arr.length > 0) {
+                  for (var i = 0; i < arr.length; i++) {
+                      if (item == arr[i]) return true;
+                  }
+              }
+              return false;
+          }
+          var loadSearchMemberNameCriteria = window.loadSearchMemberNameCriteria = function () {
+              var arrFirstLoadYears = null;
+              var $jsonSearForMemberFirstLoadYear = $('#ctl00_mainContent_ss_jsonSearForMemberFirstLoadYear');
+              if ($jsonSearForMemberFirstLoadYear.length > 0) {
+                  var val = $jsonSearForMemberFirstLoadYear.val();
+                  if (val) {
+                      arrFirstLoadYears = val.split(",");
+                  }
+              }
+
+              //ex:{ "City": ["San Antonio", "Miami", "Corpus Christi", "Midland"], "State": ["TX", "GA"], "Year": [2015, 2014, 2013, 2012, 2011] };
+              var jsonSearForMemberResultCriteria = null;
+              var $jsonSearForMemberResultCriteria = $('#ctl00_mainContent_ss_jsonSearForMemberResultCriteria');
+              if ($jsonSearForMemberResultCriteria.length > 0) {
+                  var val = $jsonSearForMemberResultCriteria.val();
+                  if (val) jsonSearForMemberResultCriteria = JSON.parse(val);
+              }
+              var jsonSearForMemberFilterCriteria = null;
+              var $jsonSearForMemberFilterCriteria = $('#ctl00_mainContent_ss_jsonSearForMemberFilterCriteria');
+              if ($jsonSearForMemberFilterCriteria.length > 0) {
+                  var val = $jsonSearForMemberFilterCriteria.val();
+                  if(val) jsonSearForMemberFilterCriteria = JSON.parse($jsonSearForMemberFilterCriteria.val());
+              }
+
+              if (jsonSearForMemberResultCriteria == null && jsonSearForMemberFilterCriteria == null) return;
+
+              var $divYears = $("#ss_div_search_member_name_criteria_year");
+              if ($divYears.length > 0) {
+                  var yearAllBtn = $('<span class="ss-search-member-name-year-btn all">All</span>').click(selectSearchMemberNameCriteriaYear);
+                  if (jsonSearForMemberFilterCriteria != null && (!jsonSearForMemberFilterCriteria.Year || jsonSearForMemberFilterCriteria.Year.length == 0)) {
+                      yearAllBtn.addClass("selected");
+                  }
+                  $divYears.append(yearAllBtn);
+                  for (var i = 0; i < jsonSearForMemberResultCriteria.Year.length; i++) {
+                      var iYear = jsonSearForMemberResultCriteria.Year[i];
+                      var $span = $('<span class="ss-search-member-name-year-btn">' + iYear + '</span>').click(selectSearchMemberNameCriteriaYear);
+
+                      if (jsonSearForMemberFilterCriteria == null) {
+                          if (isArrayContain(iYear, arrFirstLoadYears)) {
+                              $span.addClass("selected");
+                          }
+                      } else {
+                          if (jsonSearForMemberFilterCriteria.Year && jsonSearForMemberFilterCriteria.Year.length > 0) {
+                              if (isArrayContain(iYear, jsonSearForMemberFilterCriteria.Year)) {
+                                  $span.addClass("selected");
+                              }
+                          }
+                      }
+                      $divYears.append($span);
+                  }
+                  updateCriteriaYearValue();
+              }
+              var cityDef = jsonSearForMemberFilterCriteria && jsonSearForMemberFilterCriteria.City && jsonSearForMemberFilterCriteria.City.length > 0 ? jsonSearForMemberFilterCriteria.City[0] : null;
+              var stateDef = jsonSearForMemberFilterCriteria && jsonSearForMemberFilterCriteria.State && jsonSearForMemberFilterCriteria.State.length > 0 ? jsonSearForMemberFilterCriteria.State[0] : null;
+              var sectionDef = jsonSearForMemberFilterCriteria && jsonSearForMemberFilterCriteria.Section && jsonSearForMemberFilterCriteria.Section.length > 0 ? jsonSearForMemberFilterCriteria.Section[0] : null;
+              addSelectOptions(jsonSearForMemberResultCriteria.City, "ss_search_member_name_criteria_city", cityDef);
+              addSelectOptions(jsonSearForMemberResultCriteria.State, "ss_search_member_name_criteria_state", stateDef);
+              addSelectOptions(jsonSearForMemberResultCriteria.Section, "ss_search_member_name_criteria_section", sectionDef);
+
+              if (jsonSearForMemberFilterCriteria && jsonSearForMemberFilterCriteria.Gender && jsonSearForMemberFilterCriteria.Gender.length > 0) {
+                  $("#ss_search_member_name_criteria_gender").val(jsonSearForMemberFilterCriteria.Gender[0]);
+              }
+          }
+
+          function showError(error){
+              var errMessage = $("#ss_search_member_name_error");
+              errMessage.html(error);
+              errMessage.show();
+          }
+          function isInt(value) {
+              var reg = /\D/;
+              return value.match(reg) == null;
+          }
+
+          window.validateSearchMemberNameFromResultPage = function () {
+              var searchTerm = $("#ss_search_member_name").val().trim();
+              if (searchTerm.length == 0) {
+                  showError("Enter USTA Membership player name.");
+                  return false;
+              }
+              if (isInt(searchTerm) != true) {
+                  var result = validateSearchMemberName(searchTerm);
+                  if (!result.success) {
+                      showError(result.error);
+                      return false;
+                  }
+              }
+              return true;
+          }
+
+          Sys.WebForms.PageRequestManager.getInstance().add_endRequest(loadSearchMemberNameCriteria);
+          $(loadSearchMemberNameCriteria);
+      })();
+    </script>
+
+    <script type="text/javascript">
+        function PrintWithoutHeader() {
+            var SearchType = $('[id$=hdnSearchType]').val();
+            var printCSS = $('[id$=lnkCssType]')[0].href
+            if (SearchType == "BlankScorecard" || SearchType == "BlankMatchScorecard") {
+                $('[id$=lnkCssType]')[0].href = $('[id$=lnkCssType]')[0].href.replace("printC", "PrintWithoutHeader");
+            }
+            else {
+                $('[id$=lnkCssType]')[0].href = $('[id$=lnkCssType]')[0].href.replace("PrintWithoutHeader", "printC");
+            }
+        }
+        function PrintInDiffBrowser() {
+            $('[id$=litRightAd]').val() = "";
+            var BrowserType = navigator.appName;
+            if (BrowserType == "Netscape") {
+                window.print();
+            }
+            else {
+                window.print();
+            }
+        }
+        function ClearAllInputs() {
+            $("[id$=txtMatchNum]").val("");
+        }
+        function ClearAllInputsForSearchPlayer() {
+            $("[id$=txtUSTANum]").val("");
+            $("[id$=txtFirstName]").val("");
+            $("[id$=txtLastName]").val("");
+            $("[id$=cbxExactMatch]")[0].checked = false;
+        }
+    </script>
+
+    <div id="ctl00_mainContent_UpdatePanel1">
+	
+            <div id="ctl00_mainContent_UpdateProgress" style="display:none;">
+		
+                    <iframe id='Loading_HideSelect'></iframe>
+                    <div id='Loading_window'>
+                        <br />
+                        <img alt="Loading" src="../Common/images/loading.gif" />
+                    </div>
+                
+	</div>
+            
+            
+            
+            
+            
+            <div id="ctl00_mainContent_pnlMatchAnchor">
+		
+                <div class="TeamSummaryDetailShort">
+                    <div class="NoPrint">
+                        <div class="UserNav">
+                            <a onclick="return SaveTeamStandingAndMatchSummary();" id="ctl00_mainContent_lnkMatchAnchorSendToExcel" href="javascript:__doPostBack(&#39;ctl00$mainContent$lnkMatchAnchorSendToExcel&#39;,&#39;&#39;)">Send To Excel</a>
+                            | <a href="#" id="MatchAnchorPrint" onclick="window.print();return false;">Print Report</a>
+                        </div>
+
+                        <h1>TennisLink League Reports - League Match</h1>
+                    </div>
+                    <table id="ctl00_mainContent_tblMatchAnchor" class="TeamSummaryTable">
+			<tr>
+				<td class="subhead">
+                                    Flight
+                                </td>
+				<td class="subhead">
+                                    USTA Section
+                                </td>
+				<td class="subhead">
+                                    District/Area
+                                </td>
+				<td class="subhead last_right">
+                                    League
+                                </td>
+			</tr>
+			<tr>
+				<td class="top">
+                                    <strong>
+                                        Women's 3.5</strong>
+                                </td>
+				<td class="top">
+                                    <strong>
+                                        USTA/NO. CALIFORNIA</strong>
+                                </td>
+				<td class="top">
+                                    <strong>
+                                        NO. CALIFORNIA
+                                    </strong>
+                                </td>
+				<td class="top">
+                                    <a id="ctl00_mainContent_lnkLeagueForMatch" href="javascript:__doPostBack(&#39;ctl00$mainContent$lnkLeagueForMatch&#39;,&#39;&#39;)">2026 ADULT 18&Over</a>
+                                </td>
+			</tr>
+		</table>
+		
+                </div>
+                <div class="TeamSummaryMainColumn">
+                    <div class="margin-bottom12">
+                        <!-- the tabs -->
+                        <ul class="tabs">
+                            <li>
+                                <a id="ctl00_mainContent_lnkScoreCardForMatch" href="javascript:__doPostBack(&#39;ctl00$mainContent$lnkScoreCardForMatch&#39;,&#39;&#39;)">Score Card</a>
+                            </li>
+                            <li>
+                                <a id="ctl00_mainContent_lnkSummaryForMatch" href="javascript:__doPostBack(&#39;ctl00$mainContent$lnkSummaryForMatch&#39;,&#39;&#39;)">Summary</a>
+                            </li>
+                            <li>
+                                <a id="ctl00_mainContent_lnkTeamStandingsForMatch" href="javascript:__doPostBack(&#39;ctl00$mainContent$lnkTeamStandingsForMatch&#39;,&#39;&#39;)">Team Standings</a>
+                            </li>
+                            <li>
+                                <a id="ctl00_mainContent_lnkPlayerCountsForMatch" href="javascript:__doPostBack(&#39;ctl00$mainContent$lnkPlayerCountsForMatch&#39;,&#39;&#39;)">Player Counts</a>
+                            </li>
+                            <li>
+                                <a id="ctl00_mainContent_lnkMatchSummaryForMatch" href="javascript:__doPostBack(&#39;ctl00$mainContent$lnkMatchSummaryForMatch&#39;,&#39;&#39;)">Match Summary</a>
+                            </li>
+                            <li>
+                                <a id="ctl00_mainContent_lnkMatchScheduleForMatch" href="javascript:__doPostBack(&#39;ctl00$mainContent$lnkMatchScheduleForMatch&#39;,&#39;&#39;)">Match Schedule</a>
+                            </li>
+                            <li>
+                                <a id="ctl00_mainContent_lnkPlayerRosterForMatch" href="javascript:__doPostBack(&#39;ctl00$mainContent$lnkPlayerRosterForMatch&#39;,&#39;&#39;)">Player Roster</a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            
+	</div>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <div id="ctl00_mainContent_pnlScoreCard">
+		
+                <div class="TeamSummaryMainColumn">
+                    <div class="margin-bottom12">
+                        <!-- tab "panes" -->
+                        <div id="ctl00_mainContent_divScoreCard" class="panes">
+                            <table id="ctl00_mainContent_tblScoreCardHeader1" class="CommonTable Segmented" border="0" width="100%">
+			<tr>
+				<td colspan="9" align="center">
+                                            <font size='3'><strong>Scorecard for Match # 1011875481 in 2026 ADULT 18&Over</strong></font><br/ ><br /><strong>Status:&nbsp;</strong>Confirmed by Lisa Italia (V) &nbsp;&nbsp;&nbsp;&nbsp;Today's Date: 05/27/2026 12:44 AMEST<br><br>* Calculation of game-winning percentage does not include defaulted matches.
+                                        </td>
+			</tr>
+			<tr>
+				<td style="width: 15%">
+                                        </td>
+				<td class="top" style="width: 25%; border-right: 0px; vnd.ms-excel.numberformat:@;">
+                                            <b>
+                                                <a id="ctl00_mainContent_lnkHomeTeamForScoreCard" href="javascript:__doPostBack(&#39;ctl00$mainContent$lnkHomeTeamForScoreCard&#39;,&#39;&#39;)">ROUND HILL CC 18AW3.5B</a></b>
+                                            <br>
+                                            Team ID:&nbsp;*****
+                                        </td>
+				<td class="top" style="width: 5%; border-left: 0px; border-right: 0px;">
+                                        </td>
+				<td class="top" align="center" style="width: 10%">
+                                            Vs.
+                                        </td>
+				<td class="top" valign="top" style="width: 25%; border-right: 0px; vnd.ms-excel.numberformat:@;">
+                                            <b>
+                                                <a id="ctl00_mainContent_lnkVisitorTeamForScoreCard" href="javascript:__doPostBack(&#39;ctl00$mainContent$lnkVisitorTeamForScoreCard&#39;,&#39;&#39;)">WALNUT CREEK RC/Walnut Creek TC 18AW3.5A</a></b>
+                                            <br>
+                                            Team ID:&nbsp;
+                                            *****
+                                        </td>
+				<td class="top" style="width: 5%; border-left: 0px; border-right: 0px;">
+                                        </td>
+				<td id="ctl00_mainContent_tdPointsHeaderPaddingV" class="top" style="width: 0%; border-left: 0px;">
+                                        </td>
+				<td style="width: 15%">
+                                        </td>
+			</tr>
+		</table>
+		
+                            <table id="ctl00_mainContent_tblScoreCardHeader2" class="CommonTable Segmented" border="0" width="100%">
+			<tr>
+				<td colspan="7">
+                                            <table cellpadding="0" border="0" style="border-width:0px;border-style:None;">
+					<tr>
+						<td>
+                                                        Date Scheduled:&nbsp;<b>5/11/2026 6:30 PM</b>
+                                                    </td><td>
+                                                        Date Match Played:&nbsp;<b>5/11/2026</b>
+                                                    </td><td>
+                                                        Entry Date:&nbsp;<b>5/25/2026</b>
+                                                    </td>
+					</tr>
+				</table>
+                                        </td>
+			</tr>
+			<tr id="ctl00_mainContent_trScoreCardMatchWinCriteria">
+				<td colspan="7" style="text-align:left;">
+                                            <font size="-1"><strong>Match Win Criteria: </strong>Team Wins</font>
+                                        </td>
+			</tr>
+		</table>
+		
+                            <table id="ctl00_mainContent_tblScoreCardHeader3" class="CommonTable Segmented" border="0" width="100%">
+			<tr>
+				<td class="top" style="width: 15%">
+                                        </td>
+				<td class="top" valign="bottom" style="width: 20%; border-right: 0px;">
+                                            <font size="-1"><b>Home Team </b></font>
+                                        </td>
+				<td class="top" style="width: 5%; border-left: 0px;">
+                                        </td>
+				<td class="top" style="width: 10%">
+                                        </td>
+				<td class="top" valign="bottom" style="width: 20%; border-right: 0px;">
+                                            <font size="-1"><b>Visiting Team </b></font>
+                                        </td>
+				<td class="top" style="width: 5%; border-left: 0px;">
+                                        </td>
+				<td class="top" valign="bottom" style="width: 15%">
+                                            <font size="-1"><b>
+                                                3<sup>rd</sup> Set Tie-break</b></font>
+                                            <br>
+                                        </td>
+			</tr>
+		</table>
+		
+                            
+                                    <table class="CommonTable Segmented" border="0" width="100%">
+                                        
+                                        <tr>
+                                            <td class="top" style="width: 15%">
+                                                1# Doubles<br />6:30 PM
+                                            </td>
+                                            <td class="top" valign="top" align="left" style="width: 20%; border-right: 0px;">
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl00_lnkHomePlayer1" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl00$lnkHomePlayer1&#39;,&#39;&#39;)">Kara Chizever</a>
+                                                <br>
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl00_lnkHomePlayer2" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl00$lnkHomePlayer2&#39;,&#39;&#39;)">Shawn Young</a>
+                                                <br>
+                                                Completed
+                                            </td>
+                                            
+                                            <td class="top" style="width: 5%; border-left: none;">
+                                                &nbsp;<br />
+                                                <img src="https://tennislink.usta.com/Leagues/Common/Images/mark.gif" id="ctl00_mainContent_rptScoreCard_ctl00_imgHomePlayer" /><br />
+                                                &nbsp;
+                                            </td>
+                                            <td class="top" valign="top" align="center" style="width: 10%">
+                                                <font size="-1">Vs.<br></font>
+                                            </td>
+                                            <td class="top" valign="top" align="left" style="width: 20%; border-right: 0px;">
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl00_lnkVisitorPlayer1" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl00$lnkVisitorPlayer1&#39;,&#39;&#39;)">Lori Guariento</a>
+                                                <br>
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl00_lnkVisitorPlayer2" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl00$lnkVisitorPlayer2&#39;,&#39;&#39;)">Wendy Schofield</a>
+                                            </td>
+                                            
+                                            <td class="top" style="width: 5%; border-left: none;">
+                                                &nbsp;<br />
+                                                <br />
+                                                &nbsp;
+                                            </td>
+                                            <td class="top" style="width: 15%">
+                                                &nbsp;6-2<BR>&nbsp;6-0
+                                            </td>
+                                        </tr>
+                                
+                                    <table class="CommonTable Segmented" border="0" width="100%">
+                                        
+                                        <tr>
+                                            <td class="top" style="width: 15%">
+                                                1# Singles<br />6:30 PM
+                                            </td>
+                                            <td class="top" valign="top" align="left" style="width: 20%; border-right: 0px;">
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl01_lnkHomePlayer1" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl01$lnkHomePlayer1&#39;,&#39;&#39;)">Tori DeCoite</a>
+                                                <br>
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl01_lnkHomePlayer2" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl01$lnkHomePlayer2&#39;,&#39;&#39;)"></a>
+                                                <br>
+                                                Completed
+                                            </td>
+                                            
+                                            <td class="top" style="width: 5%; border-left: none;">
+                                                &nbsp;<br />
+                                                <br />
+                                                &nbsp;
+                                            </td>
+                                            <td class="top" valign="top" align="center" style="width: 10%">
+                                                <font size="-1">Vs.<br></font>
+                                            </td>
+                                            <td class="top" valign="top" align="left" style="width: 20%; border-right: 0px;">
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl01_lnkVisitorPlayer1" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl01$lnkVisitorPlayer1&#39;,&#39;&#39;)">Melanie Espejo</a>
+                                                <br>
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl01_lnkVisitorPlayer2" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl01$lnkVisitorPlayer2&#39;,&#39;&#39;)"></a>
+                                            </td>
+                                            
+                                            <td class="top" style="width: 5%; border-left: none;">
+                                                &nbsp;<br />
+                                                <img src="https://tennislink.usta.com/Leagues/Common/Images/mark.gif" id="ctl00_mainContent_rptScoreCard_ctl01_imgVisitorPlayer" /><br />
+                                                &nbsp;
+                                            </td>
+                                            <td class="top" style="width: 15%">
+                                                &nbsp;6-2<BR>&nbsp;6-2
+                                            </td>
+                                        </tr>
+                                
+                                    <table class="CommonTable Segmented" border="0" width="100%">
+                                        
+                                        <tr>
+                                            <td class="top" style="width: 15%">
+                                                2# Doubles<br />6:30 PM
+                                            </td>
+                                            <td class="top" valign="top" align="left" style="width: 20%; border-right: 0px;">
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl02_lnkHomePlayer1" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl02$lnkHomePlayer1&#39;,&#39;&#39;)">Andrea Eubanks</a>
+                                                <br>
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl02_lnkHomePlayer2" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl02$lnkHomePlayer2&#39;,&#39;&#39;)">Christine Brashear</a>
+                                                <br>
+                                                Completed
+                                            </td>
+                                            
+                                            <td class="top" style="width: 5%; border-left: none;">
+                                                &nbsp;<br />
+                                                <br />
+                                                &nbsp;
+                                            </td>
+                                            <td class="top" valign="top" align="center" style="width: 10%">
+                                                <font size="-1">Vs.<br></font>
+                                            </td>
+                                            <td class="top" valign="top" align="left" style="width: 20%; border-right: 0px;">
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl02_lnkVisitorPlayer1" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl02$lnkVisitorPlayer1&#39;,&#39;&#39;)">Linda Choi</a>
+                                                <br>
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl02_lnkVisitorPlayer2" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl02$lnkVisitorPlayer2&#39;,&#39;&#39;)">Isabella Feinberg</a>
+                                            </td>
+                                            
+                                            <td class="top" style="width: 5%; border-left: none;">
+                                                &nbsp;<br />
+                                                <img src="https://tennislink.usta.com/Leagues/Common/Images/mark.gif" id="ctl00_mainContent_rptScoreCard_ctl02_imgVisitorPlayer" /><br />
+                                                &nbsp;
+                                            </td>
+                                            <td class="top" style="width: 15%">
+                                                &nbsp;6-1<BR>&nbsp;6-1
+                                            </td>
+                                        </tr>
+                                
+                                    <table class="CommonTable Segmented" border="0" width="100%">
+                                        
+                                        <tr>
+                                            <td class="top" style="width: 15%">
+                                                2# Singles<br />6:30 PM
+                                            </td>
+                                            <td class="top" valign="top" align="left" style="width: 20%; border-right: 0px;">
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl03_lnkHomePlayer1" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl03$lnkHomePlayer1&#39;,&#39;&#39;)">Christine Reiners</a>
+                                                <br>
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl03_lnkHomePlayer2" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl03$lnkHomePlayer2&#39;,&#39;&#39;)"></a>
+                                                <br>
+                                                Completed
+                                            </td>
+                                            
+                                            <td class="top" style="width: 5%; border-left: none;">
+                                                &nbsp;<br />
+                                                <br />
+                                                &nbsp;
+                                            </td>
+                                            <td class="top" valign="top" align="center" style="width: 10%">
+                                                <font size="-1">Vs.<br></font>
+                                            </td>
+                                            <td class="top" valign="top" align="left" style="width: 20%; border-right: 0px;">
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl03_lnkVisitorPlayer1" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl03$lnkVisitorPlayer1&#39;,&#39;&#39;)">Stella So</a>
+                                                <br>
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl03_lnkVisitorPlayer2" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl03$lnkVisitorPlayer2&#39;,&#39;&#39;)"></a>
+                                            </td>
+                                            
+                                            <td class="top" style="width: 5%; border-left: none;">
+                                                &nbsp;<br />
+                                                <img src="https://tennislink.usta.com/Leagues/Common/Images/mark.gif" id="ctl00_mainContent_rptScoreCard_ctl03_imgVisitorPlayer" /><br />
+                                                &nbsp;
+                                            </td>
+                                            <td class="top" style="width: 15%">
+                                                &nbsp;6-2<BR>&nbsp;6-3
+                                            </td>
+                                        </tr>
+                                
+                                    <table class="CommonTable Segmented" border="0" width="100%">
+                                        
+                                        <tr>
+                                            <td class="top" style="width: 15%">
+                                                3# Doubles<br />6:30 PM
+                                            </td>
+                                            <td class="top" valign="top" align="left" style="width: 20%; border-right: 0px;">
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl04_lnkHomePlayer1" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl04$lnkHomePlayer1&#39;,&#39;&#39;)">Susie Hansen</a>
+                                                <br>
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl04_lnkHomePlayer2" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl04$lnkHomePlayer2&#39;,&#39;&#39;)">Laura Dommes</a>
+                                                <br>
+                                                Completed
+                                            </td>
+                                            
+                                            <td class="top" style="width: 5%; border-left: none;">
+                                                &nbsp;<br />
+                                                <img src="https://tennislink.usta.com/Leagues/Common/Images/mark.gif" id="ctl00_mainContent_rptScoreCard_ctl04_imgHomePlayer" /><br />
+                                                &nbsp;
+                                            </td>
+                                            <td class="top" valign="top" align="center" style="width: 10%">
+                                                <font size="-1">Vs.<br></font>
+                                            </td>
+                                            <td class="top" valign="top" align="left" style="width: 20%; border-right: 0px;">
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl04_lnkVisitorPlayer1" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl04$lnkVisitorPlayer1&#39;,&#39;&#39;)">Kelly Copland</a>
+                                                <br>
+                                                
+                                                <a id="ctl00_mainContent_rptScoreCard_ctl04_lnkVisitorPlayer2" href="javascript:__doPostBack(&#39;ctl00$mainContent$rptScoreCard$ctl04$lnkVisitorPlayer2&#39;,&#39;&#39;)">Sharon Sintchak</a>
+                                            </td>
+                                            
+                                            <td class="top" style="width: 5%; border-left: none;">
+                                                &nbsp;<br />
+                                                <br />
+                                                &nbsp;
+                                            </td>
+                                            <td class="top" style="width: 15%">
+                                                &nbsp;6-2<BR>&nbsp;7-5
+                                            </td>
+                                        </tr>
+                                
+                                    <tr>
+                                        <td id="ctl00_mainContent_rptScoreCard_ctl05_tdScoreCardBottomLine" class="bottomLine" colspan="6">
+                                        </td>
+		
+                                    </tr>
+                                    </table>
+                                
+                            <table id="ctl00_mainContent_tblScoreCardFooter">
+			<tr>
+				<td colspan="6">
+                                        <font size="2">
+                                            <hr color='silver'/>
+</font>
+                                    </td>
+			</tr>
+			<tr>
+				<td nowrap="nowrap">
+                                        <font size="-1">TOTAL TEAM SCORE:</font>
+                                    </td>
+			</tr>
+			<tr>
+				<td nowrap="nowrap">
+                                        <font size="-1">
+                                            ROUND HILL CC 18AW3.5B <font size=-1>(Home Team)</font> 2 WINS<BR>WALNUT CREEK RC/Walnut Creek TC 18AW3.5A <font size=-1>(Visiting Team)</font> 3 WINS</font>
+                                    </td>
+			</tr>
+			<tr>
+				<td nowrap="nowrap">
+                                        <font size="-1">*GAME WINNING %:</font>
+                                    </td>
+			</tr>
+			<tr>
+				<td nowrap="nowrap">
+                                        <font size="-1">
+                                            ROUND HILL CC 18AW3.5B <font size=-1>(Home Team)</font> 44.44%<BR>WALNUT CREEK RC/Walnut Creek TC 18AW3.5A <font size=-1>(Visiting Team)</font> 55.56%</font>
+                                    </td>
+			</tr>
+		</table>
+		
+                            <input type="hidden" name="ctl00$mainContent$hdnScoreCardShowPoints" id="ctl00_mainContent_hdnScoreCardShowPoints" value="False" />
+                        </div>
+                        
+                        
+                    </div>
+                </div>
+            
+	</div>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <!--USTA-17802 by Aaron Jee Begin-->
+            
+            <!--USTA-17802 by Aaron Jee End  -->
+
+            
+            
+            
+            
+            
+            
+            <input type="hidden" name="ctl00$mainContent$hdnSearchType" id="ctl00_mainContent_hdnSearchType" value="DefaultType" />
+            <input type="hidden" name="ctl00$mainContent$hfScoreEntryPopupShowHide" id="ctl00_mainContent_hfScoreEntryPopupShowHide" />
+            <input type="hidden" name="ctl00$mainContent$hfHistoryPointParam" id="ctl00_mainContent_hfHistoryPointParam" value="FGq643qvucjbm_STunc4jaUjTamf3UHY0" />
+        
+</div>
+
+    <script type="text/javascript">
+        //TL-17581 Tooltip Popup 
+        $('.hastooltip').each(function () {
+
+            $(this).qtip({
+                content: $(this).next('.tooltiptext'),
+                hide: {
+                    fixed: true,
+                    delay: 300
+                },
+                position: {
+                    target: 'mouse', // Use the mouse position as the position origin
+                    adjust: {
+                        // Don't adjust continuously the mouse, just use initial position
+                        mouse: false
+                    }
+                },
+                style: { classes: 'qtip-shadow myCustomClass', tip: false }
+            });
+        });
+
+        if ($("#ctl00_mainContent_hfScoreEntryPopupShowHide").val() == "false") {
+            $(".hastooltip")
+                .filter(function (index) {
+                    var playerIsInCPSubflight = $("+ .tooltiptext span[id$='_playerIsInCPSubFlight']", this).text();
+                    return playerIsInCPSubflight !== "true";
+                })
+                .unbind();
+        }
+
+        function ViewScore(MatchNumber, reportType, hasAccess) {
+            if (hasAccess == "True") {
+                location.href = "../Scorecard/RecordAScore.aspx?matchNumber=" + MatchNumber + "&ScoreEntry=1&BackToUrl=" + encodeURIComponent(window.location.href);
+            } else {
+                location.href = "../Main/StatsAndStandings.aspx?t=" + reportType + "&par1=" + MatchNumber + "&par2=2026&par3=0&BackToUrl=" + encodeURIComponent(window.location.href);
+            }
+            return true;
+        }
+        function ViewEnterScore(MatchNumber) {
+            location.href = "../Scorecard/RecordAScore.aspx?matchNumber=" + MatchNumber + "&BackToUrl=" + encodeURIComponent(window.location.href);
+            return true;
+        }
+        function PrintBlankScore(MatchNumber) {
+            window.open("../Scorecard/printscorecard.aspx?matchnum=" + MatchNumber + "&BackToUrl=" + encodeURIComponent(window.location.href), '_blank');
+            return false;
+        }
+        function PrintBlankScoreCP(MatchNumber) {
+            window.open("../Championship/Scorecard/BlankScorecard.aspx?team_match_id=" + MatchNumber + "&BackToUrl=" + encodeURIComponent(window.location.href), '_blank');
+            return false;
+        }
+        function ConfirmScore(MatchNumber) {
+            location.href = "../Scorecard/RecordAScore.aspx?matchNumber=" + MatchNumber + "&confirm=1&BackToUrl=" + encodeURIComponent(window.location.href);
+            return true;
+        }
+       
+        $(document).ready(function () {
+            //USTA-20221
+            //Leagues Advanced Search
+            if ($("#ctl00_mainContent_pnlSearchResult").length > 0 && $("#ctl00_mainContent_btnBackToSearch").length > 0) {
+                RunTLWidgetTracking($("#ctl00_mainContent_pnlSearchResult h1").html().replace(/(<([^>]+)>)/ig, "").replace(/&nbsp;/gi, ' ').split("Back To Search")[0].trim(), window.location.href);
+            }
+            //Invidual Players Record Search
+            if ($("#ctl00_mainContent_pnlSearchResult").length > 0 && $("#ctl00_mainContent_hResultTitle").length > 0) {
+                RunTLWidgetTracking($("#ctl00_mainContent_pnlSearchResult #ctl00_mainContent_hResultTitle").html().replace(/(<([^>]+)>)/ig, "").replace(/&nbsp;/gi, ' ').trim(), window.location.href);
+            }
+            //Invidual Players Record
+            if ($("#ctl00_mainContent_pnlIndividualAnchor").length > 0) {
+                RunTLWidgetTracking('Individual player Record: ' + $("#ctl00_mainContent_tblIndividualAnchor strong").html().trim(), window.location.href);
+            }
+            if ($("#ctl00_mainContent_tblCPDrillDownAnchor").length > 0) {
+                RunTLWidgetTracking('Championship Advanced Search Results', window.location.href);
+            }
+            //Special case for Champ scorecard reached from home page match # search
+            if ($("#ctl00_mainContent_tblCPScoreCardHeader").length > 0) {
+                RunTLWidgetTracking('Score Card - Champ: ' + $("#ctl00_mainContent_tblCPMatchAnchor strong").first().text().trim(), window.location.href.toLowerCase().split("statsandstandings.aspx")[0] + $(".share-link").attr("href"));
+            }
+            //Special case for Local League scorecard reached from home page match # search
+            if ($("#ctl00_mainContent_pnlMatchAnchor").length > 0) {
+                //USTA-21356 Only score card and Team standings tab
+                if ($(".tabs .current").html().replace(/(<([^>]+)>)/ig, "").trim() == "Score Card") {
+                    RunTLWidgetTracking('Score Card - League: ' + $("#ctl00_mainContent_lnkLeagueForMatch").text().trim(), window.location.href.toLowerCase().split("statsandstandings.aspx")[0] + $(".share-link").attr("href"));
+                }
+                if ($(".tabs .current").html().replace(/(<([^>]+)>)/ig, "").trim() == "Team Standings") {
+                    RunTLWidgetTracking('Team Standings - League: ' + $("#ctl00_mainContent_lnkLeagueForMatch").text().trim(), window.location.href.toLowerCase().split("statsandstandings.aspx")[0] + $(".share-link").attr("href"));
+                }
+            }
+            //Local League Team Standings page first load
+            if ($("#ctl00_mainContent_pnlFlightAnchor").length > 0) {
+                //USTA-21356 Only Track Team Standings tab
+                if ($(".tabs .current").html().replace(/(<([^>]+)>)/ig, "").trim() == "Team Standings") {
+                    RunTLWidgetTracking('Team Standings - Flight: ' + $("#ctl00_mainContent_tblFlightAnchor strong").html().trim(), window.location.href.toLowerCase().split("statsandstandings.aspx")[0] + $(".share-link").attr("href"));
+                }
+            }
+            if ($("#ctl00_mainContent_pnlSubFlightAnchor").length > 0) {
+                //USTA-21356 Only Track Team Standings tab
+                if ($(".tabs .current").html().replace(/(<([^>]+)>)/ig, "").trim() == "Team Standings") {
+                    RunTLWidgetTracking('Team Standings - SubFlight: ' + $("#ctl00_mainContent_tblSubFlightAnchor strong").html().trim(), window.location.href.toLowerCase().split("statsandstandings.aspx")[0] + $(".share-link").attr("href"));
+                }
+            }
+        });
+
+        function DisplayTeamMatchDefaultingStatus() {
+            $('.tblMatchSummarySearch').each(function () {
+                if ($(this).find('span.fullTeamDefault').length > 0) {
+                    $(this).find('span.fullTeamDefault').css('color','red');
+                    $(this).find('span.footnoteFullTeamDefault').css('display','');
+                } else {
+                    $(this).find('span.footnoteFullTeamDefault').remove();
+                }
+
+                if ($(this).find('span.invalidMatch').length > 0) {
+                    $(this).find('span.invalidMatch').css('color', 'red');
+                    $(this).find('span.footnoteInvalidMatch').css('display', '');
+                } else {
+                    $(this).find('span.footnoteInvalidMatch').remove();
+                }
+
+                $(this).find('span.notFullTeamDefault').remove();
+                $(this).find('span.notInvalidMatch').remove();
+            });
+
+            $('.tblCPMatchSummary').each(function () {
+                if ($(this).find('span.fullTeamDefault').length > 0) {
+                    $(this).find('span.fullTeamDefault').css('color', 'red');
+                    $(this).find('span.footnoteFullTeamDefault').css('display', '');
+                } else {
+                    $(this).find('span.footnoteFullTeamDefault').remove();
+                }
+
+                if ($(this).find('span.invalidMatch').length > 0) {
+                    $(this).find('span.invalidMatch').css('color', 'red');
+                    $(this).find('span.footnoteInvalidMatch').css('display', '');
+                } else {
+                    $(this).find('span.footnoteInvalidMatch').remove();
+                }
+
+                $(this).find('span.notFullTeamDefault').remove();
+                $(this).find('span.notInvalidMatch').remove();
+            });
+        }
+
+        Sys.WebForms.PageRequestManager.getInstance().add_endRequest(EndRequestHandler);
+        function EndRequestHandler(sender, args) {
+            //USTA-20221
+            //Leagues Advanced Search
+            if ($("#ctl00_mainContent_pnlSearchResult").length > 0 && $("#ctl00_mainContent_btnBackToSearch").length > 0) {
+                RunTLWidgetTracking($("#ctl00_mainContent_pnlSearchResult h1").html().replace(/(<([^>]+)>)/ig, "").replace(/&nbsp;/gi, ' ').split("Back To Search")[0].trim(), window.location.href.toLowerCase().split("statsandstandings.aspx")[0] + 'StatsAndStandings.aspx#&&s=' + $("#ctl00_mainContent_hfHistoryPointParam").val());
+            }
+            //Invidual Players Record
+            if ($("#ctl00_mainContent_pnlIndividualAnchor").length > 0) {
+                if ($("#ctl00_mainContent_hfHistoryPointParam").val().trim() == "") {
+                    RunTLWidgetTracking('Individual player Record: ' + $("#ctl00_mainContent_tblIndividualAnchor strong").html().trim(), window.location.href);
+                } else {
+                    RunTLWidgetTracking('Individual player Record: ' + $("#ctl00_mainContent_tblIndividualAnchor strong").html().trim(), window.location.href.toLowerCase().split("statsandstandings.aspx")[0] + 'StatsAndStandings.aspx#&&s=' + $("#ctl00_mainContent_hfHistoryPointParam").val());
+                }
+                
+            }
+            //Champ Advanced Search Results - for postbacks
+            if ($("#ctl00_mainContent_tblCPDrillDownAnchor").length > 0) {
+                RunTLWidgetTracking('Championship Advanced Search Results', window.location.href.toLowerCase().split("StatsAndStandings.aspx")[0] + 'statsandstandings.aspx#&&s=' + $("#ctl00_mainContent_hfHistoryPointParam").val());
+            }
+            if ($("#ctl00_mainContent_pnlTeamAnchor").length > 0) {
+                //USTA-21356 Only Track Team Summary tab
+                if ($(".tabs .current").html().replace(/(<([^>]+)>)/ig, "").trim() == "Team Summary"){
+                    RunTLWidgetTracking('Team Summary - ' + $(".TeamSummaryDetail h1").html().trim(), window.location.href.toLowerCase().split("statsandstandings.aspx")[0] + $(".share-link").attr("href"));
+                }
+            }
+            if ($("#ctl00_mainContent_pnlFlightAnchor").length > 0) {
+                //USTA-21356 Only Track Team Standings tab
+                if ($(".tabs .current").html().replace(/(<([^>]+)>)/ig, "").trim() == "Team Standings") {
+                    RunTLWidgetTracking('Team Standings - Flight: ' + $("#ctl00_mainContent_tblFlightAnchor strong").html().trim(), window.location.href.toLowerCase().split("statsandstandings.aspx")[0] + $(".share-link").attr("href"));
+                }
+            }
+            if ($("#ctl00_mainContent_pnlSubFlightAnchor").length > 0) {
+                //USTA-21356 Only Track Team Standings tab
+                if ($(".tabs .current").html().replace(/(<([^>]+)>)/ig, "").trim() == "Team Standings") {
+                    RunTLWidgetTracking('Team Standings - SubFlight: ' + $("#ctl00_mainContent_tblSubFlightAnchor strong").html().trim(), window.location.href.toLowerCase().split("statsandstandings.aspx")[0] + $(".share-link").attr("href"));
+                }
+            }
+            if ($("#ctl00_mainContent_pnlLeagueAnchor").length > 0) {
+                //USTA-21356 Only Track Team Standings tab
+                if ($(".tabs .current").html().replace(/(<([^>]+)>)/ig, "").trim() == "Team Standings"){
+                    RunTLWidgetTracking($(".tabs .current").html().replace(/(<([^>]+)>)/ig, "").trim() + ' - League: ' + $("#ctl00_mainContent_tblLeagueAnchor strong").html().trim(), window.location.href.toLowerCase().split("statsandstandings.aspx")[0] + $(".share-link").attr("href"));
+                }
+            }
+            if ($("#ctl00_mainContent_pnlMatchAnchor").length > 0) {
+                //USTA-21356 Only score card and Team standings tab
+                if ($(".tabs .current").html().replace(/(<([^>]+)>)/ig, "").trim() == "Score Card") {
+                    RunTLWidgetTracking('Score Card - League: ' + $("#ctl00_mainContent_lnkLeagueForMatch").text().trim(), window.location.href.toLowerCase().split("statsandstandings.aspx")[0] + $(".share-link").attr("href"));
+                }
+                if ($(".tabs .current").html().replace(/(<([^>]+)>)/ig, "").trim() == "Team Standings") {
+                    RunTLWidgetTracking('Team Standings - League: ' + $("#ctl00_mainContent_lnkLeagueForMatch").text().trim(), window.location.href.toLowerCase().split("statsandstandings.aspx")[0] + $(".share-link").attr("href"));
+                }
+            }
+            if ($("#ctl00_mainContent_tblCPFlightAnchor").length > 0) {
+                //USTA-21356 Only score card and Team standings tab
+                if ($(".tabs .current").html().replace(/(<([^>]+)>)/ig, "").trim() == "Score Card") {
+                    RunTLWidgetTracking('Score Card - Champ: ' + $("#ctl00_mainContent_tblCPFlightAnchor strong").first().text().trim(), window.location.href.toLowerCase().split("statsandstandings.aspx")[0] + $(".share-link").attr("href"));
+                }
+                if ($(".tabs .current").html().replace(/(<([^>]+)>)/ig, "").trim() == "Team Standings") {
+                    RunTLWidgetTracking('Team Standings - Champ: ' + $("#ctl00_mainContent_tblCPFlightAnchor strong").first().text().trim(), window.location.href.toLowerCase().split("statsandstandings.aspx")[0] + $(".share-link").attr("href"));
+                }
+            }
+            if ($("#ctl00_mainContent_pnlCPMatchAnchor").length > 0) {
+                //USTA-21356 Only score card and Team standings tab
+                if ($(".tabs .current").html().replace(/(<([^>]+)>)/ig, "").trim() == "Score Card") {
+                    RunTLWidgetTracking('Score Card - Champ: ' + $("#ctl00_mainContent_tblCPMatchAnchor strong").first().text().trim(), window.location.href.toLowerCase().split("statsandstandings.aspx")[0] + $(".share-link").attr("href"));
+                }
+                if ($(".tabs .current").html().replace(/(<([^>]+)>)/ig, "").trim() == "Team Standings") {
+                    RunTLWidgetTracking('Team Standings - Champ: ' + $("#ctl00_mainContent_tblCPMatchAnchor strong").first().text().trim(), window.location.href.toLowerCase().split("statsandstandings.aspx")[0] + $(".share-link").attr("href"));
+                }
+            }
+           
+            $("#accordion").accordion({
+                collapsible: true
+            });
+            $(function() {
+                AdjustDDLLeagueStyle();
+            });
+            SetupShareLink();
+          
+            PrintWithoutHeader();
+
+            AdjustTeamLevelStatsUI();
+            AdjustTeamStandingsForLeagueLevelUI();
+
+            //USTA-17802
+            AdjustTeamStandingsForChampionship();
+            //USTA-27991
+            AdjustCPScoreCardFooter();
+            
+            $("#divSubFlightsForTeamStandings").css("display", $("#ctl00_mainContent_divDetailsForTeamStandings").css("display"));
+            $("#divSubFlightListForMatchSummary").css("display", $("#ctl00_mainContent_pnlMatchSummary").css("display"));
+            
+            
+            //TL-17581 Tooltip Popup 
+            $('.hastooltip').each(function () {
+                
+                $(this).qtip({
+                    content: $(this).next('.tooltiptext'),
+                    hide: {
+                        fixed: true,
+                        delay: 300
+                    },
+                    position: {
+                        target: 'mouse', // Use the mouse position as the position origin
+                        adjust: {
+                            // Don't adjust continuously the mouse, just use initial position
+                            mouse: false
+                        }
+                    },
+                    style: { classes: 'qtip-shadow myCustomClass', tip: false }
+                });
+            });
+            
+            if ($("#ctl00_mainContent_hfScoreEntryPopupShowHide").val() == "false") {
+                $(".hastooltip")
+                    .filter(function (index) {
+                        var playerIsInCPSubflight = $("+ .tooltiptext span[id$='_playerIsInCPSubFlight']", this).text();
+                        return playerIsInCPSubflight !== "true";
+                    })
+                    .unbind();
+            }
+
+            AddPercentageDescription();
+            AdjustCPMatchSummaryUI();
+
+            //USTA-29870
+            DisplayTeamMatchDefaultingStatus();
+        }
+    </script>
+
+
+<link href="/Dashboard/Mobilizer/index.css" rel="stylesheet" />
+ <style type="text/css">    
+     .Search-Team {
+         width: 50%;
+         float: left;
+         padding: 0px 0px 0px 0px !important;
+     }
+                       
+    .btnFindStatsAndStandingForLeague{
+        margin-left:5px !important;
+    }
+    
+    .championship-button {
+        display: inline-block !important;
+        margin-left: 5px !important;
+        margin-top: 0px !important;
+    }
+
+     #accordion h3 {
+         clear:both;
+     }
+
+     .ui-accordion-content-active{
+         height:auto !important;
+     }
+
+     select,input[type=text]{
+         font-size:13px;
+     }
+
+     #accordion .row label{
+         padding-left:0;
+         padding-right:0;
+     }
+
+     #accordion .or{
+         width:90px;
+     }
+
+     input[type=submit].search-member-name {
+         float: none;
+         width: 100px;
+         margin-left: 320px;
+     }
+
+     .wide-scrollx-wrapper {
+         overflow-x: auto;
+     }
+
+     @media (max-width:999px) {
+        .TeamSummaryMainColumn {
+            width: 100%;
+        }
+
+        .wide-scrollx-wrapper {
+            width: 100%;
+            height: auto;
+            overflow-x: scroll;
+        }
+
+
+         .wide-scrollx-wrapper::-webkit-scrollbar { 
+            width: 0px;
+            height: 10px;
+        }
+
+        .wide-scrollx-wrapper::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .wide-scrollx-wrapper::-webkit-scrollbar-thumb {
+            background: #888;
+        }
+
+        .wide-scrollx-wrapper::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        } 
+
+
+        .TeamSummaryDetail .wide-scrollx-wrapper {
+            width: 90vw;
+        }
+
+        ul.tabs {
+            padding: 0;
+            margin: 0;
+        }
+
+        ul.tabs li {
+            height: 35px;
+        }
+
+        ul.tabs a {
+            padding: 3px;
+            display: inline-block;
+        }
+
+        ul.tabs a.current, ul.tabs a.current:hover, ul.tabs li.current a {
+            padding: 5px;
+            display: inline-block;
+        }
+
+        /*advance search*/
+        .content {
+            width: 100%;
+        }
+
+        #accordion {
+            width: 100%;
+        }
+
+        #accordion h3 a {
+        white-space: nowrap;
+        }
+
+        .Search-Team {
+            width: 100%;
+            float: none;
+            padding: 45px 0 !important;
+        }
+
+        div.ui-accordion-content {
+            height: auto !important
+        }
+
+        fieldset.float-left {
+            width: auto;
+            height: auto;
+        }
+
+         .spefic-error {
+             width: 100%;
+         }
+
+         #ctl00_mainContent_tblSSCPStandingsHeader {
+             clear:both;
+         }
+
+         input[type=submit].search-member-name{
+             float:none;
+             width:auto;
+             margin-left:0;
+         }
+     }
+
+     @media (max-width:679px) {
+         .btnFindStatsAndStandingForLeague {
+             margin-left: 0px !important;
+             margin-top: 5px !important;
+         }
+         .championship-button {
+             display: block !important;
+             clear: both;
+             margin-left: 0px !important;
+             margin-top: 5px !important;
+         }
+     }
+ </style>
+
+            </div>
+        </div>
+        <div class="TennisLinkRightRail">
+            <div class="cmsTowerAd">
+                <div class='play-tennis-widget-32363'>
+    <div id="slider_32363">
+        <div id="learnMore_32363">
+            <a href="https://www.usta.com/en/home/play/play-tennis-near-me.html" target="_blank">Learn More</a> 
+        </div>
+        <div class="slide-32363 active-slide-32363">
+            <div class="bule-32363 des-32363">
+                Want to find more tennis?
+            </div>
+            <div class="bule-32363 line-32363">
+            </div>
+            <img src="/Dashboard/common/widgets/PlayTennisBanner/images/blue.png">
+        </div>
+        <div class="slide-32363">
+            <div class="green-32363 des-32363">
+                Want to find more tennis?
+            </div>
+            <div class="green-32363 line-32363">
+            </div>
+            <img src="/Dashboard/common/widgets/PlayTennisBanner/images/green.png">
+        </div>
+        <div class="slide-32363">
+            <div class="purple-32363 des-32363">
+                Want to find more tennis?
+            </div>
+            <div class="purple-32363 line-32363">
+            </div>
+            <img src="/Dashboard/common/widgets/PlayTennisBanner/images/purple.png">
+        </div>
+        <div class="slide-32363">
+            <div class="yellow-32363 des-32363">
+                Want to find more tennis?
+            </div>
+            <div class="yellow-32363 line-32363">
+            </div>
+            <img src="/Dashboard/common/widgets/PlayTennisBanner/images/yellow.png">
+        </div>
+    </div>
+</div>
+<style type="text/css">
+
+@font-face { font-family: 'Graphik-Regular-App'; src: url('/Dashboard/common/widgets/PlayTennisBanner/font/Graphik-Regular-App.woff2') format('woff2'); }
+@font-face { font-family: 'Graphik-Semibold-App'; src: url('/Dashboard/common/widgets/PlayTennisBanner/font/Graphik-Semibold-App.woff2') format('woff2'); }
+@font-face { font-family: 'GraphikXXCondensed-Bold-App'; src: url('/Dashboard/common/widgets/PlayTennisBanner/font/GraphikXXCondensed-Bold-App.woff2') format('woff2'); }
+    .play-tennis-widget-32363 {
+        background-color: #fff;
+        border: 1px solid #000;
+        margin: 3px;
+        width: 163px;
+        height: 853px;
+        overflow:hidden;
+    }
+        .play-tennis-widget-32363 .bule-32363 {
+            background-color: #09B5F7;
+            color: #000;
+        }
+        .play-tennis-widget-32363 .green-32363 {
+            background-color: #A4ED91;
+            color: #000;
+        }
+        .play-tennis-widget-32363 .purple-32363 {
+            background-color: #7B4E91;
+            color: #fff;
+        }
+        .play-tennis-widget-32363 .yellow-32363 {
+            background-color: #FFEFBE;
+            color: #000;
+        }
+        .play-tennis-widget-32363 #slider_32363 {
+            position: relative;
+        }
+        .play-tennis-widget-32363 .slide-32363 {
+            display: none;
+            width: 100%;
+        }
+            .play-tennis-widget-32363 .slide-32363 img {
+                width: 100%;
+            }
+            .play-tennis-widget-32363 .slide-32363.active-slide-32363 {
+                display: block;
+            }
+        .play-tennis-widget-32363 .des-32363 {
+            height: 360px;
+            font-family: GraphikXXCondensed-Bold-App;
+            font-size: 48pt;
+            line-height: 65px;
+            padding: 10px 0px 0px 10px;
+        }
+        .play-tennis-widget-32363 .line-32363 {
+            height: 3px;
+            margin-top: 3px;
+            margin-bottom: 6px;
+        }
+        .play-tennis-widget-32363 #learnMore_32363 {
+            position: absolute;
+            top: 290px;
+            text-align: center;
+            width: 100%
+        }
+            .play-tennis-widget-32363 #learnMore_32363 a {
+                width: 120px;
+                margin: auto;
+                background-color: #000;
+                color: #fff;
+                border-radius: 20px;
+                display: block;
+                height: 32px;
+                font-size: 14px;
+                line-height: 32px;
+                font-family: Graphik-Semibold-App;
+                text-decoration:none;
+            }
+            .play-tennis-widget-32363 #learnMore_32363 a:hover { 
+                text-decoration: none;
+            }
+</style>
+
+<script>
+    $(document).ready(function () {
+        var slides = $('.play-tennis-widget-32363 #slider_32363 .slide-32363');
+        var currentIndex = 0; 
+        setInterval(function () {            
+            $(slides[currentIndex]).removeClass('active-slide-32363');
+            currentIndex = (currentIndex + 1) % slides.length; 
+            $(slides[currentIndex]).addClass('active-slide-32363');
+        }, 10000); 
+    });
+</script>
+            </div>
+        </div>
+        <div class="tennislink-footer-wrapper">
+            <div class="TennisLinkFooter">
+                <!--Chris Redirect URL-->
+                
+               <!--Chris End-->
+                
+<script type='text/javascript'>
+    var googletag = googletag || {};
+    googletag.cmd = googletag.cmd || [];
+    (function () {
+        var gads = document.createElement('script');
+        gads.async = true;
+        gads.type = 'text/javascript';
+        var useSSL = 'https:' == document.location.protocol;
+        gads.src = (useSSL ? 'https:' : 'http:') +
+        '//www.googletagservices.com/tag/js/gpt.js';
+        var node = document.getElementsByTagName('script')[0];
+        node.parentNode.insertBefore(gads, node);
+    })();
+</script>
+<script type='text/javascript'>
+    googletag.cmd.push(function () {
+        googletag.defineSlot('/5681/USTA/Leagues/300x250_Left', [300, 250], 'Leagues_300x250_Left').addService(googletag.pubads());
+        googletag.defineSlot('/5681/USTA/Leagues/300x250_Middle', [300, 250], 'Leagues_300x250_Middle').addService(googletag.pubads());
+        googletag.defineSlot('/5681/USTA/Leagues/300x250_Right', [300, 250], 'Leagues_300x250_Right').addService(googletag.pubads());
+        googletag.pubads().enableSingleRequest();
+        googletag.enableServices();
+    });
+</script>
+<style>
+#Leagues_300x250_Left
+{
+    float:left;
+    padding: 10px 0 0 0px;
+}
+#Leagues_300x250_Middle, #Leagues_300x250_Right
+{
+    float:left;
+    padding: 10px 0 0 50px;
+}
+</style>
+
+<div id='Leagues_300x250_Left'>
+<script type='text/javascript'>
+    googletag.cmd.push(function () { googletag.display('Leagues_300x250_Left'); });
+</script>
+</div>
+
+<div id='Leagues_300x250_Middle'>
+<script type='text/javascript'>
+    googletag.cmd.push(function () { googletag.display('Leagues_300x250_Middle'); });
+</script>
+</div>
+
+<div id='Leagues_300x250_Right' >
+<script type='text/javascript'>
+    googletag.cmd.push(function () { googletag.display('Leagues_300x250_Right'); });
+</script>
+</div>
+
+
+            </div>
+            <div class="container ustaFooter" id="ustaFooterDiv">
+                
+                <script src='https://www.usta.com/thirdparty/include_sitefooter.js.aspx?d=1'></script>
+                
+                <span id="ctl00_lblBuildNumber" style="color:#477DC6;">Code 1.26.051.8380</span>
+                
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Start Quantcast tag --> <script type="text/javascript"> _qoptions={ qacct:"p-74uD-kgmvp83w" }; </script> <script type="text/javascript" src="//secure.quantserve.com/quant.js"></script> <noscript> <img src="//secure.quantserve.com/pixel/p-74uD-kgmvp83w.gif" style="display: none;" border="0" height="1" width="1" alt="Quantcast"/> </noscript> <!-- End Quantcast tag -->
+    
+<script type="text/javascript" src="/Dashboard/Common/js/AdobeTracker.js"></script>  
+
+<div id="ctl00_ucHB_newSiteCatalyst">
+	
+
+    <!--Adobe Launch Script-->
+    <script src="https://assets.adobedtm.com/15c795eb812c/4ff15bded0fc/launch-108cb2d65a52.min.js" async></script>
+    
+        <script type="text/javascript">
+            window.addEventListener("load", function () {
+                window.AdobeTrackerService.track_uaid('920522940');
+            });
+        </script>
+    
+    <script type="text/javascript">
+        window.addEventListener("load", function () {
+            window.AdobeTrackerService.track_pageName('https://tennislink.usta.com/Leagues/Main/StatsAndStandings.aspx');
+        });
+    </script>
+
+</div>
+    
+
+    <script type="text/javascript">
+     
+        Sys.WebForms.PageRequestManager.getInstance().add_endRequest(EndRequestHandler);
+        function EndRequestHandler(sender, args) {   
+            /*reset default button */
+            __defaultFired = false;
+        }
+        
+    </script>        
+    
+ <script type='text/javascript'>$('[id$=lnkScoreCardForMatch]').parent().parent().children().removeClass('current');$('[id$=lnkScoreCardForMatch]').parent().addClass('current')</script>
+<script type="text/javascript">
+//<![CDATA[
+Sys.Application.add_init(function() {
+    $create(Sys.UI._UpdateProgress, {"associatedUpdatePanelId":null,"displayAfter":500,"dynamicLayout":true}, null, null, $get("ctl00_mainContent_UpdateProgress"));
+});
+//]]>
+</script>
+</form>    
+
+    <iframe id="ifrmSyncUSTASSO" src="https://tennislink.usta.com/Dashboard/Common/SyncUSTASSO.aspx" width="0" height="0"></iframe>
+</body>
+</html>
