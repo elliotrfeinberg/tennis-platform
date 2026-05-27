@@ -31,9 +31,11 @@ export {
   teamProfileUrl,
   flightStandingsUrl,
   scorecardUrl,
+  playerProfileUrl,
   type SearchCriteria,
   type TeamRef,
   type ScorecardRef,
+  type PlayerRef,
 } from "./tennislinkUrls.js";
 
 export {
@@ -57,6 +59,13 @@ export {
   type ScorecardCourt,
   type ScorecardSet,
 } from "./parseScorecard.js";
+
+export {
+  parsePlayerProfile,
+  type ParsedPlayerProfile,
+  type PlayerProfileHeader,
+  type PlayerMatchRow,
+} from "./parsePlayerProfile.js";
 
 export {
   parseRobots,
@@ -85,3 +94,10 @@ export {
   type OpponentPar1Error,
   type ExtractOpponentPar1sResult,
 } from "./extractOpponentPar1s.js";
+
+export {
+  harvestPlayerPar1s,
+  type PlayerPar1Entry,
+  type PlayerPar1Error,
+  type HarvestPlayerPar1sResult,
+} from "./harvestPlayerPar1s.js";

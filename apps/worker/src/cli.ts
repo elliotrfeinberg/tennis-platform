@@ -25,11 +25,15 @@ import {
   crawlTeam,
   defaultSessionPath,
   extractOpponentPar1s,
+  harvestPlayerPar1s,
   initSessionTemplate,
   loadSession,
+  parsePlayerProfile,
   parsePlayerSearch,
   parseRobots,
+  playerProfileUrl,
   teamProfileUrl,
+  type PlayerPar1Entry,
   type UstaSession,
 } from "@tennis/scraper";
 
@@ -290,7 +294,7 @@ async function crawlTeamCmd(
 async function crawlSubflightCmd(
   par1: string,
   year: number,
-  opts: { rootDir: string }
+  opts: { rootDir: string; includePlayers: boolean }
 ) {
   const session = await loadSession();
   const ownProfileUrl = teamProfileUrl({ par1, year });
@@ -300,20 +304,22 @@ async function crawlSubflightCmd(
   await mkdir(subflightDir, { recursive: true });
   console.error(`Subflight crawl: par1=${par1} year=${year}`);
   console.error(`  staging dir: ${subflightDir}`);
+  console.error(`  include players: ${opts.includePlayers}`);
+  const totalPhases = opts.includePlayers ? 4 : 2;
 
-  // Phase 1: harvest opponent par1s via browser.
-  console.error("Phase 1/2: harvesting opponent par1s via Chromium...");
+  // Browser stays alive across all Playwright phases — Phase 1 (opponent
+  // par1 harvest) and, if --include-players, Phase 3 (player par1
+  // harvest). Closed in the outer finally.
   const browser = new BrowserFetcher({
     session,
     minDelayMs: 3000,
     maxDelayMs: 5000,
   });
-  let harvest;
   try {
-    harvest = await extractOpponentPar1s(browser, ownProfileUrl);
-  } finally {
-    await browser.close();
-  }
+
+  // Phase 1: harvest opponent par1s via browser.
+  console.error(`Phase 1/${totalPhases}: harvesting opponent par1s via Chromium...`);
+  const harvest = await extractOpponentPar1s(browser, ownProfileUrl);
   await writeFile(
     join(subflightDir, "par1s.json"),
     JSON.stringify(harvest, null, 2) + "\n",
@@ -330,7 +336,7 @@ async function crawlSubflightCmd(
   }
 
   // Phase 2: run crawlTeam against each team via PoliteFetcher.
-  console.error("Phase 2/2: crawling each team via PoliteFetcher...");
+  console.error(`Phase 2/${totalPhases}: crawling each team via PoliteFetcher...`);
   const fetcher = new PoliteFetcher({
     userAgent: session.userAgent,
     contactEmail: session.contactEmail,
@@ -433,6 +439,118 @@ async function crawlSubflightCmd(
     ? `${ownTeamId}-subflight`
     : stagingKey;
 
+  // Phase 3 + 4 (optional): per-team player par1 discovery, then
+  // per-player profile fetch. Both are deduped across teams by USTA
+  // member id — a player on multiple teams is fetched once.
+  const playerResults: Array<{
+    name: string;
+    memberId: string | undefined;
+    playerPar1: string;
+    teams: string[]; // team names where this player appears
+    ok: boolean;
+    matchCount?: number;
+    error?: string;
+  }> = [];
+  if (opts.includePlayers) {
+    // Map memberId (or name fallback) → entry so re-encounters across
+    // teams just append to .teams[] instead of double-fetching.
+    const byKey = new Map<
+      string,
+      { entry: PlayerPar1Entry; teams: string[] }
+    >();
+    console.error(
+      `Phase 3/${totalPhases}: harvesting player par1s via Chromium (per team rosters)...`
+    );
+    for (const target of allTargets) {
+      const target_team_url = teamProfileUrl({ par1: target.par1, year });
+      console.error(`  roster of ${target.teamName}...`);
+      try {
+        const rosterResult = await harvestPlayerPar1s(browser, target_team_url);
+        console.error(
+          `    recovered ${rosterResult.players.length} player par1s; ${rosterResult.errors.length} errors`
+        );
+        for (const e of rosterResult.errors) {
+          console.error(`    ! ${e.name}: ${e.message}`);
+        }
+        for (const p of rosterResult.players) {
+          const key = p.memberId ?? `name:${p.name}`;
+          const existing = byKey.get(key);
+          if (existing) {
+            existing.teams.push(rosterResult.teamName);
+          } else {
+            byKey.set(key, { entry: p, teams: [rosterResult.teamName] });
+          }
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`    ERROR: ${message}`);
+      }
+    }
+    console.error(
+      `  unique players across subflight: ${byKey.size}`
+    );
+
+    // Phase 4: PoliteFetcher each unique player profile. Persist raw +
+    // parsed under raw/{subflightDir}/players/{memberId-or-par1}/.
+    console.error(
+      `Phase 4/${totalPhases}: fetching unique player profiles via PoliteFetcher...`
+    );
+    const playersRoot = join(subflightDir, "players");
+    await mkdir(playersRoot, { recursive: true });
+    for (const { entry, teams } of byKey.values()) {
+      const key = entry.memberId ?? entry.playerPar1.slice(0, 12);
+      const playerDir = join(playersRoot, key);
+      await mkdir(playerDir, { recursive: true });
+      const url = playerProfileUrl({ par1: entry.playerPar1, year });
+      try {
+        const res = await fetcher.fetch(url);
+        if (!res.body) {
+          playerResults.push({
+            name: entry.name,
+            memberId: entry.memberId,
+            playerPar1: entry.playerPar1,
+            teams,
+            ok: false,
+            error: `empty body (status ${res.status})`,
+          });
+          console.error(
+            `    ${entry.name}: empty body (status ${res.status})`
+          );
+          continue;
+        }
+        await writeFile(join(playerDir, "profile.html"), res.body, "utf8");
+        const parsed = parsePlayerProfile(res.body);
+        await writeFile(
+          join(playerDir, "parsed.json"),
+          JSON.stringify({ teams, ...parsed }, null, 2) + "\n",
+          "utf8"
+        );
+        playerResults.push({
+          name: entry.name,
+          memberId: entry.memberId,
+          playerPar1: entry.playerPar1,
+          teams,
+          ok: true,
+          matchCount: parsed.matches.length,
+        });
+        console.error(
+          `    ${entry.name}: ${parsed.matches.length} matches across ${teams.length} team(s)`
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        playerResults.push({
+          name: entry.name,
+          memberId: entry.memberId,
+          playerPar1: entry.playerPar1,
+          teams,
+          ok: false,
+          error: message,
+        });
+        console.error(`    ${entry.name}: ERROR ${message}`);
+      }
+    }
+  }
+
   // Write the parsed aggregate. Pointers to per-team blobs instead of
   // inlining all parsed teams (~MBs) to keep the aggregate browsable.
   const aggregate = {
@@ -443,6 +561,7 @@ async function crawlSubflightCmd(
     ownTeamId,
     rawDir: subflightDir,
     teams: teamResults,
+    players: opts.includePlayers ? playerResults : undefined,
     par1HarvestErrors: harvest.errors,
   };
   const parsedFile = join(
@@ -456,8 +575,14 @@ async function crawlSubflightCmd(
   console.error(`Wrote ${parsedFile}`);
   const successCount = teamResults.filter((t) => t.ok).length;
   console.error(
-    `Subflight crawl complete: ${successCount}/${teamResults.length} teams ok`
+    `Subflight crawl complete: ${successCount}/${teamResults.length} teams ok` +
+      (opts.includePlayers
+        ? `, ${playerResults.filter((p) => p.ok).length}/${playerResults.length} players ok`
+        : "")
   );
+  } finally {
+    await browser.close();
+  }
 }
 
 // Follow a __doPostBack through a real Chromium so USTA's CSRF-reinit JS
@@ -497,7 +622,7 @@ function usage(): never {
   tennis-scrape session init
   tennis-scrape session check [probe-url]
   tennis-scrape crawl team <par1> <year> [--out <dir>]   (default --out: ./captures)
-  tennis-scrape crawl subflight <par1> <year> [--out <dir>]
+  tennis-scrape crawl subflight <par1> <year> [--out <dir>] [--include-players]
 
 Env:
   TENNIS_CONTACT_EMAIL  email site admins can use to reach you
@@ -548,6 +673,7 @@ async function main() {
         if (sub !== "team" && sub !== "subflight") usage();
         const positional: string[] = [];
         let outDir = "captures";
+        let includePlayers = false;
         for (let i = 0; i < rest.length; i++) {
           const arg = rest[i]!;
           if (arg === "--out") {
@@ -555,6 +681,8 @@ async function main() {
             if (!next) usage();
             outDir = next;
             i += 1;
+          } else if (arg === "--include-players") {
+            includePlayers = true;
           } else {
             positional.push(arg);
           }
@@ -565,7 +693,10 @@ async function main() {
         if (sub === "team") {
           await crawlTeamCmd(positional[0]!, year, { rootDir: outDir });
         } else {
-          await crawlSubflightCmd(positional[0]!, year, { rootDir: outDir });
+          await crawlSubflightCmd(positional[0]!, year, {
+            rootDir: outDir,
+            includePlayers,
+          });
         }
         break;
       }

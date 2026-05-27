@@ -69,6 +69,10 @@ export interface ScheduleRow {
 export interface RosterEntry {
   name: string;
   ntrp: number | undefined;
+  // DOM id of the player-name anchor — needed for clickPostback-based
+  // player par1 discovery. Roster names are __doPostBack only; no par1
+  // in the href.
+  linkButtonId: string | undefined;
 }
 
 export interface ParsedTeamProfile {
@@ -305,19 +309,16 @@ function parseRoster($: CheerioAPI): RosterEntry[] {
     if ($cells.first().is("td.subhead")) return;
     // Cells come in (Name, NTRP) pairs; some pairs may be empty padding.
     for (let i = 0; i + 1 < $cells.length; i += 2) {
-      const name = $cells
-        .eq(i)
-        .find("a")
-        .first()
-        .text()
-        .replace(/\s+/g, " ")
-        .trim();
+      const $anchor = $cells.eq(i).find("a").first();
+      const name = $anchor.text().replace(/\s+/g, " ").trim();
       if (!name) continue;
+      const linkButtonId = $anchor.attr("id");
       const ntrpText = $cells.eq(i + 1).text().trim();
       const ntrp = ntrpText ? Number(ntrpText) : undefined;
       entries.push({
         name,
         ntrp: ntrp !== undefined && Number.isFinite(ntrp) ? ntrp : undefined,
+        linkButtonId,
       });
     }
   });

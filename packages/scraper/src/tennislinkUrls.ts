@@ -96,3 +96,22 @@ export function scorecardUrl(ref: ScorecardRef): string {
     `&par2=${ref.year}&par3=${flight}`
   );
 }
+
+// Player-record page: all matches a player played in a given year,
+// grouped by team-context. par1 is the player's hex token — different
+// namespace from team par1s (34 chars vs ~42), discovered by clicking
+// a roster name (a ViewScore-style __doPostBack) and reading the
+// destination page's canonical share URL. Mode t=8.
+export interface PlayerRef {
+  par1: string; // player hex token, e.g. DB0015BB82D06F8695947B4A59485F5E2D
+  year: number;
+  flight?: number; // par3, 0 in the cases we've seen
+}
+export function playerProfileUrl(ref: PlayerRef): string {
+  const flight = ref.flight ?? 0;
+  return (
+    `${BASE}/Leagues/Main/StatsAndStandings.aspx` +
+    `?t=8&par1=${encodeURIComponent(ref.par1)}` +
+    `&par2=${ref.year}&par3=${flight}`
+  );
+}
