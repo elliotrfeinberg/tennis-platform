@@ -36,6 +36,12 @@ import {
   type PlayerPar1Entry,
   type UstaSession,
 } from "@tennis/scraper";
+import {
+  computeRatings,
+  labeledRows,
+  loadCaptures,
+} from "@tennis/calibrate";
+import { fitCalibration, glickoToNtrp } from "@tennis/ratings";
 
 const ENV_CONTACT = process.env.TENNIS_CONTACT_EMAIL;
 const ENV_UA = process.env.TENNIS_USER_AGENT ?? "TennisPlatform/0.1";
@@ -612,6 +618,109 @@ async function browserPostback(
   }
 }
 
+// Run the full ratings pipeline against a parsed subflight aggregate:
+// load captures → chronological Glicko → fit Glicko→NTRP linear
+// regression against labeled rosters. Prints a summary table and a
+// fit-quality report; writes calibration.json + ratings.json next to
+// the input.
+async function ratingsFitCmd(
+  aggregatePath: string,
+  opts: { minMatches: number }
+) {
+  console.error(`Loading captures from ${aggregatePath}`);
+  const captures = await loadCaptures(aggregatePath);
+  console.error(
+    `  ${captures.players.size} players, ${captures.matches.length} court matches`
+  );
+  if (captures.unresolvedNames.length > 0) {
+    console.error(
+      `  ${captures.unresolvedNames.length} unresolved scorecard names (won't get NTRP labels)`
+    );
+  }
+
+  console.error("Running chronological Glicko-2 update...");
+  const result = computeRatings(captures);
+  console.error(
+    `  computed ${result.ratings.size} ratings; skipped ${result.skipped} matches (no winner)`
+  );
+
+  const rows = labeledRows(captures, result, { minMatches: opts.minMatches });
+  console.error(
+    `  ${rows.length} players with NTRP label and ≥${opts.minMatches} matches`
+  );
+  if (rows.length < 10) {
+    console.error("Not enough labeled players to fit (need ≥10). Aborting.");
+    process.exit(1);
+  }
+
+  // NTRP labels in our data come from the team roster — those are
+  // typically the *level the player plays at* (3.5, 4.0, etc.), not a
+  // continuous rating. Treat them as discrete bands for the fit.
+  const calib = fitCalibration(
+    rows.map((r) => ({ glickoRating: r.rating, ntrpLevel: r.ntrp }))
+  );
+  console.error(
+    `Fit: NTRP ≈ ${calib.slope.toFixed(6)} * glicko + ${calib.intercept.toFixed(4)}`
+  );
+  console.error(`     RMSE ${calib.rmse.toFixed(4)} over ${calib.sampleSize} players`);
+
+  // Per-band predicted ranges (useful sanity-check: does the fit place
+  // 3.5 players inside the 3.0–3.5 NTRP band?).
+  const byLevel = new Map<number, number[]>();
+  for (const r of rows) {
+    const arr = byLevel.get(r.ntrp) ?? [];
+    arr.push(glickoToNtrp(r.rating, calib));
+    byLevel.set(r.ntrp, arr);
+  }
+  console.error("Predicted NTRP by labeled level:");
+  for (const level of [...byLevel.keys()].sort()) {
+    const preds = byLevel.get(level)!;
+    const mean = preds.reduce((a, b) => a + b, 0) / preds.length;
+    const sorted = [...preds].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)]!;
+    const p10 = sorted[Math.floor(sorted.length * 0.1)]!;
+    const p90 = sorted[Math.floor(sorted.length * 0.9)]!;
+    console.error(
+      `  label ${level}: n=${preds.length} mean=${mean.toFixed(3)} ` +
+        `median=${median.toFixed(3)} p10=${p10.toFixed(3)} p90=${p90.toFixed(3)}`
+    );
+  }
+
+  // Write outputs alongside the aggregate.
+  const outDir = dirname(aggregatePath);
+  const stem = aggregatePath.endsWith(".json")
+    ? aggregatePath.slice(0, -5)
+    : aggregatePath;
+  const calibPath = `${stem}.calibration.json`;
+  const ratingsPath = `${stem}.ratings.json`;
+  await writeFile(calibPath, JSON.stringify(calib, null, 2) + "\n", "utf8");
+
+  const ratingsDump = [...result.ratings.entries()].map(([key, r]) => {
+    const player = captures.players.get(key);
+    return {
+      key,
+      name: player?.name,
+      memberId: player?.memberId,
+      ntrpLabel: player?.ntrp,
+      teams: player?.teams ?? [],
+      rating: r.rating,
+      rd: r.rd,
+      vol: r.vol,
+      matches: result.matchCounts.get(key) ?? 0,
+      predictedNtrp: glickoToNtrp(r.rating, calib),
+    };
+  });
+  ratingsDump.sort((a, b) => b.rating - a.rating);
+  await writeFile(
+    ratingsPath,
+    JSON.stringify(ratingsDump, null, 2) + "\n",
+    "utf8"
+  );
+  void outDir; // silence unused
+  console.error(`Wrote ${calibPath}`);
+  console.error(`Wrote ${ratingsPath}`);
+}
+
 function usage(): never {
   console.error(`Usage:
   tennis-scrape capture <url> <out-file> [--no-auth]
@@ -623,6 +732,7 @@ function usage(): never {
   tennis-scrape session check [probe-url]
   tennis-scrape crawl team <par1> <year> [--out <dir>]   (default --out: ./captures)
   tennis-scrape crawl subflight <par1> <year> [--out <dir>] [--include-players]
+  tennis-scrape ratings fit <subflight-aggregate.json> [--min-matches N]
 
 Env:
   TENNIS_CONTACT_EMAIL  email site admins can use to reach you
@@ -669,6 +779,26 @@ async function main() {
         else if (sub === "check") await sessionCheck(rest[0]);
         else usage();
         break;
+      case "ratings": {
+        if (sub !== "fit") usage();
+        const positional: string[] = [];
+        let minMatches = 3;
+        for (let i = 0; i < rest.length; i++) {
+          const arg = rest[i]!;
+          if (arg === "--min-matches") {
+            const next = rest[i + 1];
+            if (!next) usage();
+            minMatches = Number(next);
+            if (!Number.isFinite(minMatches)) usage();
+            i += 1;
+          } else {
+            positional.push(arg);
+          }
+        }
+        if (positional.length !== 1) usage();
+        await ratingsFitCmd(positional[0]!, { minMatches });
+        break;
+      }
       case "crawl": {
         if (sub !== "team" && sub !== "subflight") usage();
         const positional: string[] = [];

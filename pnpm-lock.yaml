@@ -63,6 +63,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@tennis/calibrate':
+        specifier: workspace:*
+        version: link:../../packages/calibrate
       '@tennis/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -82,6 +85,22 @@ importers:
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
+
+  packages/calibrate:
+    dependencies:
+      '@tennis/ratings':
+        specifier: workspace:*
+        version: link:../ratings
+      '@tennis/scraper':
+        specifier: workspace:*
+        version: link:../scraper
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.19)
 
   packages/db:
     dependencies:
