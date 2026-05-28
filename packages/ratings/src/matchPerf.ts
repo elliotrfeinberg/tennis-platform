@@ -24,45 +24,67 @@
 // game-ratio = 1.0.
 
 export interface MatchPerfConfig {
-  // Maximum performance-rating adjustment from a totally lopsided
-  // result. A 6-0, 6-0 win = ratio 1.0 → +maxDelta. Loss is symmetric.
-  // 0.5 reflects USTA's general rule that a double-bagel implies a
-  // ≥0.5-level difference.
-  maxDelta: number;
+  // Bonus applied based on the match outcome regardless of margin. A
+  // win adds +matchWinBonus; a loss adds -matchWinBonus. This ensures
+  // a tiebreak win counts for SOMETHING beyond the near-zero game
+  // ratio, and that retirement wins (where the loser may have won
+  // more games before retiring) still score positive for the winner.
+  matchWinBonus: number;
+  // Per-unit-game-ratio weight. At ratio = ±1.0 (a 6-0, 6-0 sweep
+  // either way), this contributes ±gameMarginWeight.
+  gameMarginWeight: number;
+  // Convenience: matchWinBonus + gameMarginWeight is the total max
+  // delta vs. opponent. Default is 0.15 + 0.35 = 0.50, matching the
+  // calibration anchor: 6-0, 6-0 ⇒ ≥0.5 NTRP gap.
 }
 
 export const DEFAULT_MATCH_PERF_CONFIG: MatchPerfConfig = {
-  maxDelta: 0.5,
+  matchWinBonus: 0.15,
+  gameMarginWeight: 0.35,
 };
 
+export interface MatchPerfInput {
+  opponentRating: number;
+  // Did this player's side win the match? Required separately from
+  // game count because outcome can diverge from game-margin in retired
+  // / defaulted matches (you can win by retirement after losing more
+  // games), and because winning a match inherently signals more skill
+  // than barely losing it, independent of the score margin.
+  matchWon: boolean;
+  // Games won by this player's side, summed across all sets played.
+  gamesWon: number;
+  // Games won by the opponent's side, summed across all sets played.
+  gamesLost: number;
+}
+
 // Compute a player's performance rating for a single match, in NTRP
-// units. Inputs are summed across all sets played:
-//   opponentRating - opponent's pre-match rating (NTRP scale)
-//   gamesWon       - games won by this player's side
-//   gamesLost      - games won by the opponent's side
+// units.
 //
-// Linear approximation:
-//   perf = opp + maxDelta * (gamesWon - gamesLost) / (gamesWon + gamesLost)
+//   perf = opp + matchWinBonus * sign(matchWon) + gameMarginWeight * ratio
 //
-// At ratio = +1.0 (6-0, 6-0 win):   perf = opp + maxDelta
-// At ratio =  0.0 (tied games):     perf = opp
-// At ratio = -1.0 (0-6, 0-6 loss):  perf = opp - maxDelta
+// where ratio = (gamesWon - gamesLost) / total_games, clipped to ±1.
 //
-// A 7-6, 7-6 win is essentially a coin flip in this model (ratio ≈ 0.04
-// → perf ≈ opp + 0.02), which matches intuition: tiebreak matches
-// indicate the players are at equivalent level.
+// Examples (default config, opponent at 3.0):
+//   6-0, 6-0 W: 3.0 + 0.15 + 0.35*1.00 = 3.50  (calibration anchor)
+//   6-3, 6-3 W: 3.0 + 0.15 + 0.35*0.33 = 3.27
+//   7-6, 7-6 W: 3.0 + 0.15 + 0.35*0.04 = 3.16  (close win still > 3.0)
+//   6-7, 6-7 L: 3.0 - 0.15 - 0.35*0.04 = 2.84  (close loss still < 3.0)
+//   0-6, 0-6 L: 3.0 - 0.15 - 0.35*1.00 = 2.50  (calibration anchor)
 //
-// Retired or default matches: the partial score reflects what was
-// played; we still compute a perf rating from it. Callers can opt to
-// down-weight or skip these.
+// Retired/defaulted matches: the winner can have fewer total games
+// (e.g. lost first set, won 2nd 3-2 before opponent retired). The
+// matchWinBonus ensures the retirement-winner still gets a positive
+// delta; the game-margin term may be negative but never enough to flip
+// the sign for normal retirement scenarios.
 export function matchPerformance(
-  opponentRating: number,
-  gamesWon: number,
-  gamesLost: number,
+  input: MatchPerfInput,
   cfg: MatchPerfConfig = DEFAULT_MATCH_PERF_CONFIG
 ): number {
+  const { opponentRating, matchWon, gamesWon, gamesLost } = input;
   const total = gamesWon + gamesLost;
-  if (total <= 0) return opponentRating;
-  const ratio = (gamesWon - gamesLost) / total;
-  return opponentRating + cfg.maxDelta * ratio;
+  const ratio = total > 0 ? (gamesWon - gamesLost) / total : 0;
+  const sign = matchWon ? 1 : -1;
+  return (
+    opponentRating + cfg.matchWinBonus * sign + cfg.gameMarginWeight * ratio
+  );
 }

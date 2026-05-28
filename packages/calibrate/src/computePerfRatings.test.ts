@@ -62,8 +62,9 @@ describe("computePerfRatings", () => {
     expect(result.ratings.get("B")!).toBeCloseTo(2.5, 6);
   });
 
-  it("a 7-6, 7-6 win shifts winner ~+0.04 vs opponent (essentially tied)", () => {
-    // 14 won, 12 lost → ratio 2/26 ≈ 0.077 → delta 0.5 * 0.077 ≈ 0.038
+  it("a 7-6, 7-6 win includes the matchWinBonus, not just game margin", () => {
+    // 14 won, 12 lost → game ratio 2/26 ≈ 0.077. With matchWinBonus=0.15
+    // and gameMarginWeight=0.35, winner perf = 3.5 + 0.15 + 0.35*0.077.
     const captures = mkCaptures(
       [
         { key: "A", name: "A", memberId: undefined, ntrp: 3.5, teams: [] },
@@ -72,8 +73,47 @@ describe("computePerfRatings", () => {
       [mkMatch(new Date(2026, 0, 1), ["A"], ["B"], 14, 12)]
     );
     const result = computePerfRatings(captures);
-    expect(result.ratings.get("A")!).toBeCloseTo(3.5 + 0.5 * (2 / 26), 6);
-    expect(result.ratings.get("B")!).toBeCloseTo(3.5 - 0.5 * (2 / 26), 6);
+    expect(result.ratings.get("A")!).toBeCloseTo(
+      3.5 + 0.15 + 0.35 * (2 / 26),
+      6
+    );
+    expect(result.ratings.get("B")!).toBeCloseTo(
+      3.5 - 0.15 - 0.35 * (2 / 26),
+      6
+    );
+  });
+
+  it("winning by retirement after losing more games still credits the winner", () => {
+    // Won by opponent retirement after losing first set 3-6, leading
+    // 3-2 in the second. Total games 6 won vs 8 lost — pure game-margin
+    // would say winner played BELOW opp. Match-win bonus saves it.
+    const captures = mkCaptures(
+      [
+        { key: "A", name: "A", memberId: undefined, ntrp: 3.5, teams: [] },
+        { key: "B", name: "B", memberId: undefined, ntrp: 3.5, teams: [] },
+      ],
+      [
+        {
+          matchId: "ret",
+          date: new Date(2026, 0, 1),
+          homeTeamName: "H",
+          visitorTeamName: "V",
+          line: 1,
+          kind: "S",
+          homePlayerKeys: ["A"],
+          visitorPlayerKeys: ["B"],
+          homeWon: true, // A won by retirement
+          retired: "visitor",
+          defaulted: undefined,
+          gamesHome: 6,
+          gamesVisitor: 8,
+        },
+      ]
+    );
+    const result = computePerfRatings(captures);
+    // Winner stays positive vs opp despite worse game count.
+    expect(result.ratings.get("A")!).toBeGreaterThan(3.5);
+    expect(result.ratings.get("B")!).toBeLessThan(3.5);
   });
 
   it("a player with no matches keeps their NTRP-label initial rating", () => {

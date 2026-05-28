@@ -130,8 +130,24 @@ export function computePerfRatings(
     const gamesVisitor =
       m.gamesVisitor !== undefined ? m.gamesVisitor : m.homeWon ? 0 : 12;
 
-    const homePerf = matchPerformance(visitorMean, gamesHome, gamesVisitor, cfg);
-    const visitorPerf = matchPerformance(homeMean, gamesVisitor, gamesHome, cfg);
+    const homePerf = matchPerformance(
+      {
+        opponentRating: visitorMean,
+        matchWon: m.homeWon,
+        gamesWon: gamesHome,
+        gamesLost: gamesVisitor,
+      },
+      cfg
+    );
+    const visitorPerf = matchPerformance(
+      {
+        opponentRating: homeMean,
+        matchWon: !m.homeWon,
+        gamesWon: gamesVisitor,
+        gamesLost: gamesHome,
+      },
+      cfg
+    );
 
     // Append to each player's history, then re-snapshot their current
     // rating for use by later matches.
