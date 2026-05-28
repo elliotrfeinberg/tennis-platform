@@ -45,6 +45,7 @@ function mkCourt(
     defaulted: undefined,
     gamesHome: undefined,
     gamesVisitor: undefined,
+    sets: [],
   };
 }
 

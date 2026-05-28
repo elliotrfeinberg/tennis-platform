@@ -64,10 +64,13 @@ export interface CourtMatch {
   defaulted: "home" | "visitor" | undefined;
   // Sum of games won across all sets in the match, per side. Undefined
   // when the scorecard didn't record set scores (e.g. defaulted before
-  // play). The performance-rating model uses these to weigh margin;
-  // Glicko-2 ignores them.
+  // play). Glicko-2 ignores these; the perf model prefers `sets`.
   gamesHome: number | undefined;
   gamesVisitor: number | undefined;
+  // Per-set scores as captured by parseScorecard. Empty array when no
+  // sets were played (default before any games). The perf model uses
+  // this for table-based score → rating-diff lookup.
+  sets: Array<{ home: number; visitor: number }>;
 }
 
 export interface CapturesData {
@@ -298,6 +301,9 @@ export async function loadCaptures(
           defaulted: court.defaulted,
           gamesHome: gh,
           gamesVisitor: gv,
+          sets: court.sets
+            ? court.sets.map((s) => ({ home: s.home, visitor: s.visitor }))
+            : [],
         });
       }
     }

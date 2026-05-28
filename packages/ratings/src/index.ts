@@ -27,6 +27,7 @@ export {
 
 export {
   matchPerformance,
-  DEFAULT_MATCH_PERF_CONFIG,
-  type MatchPerfConfig,
+  scoreToPerfDelta,
+  type MatchPerfInput,
+  type PerfSetScore,
 } from "./matchPerf.js";

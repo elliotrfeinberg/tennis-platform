@@ -18,11 +18,7 @@
 // as Glicko. Both partners get the same per-match perf rating (their
 // side's collective performance).
 
-import {
-  matchPerformance,
-  DEFAULT_MATCH_PERF_CONFIG,
-  type MatchPerfConfig,
-} from "@tennis/ratings";
+import { matchPerformance, type PerfSetScore } from "@tennis/ratings";
 import type { CapturesData, PlayerLabel } from "./loadCaptures.js";
 
 export interface PerfMatchEntry {
@@ -54,9 +50,6 @@ export interface ComputePerfRatingsOptions {
   // the most recent (k=0 is the latest match). Default: equal weight
   // for the last 10 matches, zero before that.
   weightFn?: (kFromEnd: number) => number;
-  // Tuning for the per-match perf curve. Default uses the calibrated
-  // maxDelta=0.5 (6-0, 6-0 ⇒ +0.5 NTRP vs opponent).
-  cfg?: Partial<MatchPerfConfig>;
 }
 
 // Equal weighting of the last 10 matches, no weight before. A typical
@@ -68,7 +61,6 @@ export function computePerfRatings(
   captures: CapturesData,
   opts: ComputePerfRatingsOptions = {}
 ): PerfRatingsResult {
-  const cfg = { ...DEFAULT_MATCH_PERF_CONFIG, ...(opts.cfg ?? {}) };
   const initialRatingFn =
     opts.initialRating ?? ((p: PlayerLabel) => p.ntrp ?? 3.5);
   const weightFn = opts.weightFn ?? DEFAULT_WEIGHT_FN;
@@ -121,33 +113,38 @@ export function computePerfRatings(
     const homeMean = mean(homePre);
     const visitorMean = mean(visitorPre);
 
-    // When set scores are missing (e.g. defaulted before play), fall
-    // back to a 12-0 proxy on the winner's side so the model doesn't
-    // silently understate a forfeit. CourtMatch.gamesHome/Visitor come
-    // from loadCaptures summing across sets.
-    const gamesHome =
-      m.gamesHome !== undefined ? m.gamesHome : m.homeWon ? 12 : 0;
-    const gamesVisitor =
-      m.gamesVisitor !== undefined ? m.gamesVisitor : m.homeWon ? 0 : 12;
+    // Build per-set scores from the home side's perspective. When sets
+    // are empty (default before any play), pass an empty array — the
+    // perf model handles that via its fallback (small win bonus).
+    const homeSets: PerfSetScore[] = m.sets.map((s) => ({
+      won: s.home,
+      lost: s.visitor,
+    }));
+    const visitorSets: PerfSetScore[] = m.sets.map((s) => ({
+      won: s.visitor,
+      lost: s.home,
+    }));
 
-    const homePerf = matchPerformance(
-      {
-        opponentRating: visitorMean,
-        matchWon: m.homeWon,
-        gamesWon: gamesHome,
-        gamesLost: gamesVisitor,
-      },
-      cfg
-    );
-    const visitorPerf = matchPerformance(
-      {
-        opponentRating: homeMean,
-        matchWon: !m.homeWon,
-        gamesWon: gamesVisitor,
-        gamesLost: gamesHome,
-      },
-      cfg
-    );
+    const homePerf = matchPerformance({
+      opponentRating: visitorMean,
+      matchWon: m.homeWon,
+      sets: homeSets,
+    });
+    const visitorPerf = matchPerformance({
+      opponentRating: homeMean,
+      matchWon: !m.homeWon,
+      sets: visitorSets,
+    });
+
+    // Pre-compute game-diff for diagnostics in history entries.
+    let gh = 0;
+    let gv = 0;
+    for (const s of m.sets) {
+      gh += s.home;
+      gv += s.visitor;
+    }
+    const gamesHome = gh;
+    const gamesVisitor = gv;
 
     // Append to each player's history, then re-snapshot their current
     // rating for use by later matches.

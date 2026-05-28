@@ -1,90 +1,184 @@
-// Per-match "performance rating" model — closer to USTA's published
-// NTRP dynamic-rating approach than Glicko.
+// Per-match performance-rating model on the NTRP scale.
 //
-// For each completed match, the player's *performance rating* for that
-// match is a function of (opponent's pre-match rating, game differential
-// in this match). The player's *current rating* is then a weighted mean
-// of their recent performance ratings.
+// For each completed match, the player's *performance rating* is:
 //
-// Key advantages over Glicko for this use case:
+//   perf = opp + scoreToPerfDelta(sets, won)
 //
-// 1. Output is on the NTRP scale by construction — no separate
-//    calibration pass needed. Roster levels (3.0, 3.5, 4.0, ...) IS the
-//    rating space.
-// 2. Score margin matters. A 6-0, 6-0 sweep contributes a stronger
-//    signal than a 7-6, 7-6 nailbiter.
-// 3. Each match anchors against the opponent's actual rating, not a
-//    shared 1500 prior — so disjoint clusters (e.g. a 3.0 subflight
-//    and a 4.0 subflight that share no players) don't drift toward
-//    each other's anchor.
+// where scoreToPerfDelta() maps a set-score pattern to a signed NTRP
+// offset. The player's *current rating* is a weighted mean of their
+// recent per-match perf ratings (computed elsewhere).
 //
-// Calibration anchor (per project-owner spec): a 6-0, 6-0 result
-// indicates at least a 0.5 NTRP level gap between the players. So the
-// max single-match performance delta vs. opponent is 0.5 NTRP, hit at
-// game-ratio = 1.0.
+// Why a lookup table, not a continuous curve:
+// 1. Tennis scores aren't continuous — they're a small set of canonical
+//    patterns (6-0 through 7-6 per set). A table fits the natural shape.
+// 2. The mapping isn't monotone in any single metric. A 7-5, 7-5 win
+//    "feels" closer than a 6-4, 6-4 win even though game-margin is
+//    larger; a 3-set win with a lost set "feels" closer than the won
+//    sets' margin would suggest.
+// 3. USTA's actual NTRP table is almost certainly discrete internally;
+//    matching that shape lets us reverse-engineer cell values later
+//    from sources like tennisrecord.com without changing the API.
+//
+// Calibration anchors from the project owner:
+//   6-0, 6-0  ⇒  ≥0.5 NTRP gap   (the floor of a bagel sweep)
+//   6-1, 6-1  ⇒  0.40–0.45 gap
+//   6-3, 6-3  ⇒  ~0.25 gap
+//
+// Loser delta is symmetric (-perfDelta).
 
-export interface MatchPerfConfig {
-  // Bonus applied based on the match outcome regardless of margin. A
-  // win adds +matchWinBonus; a loss adds -matchWinBonus. This ensures
-  // a tiebreak win counts for SOMETHING beyond the near-zero game
-  // ratio, and that retirement wins (where the loser may have won
-  // more games before retiring) still score positive for the winner.
-  matchWinBonus: number;
-  // Per-unit-game-ratio weight. At ratio = ±1.0 (a 6-0, 6-0 sweep
-  // either way), this contributes ±gameMarginWeight.
-  gameMarginWeight: number;
-  // Convenience: matchWinBonus + gameMarginWeight is the total max
-  // delta vs. opponent. Default is 0.15 + 0.35 = 0.50, matching the
-  // calibration anchor: 6-0, 6-0 ⇒ ≥0.5 NTRP gap.
+export interface PerfSetScore {
+  // Games won by this player's side in this set.
+  won: number;
+  // Games won by the opponent's side in this set.
+  lost: number;
 }
-
-export const DEFAULT_MATCH_PERF_CONFIG: MatchPerfConfig = {
-  matchWinBonus: 0.15,
-  gameMarginWeight: 0.35,
-};
 
 export interface MatchPerfInput {
   opponentRating: number;
-  // Did this player's side win the match? Required separately from
-  // game count because outcome can diverge from game-margin in retired
-  // / defaulted matches (you can win by retirement after losing more
-  // games), and because winning a match inherently signals more skill
-  // than barely losing it, independent of the score margin.
   matchWon: boolean;
-  // Games won by this player's side, summed across all sets played.
-  gamesWon: number;
-  // Games won by the opponent's side, summed across all sets played.
-  gamesLost: number;
+  sets: PerfSetScore[];
 }
 
-// Compute a player's performance rating for a single match, in NTRP
-// units.
+export function matchPerformance(input: MatchPerfInput): number {
+  const delta = scoreToPerfDelta(input.sets, input.matchWon);
+  return input.opponentRating + delta;
+}
+
+// Mapping from a 2-set sweep (no set lost by the winner) to the
+// winner's NTRP-rating offset vs. the opponent. Keys are the canonical
+// sorted-ascending string "AwAl,BwBl" where Aw≤Bw and within ties Al≤Bl.
+// Loser side gets the negative of this value.
 //
-//   perf = opp + matchWinBonus * sign(matchWon) + gameMarginWeight * ratio
+// Hand-tuned to match the three calibration anchors plus typical USTA
+// rating-delta conventions; refine cells as we observe real tennisrecord
+// dynamic-match-ratings.
+const TWO_SET_SWEEP_TABLE: Record<string, number> = {
+  "6-0,6-0": 0.5,
+  "6-0,6-1": 0.45,
+  "6-0,6-2": 0.4,
+  "6-0,6-3": 0.37,
+  "6-0,6-4": 0.34,
+  "6-0,7-5": 0.32,
+  "6-0,7-6": 0.3,
+  "6-1,6-1": 0.42,
+  "6-1,6-2": 0.37,
+  "6-1,6-3": 0.32,
+  "6-1,6-4": 0.28,
+  "6-1,7-5": 0.26,
+  "6-1,7-6": 0.24,
+  "6-2,6-2": 0.32,
+  "6-2,6-3": 0.27,
+  "6-2,6-4": 0.23,
+  "6-2,7-5": 0.2,
+  "6-2,7-6": 0.18,
+  "6-3,6-3": 0.25,
+  "6-3,6-4": 0.21,
+  "6-3,7-5": 0.18,
+  "6-3,7-6": 0.15,
+  "6-4,6-4": 0.15,
+  "6-4,7-5": 0.13,
+  "6-4,7-6": 0.1,
+  "7-5,7-5": 0.1,
+  "7-5,7-6": 0.07,
+  "7-6,7-6": 0.05,
+};
+
+// 3-set wins (split sets): losing a set inherently signals the
+// players were close in level. We cap the delta low and let the
+// winning-set margins drive a small variation.
 //
-// where ratio = (gamesWon - gamesLost) / total_games, clipped to ±1.
+// delta = MIN_3SET + (MAX_3SET - MIN_3SET) * mean_won_set_dominance
 //
-// Examples (default config, opponent at 3.0):
-//   6-0, 6-0 W: 3.0 + 0.15 + 0.35*1.00 = 3.50  (calibration anchor)
-//   6-3, 6-3 W: 3.0 + 0.15 + 0.35*0.33 = 3.27
-//   7-6, 7-6 W: 3.0 + 0.15 + 0.35*0.04 = 3.16  (close win still > 3.0)
-//   6-7, 6-7 L: 3.0 - 0.15 - 0.35*0.04 = 2.84  (close loss still < 3.0)
-//   0-6, 0-6 L: 3.0 - 0.15 - 0.35*1.00 = 2.50  (calibration anchor)
+//   MIN_3SET = 0.03, MAX_3SET = 0.13
+//   dominance(set) = max(0, (won - lost) / (won + lost))
 //
-// Retired/defaulted matches: the winner can have fewer total games
-// (e.g. lost first set, won 2nd 3-2 before opponent retired). The
-// matchWinBonus ensures the retirement-winner still gets a positive
-// delta; the game-margin term may be negative but never enough to flip
-// the sign for normal retirement scenarios.
-export function matchPerformance(
-  input: MatchPerfInput,
-  cfg: MatchPerfConfig = DEFAULT_MATCH_PERF_CONFIG
+// A "barely won 3-setter" (7-5, 4-6, 7-5): mean dom ≈ 0.17 → ~0.05
+// A "dominant 3-setter" (6-0, 4-6, 6-0):   mean dom ≈ 1.00 → ~0.13
+const MIN_3SET = 0.03;
+const MAX_3SET = 0.13;
+
+// Fallback for scores not covered above (e.g., partial-set retirements,
+// 10-point match tiebreaks recorded as "10-7" sets, etc.). Returns the
+// WINNER's delta; caller negates for loser side. Inputs are already
+// flipped to winner's perspective.
+//
+// Linear game-margin + small win bonus. Pure win-by-default (no play)
+// produces +0.05.
+function linearFallbackWinnerDelta(winnerSets: PerfSetScore[]): number {
+  let gw = 0;
+  let gl = 0;
+  for (const s of winnerSets) {
+    gw += s.won;
+    gl += s.lost;
+  }
+  const total = gw + gl;
+  if (total === 0) return 0.05;
+  const ratio = (gw - gl) / total;
+  // 0.05 winner-bonus + 0.45 * ratio, then floored at +0.02. The floor
+  // enforces "winning the match is positive signal" — a retirement win
+  // with worse game count would otherwise net negative, putting the
+  // loser above the winner in NTRP space. We accept that the perf
+  // delta is tiny in that case (0.02), reflecting how soft the win was.
+  return Math.max(0.02, 0.05 + 0.45 * ratio);
+}
+
+// Public score → NTRP delta. Always computes from winner's perspective
+// then negates for the loser. This guarantees symmetry: |winner_delta|
+// == |loser_delta|, so the winner is always rated above the loser
+// regardless of game count.
+export function scoreToPerfDelta(
+  sets: PerfSetScore[],
+  matchWon: boolean
 ): number {
-  const { opponentRating, matchWon, gamesWon, gamesLost } = input;
-  const total = gamesWon + gamesLost;
-  const ratio = total > 0 ? (gamesWon - gamesLost) / total : 0;
-  const sign = matchWon ? 1 : -1;
-  return (
-    opponentRating + cfg.matchWinBonus * sign + cfg.gameMarginWeight * ratio
-  );
+  // Re-cast sets to the WINNER's perspective. If matchWon=false, the
+  // caller's sets are from the loser's side; flip (won, lost).
+  const winnerSets: PerfSetScore[] = matchWon
+    ? sets
+    : sets.map((s) => ({ won: s.lost, lost: s.won }));
+
+  // Count sets the winner actually won.
+  let setsWonByWinner = 0;
+  for (const s of winnerSets) {
+    if (s.won > s.lost) setsWonByWinner += 1;
+  }
+
+  let winnerDelta: number;
+
+  if (winnerSets.length === 2 && setsWonByWinner === 2) {
+    const key = canonicalSweepKey(winnerSets);
+    const fromTable = TWO_SET_SWEEP_TABLE[key];
+    if (fromTable !== undefined) {
+      winnerDelta = fromTable;
+    } else {
+      winnerDelta = linearFallbackWinnerDelta(winnerSets);
+    }
+  } else if (winnerSets.length === 3 && setsWonByWinner === 2) {
+    // Split-set 3-setter. Average dominance across the two won sets.
+    let dom = 0;
+    let n = 0;
+    for (const s of winnerSets) {
+      if (s.won <= s.lost) continue;
+      const total = s.won + s.lost;
+      dom += total > 0 ? (s.won - s.lost) / total : 0;
+      n += 1;
+    }
+    const meanDom = n > 0 ? dom / n : 0;
+    winnerDelta = MIN_3SET + (MAX_3SET - MIN_3SET) * meanDom;
+  } else {
+    // Any other shape — fall back to linear (winner-perspective).
+    winnerDelta = linearFallbackWinnerDelta(winnerSets);
+  }
+
+  return matchWon ? winnerDelta : -winnerDelta;
+}
+
+// Build the canonical "Aw-Al,Bw-Bl" key with sets sorted ascending by
+// games-won (ties broken by games-lost). Always from the winner's
+// perspective; caller has already flipped for losing side.
+function canonicalSweepKey(sets: PerfSetScore[]): string {
+  const sorted = [...sets].sort((a, b) => {
+    if (a.won !== b.won) return a.won - b.won;
+    return a.lost - b.lost;
+  });
+  return sorted.map((s) => `${s.won}-${s.lost}`).join(",");
 }

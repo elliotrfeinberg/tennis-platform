@@ -43,6 +43,7 @@ function mkMatch(
     defaulted: undefined,
     gamesHome: undefined,
     gamesVisitor: undefined,
+    sets: [],
   };
 }
 
@@ -91,6 +92,7 @@ describe("computeRatings", () => {
           defaulted: undefined,
           gamesHome: undefined,
           gamesVisitor: undefined,
+          sets: [],
         },
       ]
     );
