@@ -15,9 +15,13 @@ function formatScore(sets: PerfMatchEntry["sets"]): string {
     .join(", ");
 }
 
-function bandMidpoint(label: number | undefined): number | null {
+// NTRP band edges. Band 3.5 covers (3.0001, 3.5000] — so for display
+// purposes we treat 3.0 as the LOWER edge and 3.5 as the UPPER edge.
+function bandEdges(
+  label: number | undefined
+): { low: number; high: number } | null {
   if (label === undefined) return null;
-  return label - 0.25;
+  return { low: label - 0.5, high: label };
 }
 
 export default async function PlayerProfilePage({
@@ -37,7 +41,7 @@ export default async function PlayerProfilePage({
     : 0;
   const ratingDeltaSign = ratingDelta >= 0 ? "+" : "";
 
-  const midpoint = bandMidpoint(player.ntrpLabel);
+  const edges = bandEdges(player.ntrpLabel);
 
   const sparkData = history.map((m) => ({
     x: new Date(m.date).getTime(),
@@ -74,19 +78,14 @@ export default async function PlayerProfilePage({
             player.ntrpLabel !== undefined ? player.ntrpLabel.toFixed(1) : "—"
           }
           sub={
-            midpoint !== null
-              ? `midpoint ${midpoint.toFixed(2)}`
+            edges
+              ? `${edges.low.toFixed(1)} – ${edges.high.toFixed(1)}`
               : "unrated"
           }
         />
         <Stat
           label="Current perf rating"
           value={player.perfRating.toFixed(3)}
-          sub={
-            midpoint !== null
-              ? `${(player.perfRating - midpoint).toFixed(2)} vs midpoint`
-              : ""
-          }
         />
         <Stat
           label="Matches played"
@@ -113,12 +112,17 @@ export default async function PlayerProfilePage({
           width={640}
           height={120}
           yRefs={
-            midpoint !== null
+            edges
               ? [
                   {
-                    y: midpoint,
+                    y: edges.low,
                     color: "#d6d3d1",
-                    label: `band midpoint ${midpoint.toFixed(2)}`,
+                    label: `band ${edges.low.toFixed(1)}`,
+                  },
+                  {
+                    y: edges.high,
+                    color: "#d6d3d1",
+                    label: `band ${edges.high.toFixed(1)}`,
                   },
                 ]
               : []
@@ -165,7 +169,10 @@ export default async function PlayerProfilePage({
                           className="hover:underline"
                         >
                           {m.partners[0]!.name}
-                        </Link>
+                        </Link>{" "}
+                        <span className="font-mono text-stone-400">
+                          ({m.partners[0]!.preRating.toFixed(2)})
+                        </span>
                       </div>
                     )}
                   </td>

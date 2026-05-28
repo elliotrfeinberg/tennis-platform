@@ -10,13 +10,11 @@ import {
   type PerfRatingEntry,
 } from "@/lib/perfRatings";
 
-type SortKey = "perf" | "name" | "matches" | "delta";
+type SortKey = "perf" | "name" | "matches";
 
 function parseParams(p: { sort?: string; q?: string; band?: string }) {
   const sort: SortKey =
-    p.sort === "name" || p.sort === "matches" || p.sort === "delta"
-      ? p.sort
-      : "perf";
+    p.sort === "name" || p.sort === "matches" ? p.sort : "perf";
   const q = (p.q ?? "").trim().toLowerCase();
   const band = p.band?.trim() ?? "";
   return { sort, q, band };
@@ -38,11 +36,7 @@ function filterAndSort(
   });
   if (sort === "perf") filtered.sort((a, b) => b.perfRating - a.perfRating);
   else if (sort === "matches") filtered.sort((a, b) => b.matches - a.matches);
-  else if (sort === "delta") {
-    const d = (e: PerfRatingEntry) =>
-      e.ntrpLabel === undefined ? -Infinity : e.perfRating - (e.ntrpLabel - 0.25);
-    filtered.sort((a, b) => d(b) - d(a));
-  } else {
+  else {
     filtered.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
   }
   return filtered;
@@ -124,7 +118,6 @@ export default async function PlayersPage({
             className="mt-1 w-44 rounded border border-stone-300 bg-white px-2 py-1.5 text-sm"
           >
             <option value="perf">Perf rating (high → low)</option>
-            <option value="delta">Δ vs band midpoint</option>
             <option value="matches">Match count</option>
             <option value="name">Name (A → Z)</option>
           </select>
@@ -159,57 +152,37 @@ export default async function PlayersPage({
               <th className="px-3 py-2">Teams</th>
               <th className="px-3 py-2 text-right">Roster band</th>
               <th className="px-3 py-2 text-right">Perf NTRP</th>
-              <th className="px-3 py-2 text-right">Δ vs mid</th>
               <th className="px-3 py-2 text-right">Matches</th>
             </tr>
           </thead>
           <tbody>
-            {sorted.map((p) => {
-              const midpoint =
-                p.ntrpLabel !== undefined ? p.ntrpLabel - 0.25 : null;
-              const delta = midpoint !== null ? p.perfRating - midpoint : null;
-              const sign = delta !== null && delta >= 0 ? "+" : "";
-              return (
-                <tr key={p.key} className="border-t border-stone-100">
-                  <td className="px-3 py-2">
-                    <Link
-                      href={`/players/${playerSlug(p.key)}` as `/players/${string}`}
-                      className="font-medium text-court-700 hover:underline"
-                    >
-                      {p.name ?? "(no name)"}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 text-xs text-stone-500">
-                    {p.teams.join(", ") || "—"}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono text-stone-600">
-                    {p.ntrpLabel !== undefined ? p.ntrpLabel.toFixed(1) : "—"}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono">
-                    {p.perfRating.toFixed(2)}
-                  </td>
-                  <td
-                    className={`px-3 py-2 text-right font-mono ${
-                      delta === null
-                        ? "text-stone-400"
-                        : delta >= 0.15
-                          ? "text-emerald-700"
-                          : delta <= -0.15
-                            ? "text-rose-700"
-                            : "text-stone-600"
-                    }`}
+            {sorted.map((p) => (
+              <tr key={p.key} className="border-t border-stone-100">
+                <td className="px-3 py-2">
+                  <Link
+                    href={`/players/${playerSlug(p.key)}` as `/players/${string}`}
+                    className="font-medium text-court-700 hover:underline"
                   >
-                    {delta !== null ? `${sign}${delta.toFixed(2)}` : "—"}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono text-stone-600">
-                    {p.matches}
-                  </td>
-                </tr>
-              );
-            })}
+                    {p.name ?? "(no name)"}
+                  </Link>
+                </td>
+                <td className="px-3 py-2 text-xs text-stone-500">
+                  {p.teams.join(", ") || "—"}
+                </td>
+                <td className="px-3 py-2 text-right font-mono text-stone-600">
+                  {p.ntrpLabel !== undefined ? p.ntrpLabel.toFixed(1) : "—"}
+                </td>
+                <td className="px-3 py-2 text-right font-mono">
+                  {p.perfRating.toFixed(2)}
+                </td>
+                <td className="px-3 py-2 text-right font-mono text-stone-600">
+                  {p.matches}
+                </td>
+              </tr>
+            ))}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-stone-400">
+                <td colSpan={5} className="px-3 py-8 text-center text-stone-400">
                   No players match the filters.
                 </td>
               </tr>
