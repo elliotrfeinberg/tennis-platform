@@ -2,6 +2,7 @@ export {
   loadCaptures,
   type CapturesData,
   type CourtMatch,
+  type LoadCapturesOptions,
   type PlayerLabel,
 } from "./loadCaptures.js";
 

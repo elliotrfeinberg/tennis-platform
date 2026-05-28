@@ -30,6 +30,7 @@ import {
   loadSession,
   parsePlayerProfile,
   parsePlayerSearch,
+  parseRatingSearch,
   parseRobots,
   playerProfileUrl,
   teamProfileUrl,
@@ -137,9 +138,17 @@ async function parse(kind: string, htmlFile: string) {
       console.log(JSON.stringify(rules, null, 2));
       break;
     }
+    case "rating-search": {
+      const result = parseRatingSearch(html);
+      console.log(JSON.stringify(result, null, 2));
+      console.error(
+        `Parsed ${result.rows.length} rows from "${result.context ?? "?"}"`
+      );
+      break;
+    }
     default:
       console.error(`Unknown parser kind: ${kind}`);
-      console.error("Available: search, robots");
+      console.error("Available: search, robots, rating-search");
       process.exit(2);
   }
 }
@@ -625,16 +634,26 @@ async function browserPostback(
 // the input.
 async function ratingsFitCmd(
   aggregatePath: string,
-  opts: { minMatches: number }
+  opts: { minMatches: number; labelsPath?: string }
 ) {
   console.error(`Loading captures from ${aggregatePath}`);
-  const captures = await loadCaptures(aggregatePath);
+  if (opts.labelsPath) {
+    console.error(`  with year-end labels: ${opts.labelsPath}`);
+  }
+  const captures = await loadCaptures(aggregatePath, {
+    yearEndLabelsPath: opts.labelsPath,
+  });
   console.error(
     `  ${captures.players.size} players, ${captures.matches.length} court matches`
   );
   if (captures.unresolvedNames.length > 0) {
     console.error(
       `  ${captures.unresolvedNames.length} unresolved scorecard names (won't get NTRP labels)`
+    );
+  }
+  if (opts.labelsPath) {
+    console.error(
+      `  year-end labels: ${captures.yearEndLabelMatches} matched (${captures.yearEndLabelOverrides} differed from roster), ${captures.yearEndUnmatched} dump rows unmatched`
     );
   }
 
@@ -732,7 +751,7 @@ function usage(): never {
   tennis-scrape session check [probe-url]
   tennis-scrape crawl team <par1> <year> [--out <dir>]   (default --out: ./captures)
   tennis-scrape crawl subflight <par1> <year> [--out <dir>] [--include-players]
-  tennis-scrape ratings fit <subflight-aggregate.json> [--min-matches N]
+  tennis-scrape ratings fit <subflight-aggregate.json> [--min-matches N] [--labels <year-end.json>]
 
 Env:
   TENNIS_CONTACT_EMAIL  email site admins can use to reach you
@@ -783,6 +802,7 @@ async function main() {
         if (sub !== "fit") usage();
         const positional: string[] = [];
         let minMatches = 3;
+        let labelsPath: string | undefined;
         for (let i = 0; i < rest.length; i++) {
           const arg = rest[i]!;
           if (arg === "--min-matches") {
@@ -791,12 +811,17 @@ async function main() {
             minMatches = Number(next);
             if (!Number.isFinite(minMatches)) usage();
             i += 1;
+          } else if (arg === "--labels") {
+            const next = rest[i + 1];
+            if (!next) usage();
+            labelsPath = next;
+            i += 1;
           } else {
             positional.push(arg);
           }
         }
         if (positional.length !== 1) usage();
-        await ratingsFitCmd(positional[0]!, { minMatches });
+        await ratingsFitCmd(positional[0]!, { minMatches, labelsPath });
         break;
       }
       case "crawl": {

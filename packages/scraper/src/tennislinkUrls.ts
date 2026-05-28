@@ -97,6 +97,56 @@ export function scorecardUrl(ref: ScorecardRef): string {
   );
 }
 
+// NTRP Year-End Rating search results page. Returns one row per player
+// in the (Section × Division × Flight × Gender) scope with that
+// player's year-end banded rating. All tree-node ids must be supplied
+// — they're captured once per (year, section) combination from the
+// `/Leagues/Reports/NTRP/AdvancedSearch.aspx` wizard URL after USTA
+// re-renders the tree.
+//
+// Verified id space (from a 2025 NorCal Women 3.5 fetch):
+//   NationalNodeID=6243292 USTA/NATIONAL
+//   SectionNodeID=6243303  USTA/NO. CALIFORNIA
+//   DistrictNodeID=6243366 NO. CALIFORNIA
+//   SubDistrictNodeID=6243551
+//   DivisionNodeID=6245250 Adult 18&Over
+//   FlightNodeID=6259005   Women's 3.5
+//   GenderCode=F
+//
+// Other levels (Women's 3.0, 4.0, 4.5) and divisions (Men's, 40+, etc.)
+// require their own FlightNodeID — capture interactively from a browser
+// session for each scope.
+export interface RatingSearchScope {
+  cYear: number; // e.g. 2025
+  nationalNodeId: string;
+  sectionNodeId: string;
+  districtNodeId: string;
+  subDistrictNodeId: string;
+  divisionNodeId: string;
+  flightNodeId: string;
+  genderCode: "M" | "F";
+  // Leave empty to use the flight's implicit level filter; set to e.g.
+  // "3.5" to narrow further within a flight. Per observed behavior the
+  // empty value already returns ratings from 3.0 / 3.5 / 4.0 / 0.0
+  // mixed together within a single 3.5 flight, so empty is usually fine.
+  ntrpRating?: string;
+}
+export function ratingSearchResultsUrl(s: RatingSearchScope): string {
+  const params = new URLSearchParams();
+  params.set("Search", "TreeNode");
+  params.set("update", "1");
+  params.set("NationalNodeID", s.nationalNodeId);
+  params.set("CYear", String(s.cYear));
+  params.set("SectionNodeID", s.sectionNodeId);
+  params.set("DistrictNodeID", s.districtNodeId);
+  params.set("SubDistrictNodeID", s.subDistrictNodeId);
+  params.set("DivisionNodeID", s.divisionNodeId);
+  params.set("FlightNodeID", s.flightNodeId);
+  params.set("GenderCode", s.genderCode);
+  params.set("NTRPRating", s.ntrpRating ?? "");
+  return `${BASE}/Leagues/Reports/NTRP/SearchResults.aspx?${params}`;
+}
+
 // Player-record page: all matches a player played in a given year,
 // grouped by team-context. par1 is the player's hex token — different
 // namespace from team par1s (34 chars vs ~42), discovered by clicking

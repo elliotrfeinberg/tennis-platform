@@ -17,6 +17,9 @@ function mkCaptures(
     players: pmap,
     matches,
     unresolvedNames: [],
+    yearEndLabelMatches: 0,
+    yearEndLabelOverrides: 0,
+    yearEndUnmatched: 0,
   };
 }
 

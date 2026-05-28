@@ -26,6 +26,7 @@
 import { readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type {
+  ParsedRatingSearch,
   ParsedScorecard,
   ParsedTeamProfile,
 } from "@tennis/scraper";
@@ -72,6 +73,18 @@ export interface CapturesData {
   // Distinct scorecard names that didn't match any roster entry; these
   // got synthesized "name:..." keys (no NTRP label, no team).
   unresolvedNames: string[];
+  // When year-end labels are provided, this is the count of rostered
+  // players whose name matched a row in the dump (regardless of whether
+  // the value differed from the roster level).
+  yearEndLabelMatches: number;
+  // Subset of yearEndLabelMatches where the year-end NTRP value differed
+  // from the roster-derived value (i.e. a real label change). When this
+  // is zero, the dump is confirming-only — no multi-band signal.
+  yearEndLabelOverrides: number;
+  // Names from the year-end search dump that we couldn't match to any
+  // rostered player. Often these are players in the same NTRP scope but
+  // on teams outside the subflight crawl.
+  yearEndUnmatched: number;
 }
 
 interface SubflightAggregate {
@@ -106,13 +119,54 @@ interface CrawlTeamFileShape {
   }>;
 }
 
+export interface LoadCapturesOptions {
+  // Path to a JSON dump of a parseRatingSearch result (i.e. the output
+  // of `tennis-scrape parse rating-search ...`). When provided, each
+  // rostered player whose name matches a row in the dump has their
+  // NTRP label overridden with the year-end-rating value. This is
+  // strictly more authoritative than the roster level: rosters reflect
+  // the level a player *registered at*; year-end ratings reflect what
+  // USTA's algorithm finally placed them at.
+  yearEndLabelsPath?: string;
+  // Only use year-end rows of these rating types. Defaults to ["C"]
+  // (computer-rated) since those are the most reliable. Set to undefined
+  // to accept all types (S, A, D, etc. — useful for debugging but adds
+  // noise from self-rates and appeals).
+  yearEndRatingTypes?: string[] | undefined;
+}
+
 export async function loadCaptures(
-  aggregatePath: string
+  aggregatePath: string,
+  opts: LoadCapturesOptions = {}
 ): Promise<CapturesData> {
   const agg = JSON.parse(
     await readFile(aggregatePath, "utf8")
   ) as SubflightAggregate;
   const rawDir = deriveRawDir(aggregatePath);
+
+  // Year-end labels, if provided. Keyed by normalized "first last".
+  const yearEndByName = new Map<
+    string,
+    { ntrp: number; type: string | undefined }
+  >();
+  if (opts.yearEndLabelsPath) {
+    const parsed = JSON.parse(
+      await readFile(opts.yearEndLabelsPath, "utf8")
+    ) as ParsedRatingSearch;
+    const allowed = opts.yearEndRatingTypes ?? ["C"];
+    const allowAll = opts.yearEndRatingTypes === undefined;
+    for (const row of parsed.rows) {
+      if (row.ntrpLevel === undefined) continue;
+      if (row.ntrpLevel === 0) continue; // unrated placeholder
+      if (!allowAll && !allowed.includes(row.ratingType ?? "")) continue;
+      const key = lastnameCommaFirstToNorm(row.name);
+      if (!key) continue;
+      // Keep the highest-confidence entry on collisions (multiple
+      // identically-named players — rare but possible). C beats S beats
+      // everything; if both types match, last write wins, which is fine.
+      yearEndByName.set(key, { ntrp: row.ntrpLevel, type: row.ratingType });
+    }
+  }
 
   const players = new Map<string, PlayerLabel>();
   const matches = new Map<string, CourtMatch>(); // key = matchId#line#kind
@@ -141,6 +195,12 @@ export async function loadCaptures(
     teamCrawls.push({ team, crawl });
   }
 
+  let yearEndLabelOverrides = 0;
+  let yearEndLabelMatches = 0;
+  // Track which year-end rows we actually matched so we can report the
+  // unmatched count at the end.
+  const yearEndMatchedKeys = new Set<string>();
+
   // Pass 1: register every team's roster as a labeled player. After
   // this pass, `players` contains every rostered player across the
   // subflight, with NTRP labels and team affiliations.
@@ -168,6 +228,21 @@ export async function loadCaptures(
           teams: [team.teamName],
         });
       }
+    }
+  }
+
+  // Year-end override pass: for any rostered player whose name matches
+  // a year-end search row, replace the roster-derived NTRP label with
+  // the year-end one. Match keys are "first last" normalized.
+  if (yearEndByName.size > 0) {
+    for (const p of players.values()) {
+      const key = firstLastNorm(p.name);
+      const hit = yearEndByName.get(key);
+      if (!hit) continue;
+      yearEndMatchedKeys.add(key);
+      yearEndLabelMatches += 1;
+      if (p.ntrp !== hit.ntrp) yearEndLabelOverrides += 1;
+      p.ntrp = hit.ntrp;
     }
   }
 
@@ -218,6 +293,9 @@ export async function loadCaptures(
     players,
     matches: matchList,
     unresolvedNames: [...unresolved],
+    yearEndLabelMatches,
+    yearEndLabelOverrides,
+    yearEndUnmatched: yearEndByName.size - yearEndMatchedKeys.size,
   };
 }
 
@@ -266,6 +344,25 @@ function resolveName(
   }
   unresolved.add(name);
   return key;
+}
+
+// Normalize a roster-style name ("Stella So") to lowercase
+// "firstname lastname" with collapsed whitespace. Used as the
+// year-end-label lookup key on the roster side.
+function firstLastNorm(name: string): string {
+  return name.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+// Convert a year-end "Lastname, Firstname" entry to the same
+// "firstname lastname" form used by firstLastNorm. Returns an empty
+// string for entries without a comma (defensive — we've only ever
+// seen the Lastname, Firstname form in practice).
+function lastnameCommaFirstToNorm(name: string): string {
+  const m = name.match(/^([^,]+),\s*(.+)$/);
+  if (!m) return name.replace(/\s+/g, " ").trim().toLowerCase();
+  const last = m[1]!.trim();
+  const first = m[2]!.trim();
+  return `${first} ${last}`.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 function parseDate(s: string | undefined): Date | undefined {

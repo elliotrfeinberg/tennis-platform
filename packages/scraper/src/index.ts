@@ -32,11 +32,19 @@ export {
   flightStandingsUrl,
   scorecardUrl,
   playerProfileUrl,
+  ratingSearchResultsUrl,
   type SearchCriteria,
   type TeamRef,
   type ScorecardRef,
   type PlayerRef,
+  type RatingSearchScope,
 } from "./tennislinkUrls.js";
+
+export {
+  parseRatingSearch,
+  type ParsedRatingSearch,
+  type RatingSearchRow,
+} from "./parseRatingSearch.js";
 
 export {
   parsePlayerSearch,
