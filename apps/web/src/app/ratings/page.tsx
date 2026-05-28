@@ -182,7 +182,7 @@ export default async function RatingsPage({
               const delta =
                 p.ntrpLabel !== undefined ? p.perfRating - p.ntrpLabel : null;
               const sign = delta !== null && delta >= 0 ? "+" : "";
-              const recent = p.recentMatches.slice(-3).reverse();
+              const recent = p.history.slice(-3).reverse();
               return (
                 <tr
                   key={p.key}
@@ -221,7 +221,7 @@ export default async function RatingsPage({
                           <span className="text-stone-400">{m.date}</span>{" "}
                           {m.gamesDiff >= 0 ? "+" : ""}
                           {m.gamesDiff}g · perf {m.perf.toFixed(2)} vs{" "}
-                          {m.opponent.toFixed(2)}
+                          {m.opponentMean.toFixed(2)}
                         </div>
                       ))}
                       {recent.length === 0 && (

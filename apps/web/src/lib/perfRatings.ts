@@ -2,12 +2,38 @@
 // `tennis-scrape ratings fit --model perf`.
 //
 // The CLI writes its output to {captures-dir}/parsed/{stem}.perf-ratings.json
-// with one entry per player. We hard-code a default path here that
-// points at the most recent multi-band fit; override via the
-// TENNIS_PERF_RATINGS_PATH environment variable for other deployments.
+// with one entry per player and the full chronological match history
+// embedded. We default to the most recent multi-band fit; override via
+// TENNIS_PERF_RATINGS_PATH for other datasets.
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+
+export interface PerfMatchPlayerRef {
+  key: string;
+  name: string;
+  // The player/opponent/partner's rolling rating going INTO this match.
+  preRating: number;
+}
+
+export interface PerfMatchEntry {
+  matchId: string;
+  date: string; // YYYY-MM-DD
+  won: boolean;
+  kind: "S" | "D";
+  line: number;
+  playerTeamName: string;
+  opponentTeamName: string;
+  sets: Array<{ playerGames: number; opponentGames: number }>;
+  gamesDiff: number;
+  opponents: PerfMatchPlayerRef[];
+  partners: PerfMatchPlayerRef[];
+  opponentMean: number;
+  teamPerf: number;
+  perf: number;
+  playerPreRating: number;
+  playerPostRating: number;
+}
 
 export interface PerfRatingEntry {
   key: string;
@@ -17,27 +43,15 @@ export interface PerfRatingEntry {
   teams: string[];
   perfRating: number;
   matches: number;
-  recentMatches: Array<{
-    date: string;
-    perf: number;
-    opponent: number;
-    gamesDiff: number;
-  }>;
+  history: PerfMatchEntry[];
 }
 
-// Default path: points at the 3-band NorCal Women's Adult 18+ fit
-// produced by `pnpm dev ratings fit --model perf`. Override via
-// TENNIS_PERF_RATINGS_PATH for other datasets.
 const DEFAULT_REL_PATH =
   "apps/worker/captures/parsed/5083143679-subflight/2026-05-28T03-28-44-219Z.perf-ratings.json";
 
 function resolveRatingsPath(): string {
   const override = process.env.TENNIS_PERF_RATINGS_PATH;
   if (override) return override;
-  // Walk up from cwd looking for the monorepo root (has apps/worker).
-  // In `next dev` the cwd is typically the apps/web dir, so we hop up.
-  // We don't bother with fancy discovery here — the override env var is
-  // the production-friendly path.
   return join(process.cwd(), "..", "..", DEFAULT_REL_PATH);
 }
 
@@ -53,4 +67,32 @@ export async function loadPerfRatings(): Promise<{
   const entries = JSON.parse(text) as PerfRatingEntry[];
   cached = { path, entries };
   return cached;
+}
+
+// Resolve a URL-safe player key from a key that might contain slashes,
+// "name:" prefixes, etc. Players with numeric memberId use that
+// directly; name-keyed players use a base64url of the original key.
+export function playerSlug(key: string): string {
+  if (/^\d+$/.test(key)) return key;
+  return Buffer.from(key, "utf8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+export function unslug(slug: string): string {
+  if (/^\d+$/.test(slug)) return slug;
+  // Restore base64 padding + alphabet, then decode.
+  const padded = slug.replace(/-/g, "+").replace(/_/g, "/");
+  const padLen = (4 - (padded.length % 4)) % 4;
+  return Buffer.from(padded + "=".repeat(padLen), "base64").toString("utf8");
+}
+
+export async function findPlayerBySlug(
+  slug: string
+): Promise<PerfRatingEntry | undefined> {
+  const data = await loadPerfRatings();
+  const key = unslug(slug);
+  return data.entries.find((e) => e.key === key);
 }

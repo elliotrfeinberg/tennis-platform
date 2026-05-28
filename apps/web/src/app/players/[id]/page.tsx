@@ -1,16 +1,24 @@
+// Player detail — real crawl data with full match log + rating sparkline.
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Sparkline } from "@/components/Sparkline";
 import {
-  estimatedNtrpFor,
-  estimatedNtrpRdFor,
-  FIXTURE_CALIBRATION,
-  matchesForPlayer,
-  playerById,
-  ratingHistoryForPlayer,
-  teamById,
-  type PlayerMatchView,
-} from "@tennis/fixtures";
-import { glickoToNtrp } from "@tennis/ratings";
+  findPlayerBySlug,
+  playerSlug,
+  type PerfMatchEntry,
+} from "@/lib/perfRatings";
+
+function formatScore(sets: PerfMatchEntry["sets"]): string {
+  return sets
+    .map((s) => `${s.playerGames}-${s.opponentGames}`)
+    .join(", ");
+}
+
+function bandMidpoint(label: number | undefined): number | null {
+  if (label === undefined) return null;
+  return label - 0.25;
+}
 
 export default async function PlayerProfilePage({
   params,
@@ -18,20 +26,26 @@ export default async function PlayerProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const player = playerById(id);
+  const player = await findPlayerBySlug(id);
   if (!player) notFound();
-  const team = teamById(player.teamId);
-  const history = ratingHistoryForPlayer(id);
-  const matches = matchesForPlayer(id);
 
-  const currentNtrp = estimatedNtrpFor(id);
-  const currentNtrpRd = estimatedNtrpRdFor(id);
-  const initialNtrp = glickoToNtrp(
-    player.initialRating.rating,
-    FIXTURE_CALIBRATION
-  );
-  const ntrpDelta = currentNtrp - initialNtrp;
-  const ntrpDeltaSign = ntrpDelta >= 0 ? "+" : "";
+  const history = player.history; // chronological
+  const last = history[history.length - 1];
+  const first = history[0];
+  const ratingDelta = first && last
+    ? last.playerPostRating - first.playerPreRating
+    : 0;
+  const ratingDeltaSign = ratingDelta >= 0 ? "+" : "";
+
+  const midpoint = bandMidpoint(player.ntrpLabel);
+
+  const sparkData = history.map((m) => ({
+    x: new Date(m.date).getTime(),
+    y: m.playerPostRating,
+    label: `${m.date} → ${m.playerPostRating.toFixed(2)} (${
+      m.won ? "W" : "L"
+    } ${formatScore(m.sets)})`,
+  }));
 
   return (
     <div className="space-y-8">
@@ -39,56 +53,175 @@ export default async function PlayerProfilePage({
         <Link href="/players" className="text-xs text-stone-500 hover:underline">
           ← Back to players
         </Link>
-        <h1 className="mt-1 text-2xl font-bold">{player.displayName}</h1>
+        <h1 className="mt-1 text-2xl font-bold">{player.name ?? "(no name)"}</h1>
         <p className="text-sm text-stone-600">
-          {team ? (
-            <Link href={`/teams/${team.id}`} className="hover:underline">
-              {team.name}
-            </Link>
-          ) : (
-            "Free agent"
-          )}{" "}
-          · {player.district}, {player.section}
+          {player.teams.length > 0 ? player.teams.join(" · ") : "no team"}
+          {player.memberId && (
+            <>
+              {" · "}
+              <span className="font-mono text-xs text-stone-400">
+                USTA #{player.memberId}
+              </span>
+            </>
+          )}
         </p>
       </div>
 
       <section className="grid gap-4 md:grid-cols-3">
         <Stat
-          label="Published NTRP"
-          value={player.publishedNtrp.toFixed(1)}
-          sub="Year-end rating"
+          label="Roster band"
+          value={
+            player.ntrpLabel !== undefined ? player.ntrpLabel.toFixed(1) : "—"
+          }
+          sub={
+            midpoint !== null
+              ? `midpoint ${midpoint.toFixed(2)}`
+              : "unrated"
+          }
         />
         <Stat
-          label="Est. NTRP"
-          value={currentNtrp.toFixed(4)}
-          sub={`±${currentNtrpRd.toFixed(2)} · ${ntrpDeltaSign}${ntrpDelta.toFixed(4)} this season`}
+          label="Current perf rating"
+          value={player.perfRating.toFixed(3)}
+          sub={
+            midpoint !== null
+              ? `${(player.perfRating - midpoint).toFixed(2)} vs midpoint`
+              : ""
+          }
         />
         <Stat
-          label="Season record"
-          value={`${matches.filter((m) => m.won).length}–${matches.filter((m) => !m.won).length}`}
-          sub={`${matches.length} courts played`}
+          label="Matches played"
+          value={String(player.matches)}
+          sub={
+            history.length > 0
+              ? `${ratingDeltaSign}${ratingDelta.toFixed(2)} since first match`
+              : ""
+          }
         />
       </section>
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Est. NTRP history</h2>
-        <RatingSparkline
-          points={history.map((h) =>
-            glickoToNtrp(h.rating.rating, FIXTURE_CALIBRATION)
-          )}
-          dates={history.map((h) => h.computedAt)}
+      <section className="rounded-lg border border-stone-200 bg-white p-4">
+        <div className="mb-2 flex items-baseline justify-between">
+          <h2 className="text-sm font-medium text-stone-700">Rating over time</h2>
+          <span className="text-xs text-stone-400">
+            {history.length > 0
+              ? `${history[0]!.date} → ${history[history.length - 1]!.date}`
+              : "no data"}
+          </span>
+        </div>
+        <Sparkline
+          data={sparkData}
+          width={640}
+          height={120}
+          yRefs={
+            midpoint !== null
+              ? [
+                  {
+                    y: midpoint,
+                    color: "#d6d3d1",
+                    label: `band midpoint ${midpoint.toFixed(2)}`,
+                  },
+                ]
+              : []
+          }
+          ariaLabel={`${player.name} rating history`}
         />
       </section>
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Match log</h2>
-        {matches.length === 0 ? (
-          <p className="rounded border border-dashed border-stone-300 bg-white p-6 text-center text-sm text-stone-500">
-            No matches played yet this season.
-          </p>
-        ) : (
-          <MatchLog matches={matches} viewerId={id} />
-        )}
+      <section className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+        <h2 className="border-b border-stone-100 bg-stone-50 px-4 py-2 text-sm font-medium text-stone-700">
+          Match log ({history.length})
+        </h2>
+        <table className="w-full text-sm">
+          <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+            <tr>
+              <th className="px-3 py-2">Date</th>
+              <th className="px-3 py-2">Court</th>
+              <th className="px-3 py-2">Opponent(s)</th>
+              <th className="px-3 py-2 text-right">Pre rating</th>
+              <th className="px-3 py-2 text-right">Opp rating</th>
+              <th className="px-3 py-2">W/L · Score</th>
+              <th className="px-3 py-2 text-right">Match rating</th>
+              <th className="px-3 py-2 text-right">Overall</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...history].reverse().map((m, i) => {
+              const oppNames = m.opponents.map((o) => o.name).join(" / ");
+              return (
+                <tr key={i} className="border-t border-stone-100 align-top">
+                  <td className="px-3 py-2 font-mono text-xs text-stone-600">
+                    {m.date}
+                  </td>
+                  <td className="px-3 py-2 text-xs">
+                    <span className="font-medium">
+                      {m.kind === "S" ? "S" : "D"}
+                      {m.line}
+                    </span>
+                    {m.partners.length > 0 && (
+                      <div className="text-stone-500">
+                        w/{" "}
+                        <Link
+                          href={`/players/${playerSlug(m.partners[0]!.key)}` as `/players/${string}`}
+                          className="hover:underline"
+                        >
+                          {m.partners[0]!.name}
+                        </Link>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="space-y-0.5">
+                      {m.opponents.map((o) => (
+                        <div key={o.key}>
+                          <Link
+                            href={`/players/${playerSlug(o.key)}` as `/players/${string}`}
+                            className="text-court-700 hover:underline"
+                          >
+                            {o.name}
+                          </Link>{" "}
+                          <span className="font-mono text-xs text-stone-400">
+                            ({o.preRating.toFixed(2)})
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-xs text-stone-600">
+                    {m.playerPreRating.toFixed(2)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-xs text-stone-600">
+                    {m.opponentMean.toFixed(2)}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span
+                      className={`mr-1 inline-block w-4 text-center font-semibold ${
+                        m.won ? "text-emerald-700" : "text-rose-700"
+                      }`}
+                    >
+                      {m.won ? "W" : "L"}
+                    </span>
+                    <span className="font-mono text-xs text-stone-600">
+                      {formatScore(m.sets)}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono">
+                    {m.perf.toFixed(2)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-stone-700">
+                    {m.playerPostRating.toFixed(2)}
+                  </td>
+                </tr>
+              );
+            })}
+            {history.length === 0 && (
+              <tr>
+                <td colSpan={8} className="px-3 py-8 text-center text-stone-400">
+                  No matches in the crawled data.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </section>
     </div>
   );
@@ -101,138 +234,15 @@ function Stat({
 }: {
   label: string;
   value: string;
-  sub: string;
+  sub?: string;
 }) {
   return (
     <div className="rounded-lg border border-stone-200 bg-white p-4">
       <div className="text-xs uppercase tracking-wide text-stone-500">
         {label}
       </div>
-      <div className="mt-1 text-2xl font-mono font-semibold">{value}</div>
-      <div className="text-xs text-stone-500">{sub}</div>
-    </div>
-  );
-}
-
-function RatingSparkline({
-  points,
-  dates,
-}: {
-  points: number[];
-  dates: string[];
-}) {
-  if (points.length === 0) return null;
-  const width = 600;
-  const height = 140;
-  const padX = 24;
-  const padY = 16;
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  // Range is in NTRP units now (~3.8 to ~4.2). Ensure at least 0.1 so flat
-  // lines don't collapse into a single y-pixel.
-  const range = Math.max(0.1, max - min);
-  const xs = points.map(
-    (_, i) => padX + (i * (width - 2 * padX)) / Math.max(1, points.length - 1)
-  );
-  const ys = points.map(
-    (p) => padY + ((max - p) / range) * (height - 2 * padY)
-  );
-  const path = points
-    .map((_, i) => `${i === 0 ? "M" : "L"} ${xs[i]!.toFixed(1)} ${ys[i]!.toFixed(1)}`)
-    .join(" ");
-
-  return (
-    <div className="rounded-lg border border-stone-200 bg-white p-4">
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="h-36 w-full"
-        preserveAspectRatio="none"
-      >
-        <path
-          d={path}
-          fill="none"
-          stroke="currentColor"
-          className="text-court-700"
-          strokeWidth={2}
-        />
-        {points.map((_, i) => (
-          <circle
-            key={i}
-            cx={xs[i]}
-            cy={ys[i]}
-            r={2.5}
-            className="fill-court-700"
-          />
-        ))}
-      </svg>
-      <div className="mt-2 flex justify-between text-xs text-stone-500">
-        <span>{dates[0]}</span>
-        <span className="font-mono">
-          {min.toFixed(4)} → {max.toFixed(4)}
-        </span>
-        <span>{dates[dates.length - 1]}</span>
-      </div>
-    </div>
-  );
-}
-
-function MatchLog({
-  matches,
-  viewerId,
-}: {
-  matches: PlayerMatchView[];
-  viewerId: string;
-}) {
-  return (
-    <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-      <table className="w-full text-sm">
-        <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
-          <tr>
-            <th className="px-3 py-2">Date</th>
-            <th className="px-3 py-2">Court</th>
-            <th className="px-3 py-2">With</th>
-            <th className="px-3 py-2">Vs</th>
-            <th className="px-3 py-2">Score</th>
-            <th className="px-3 py-2 text-right">Result</th>
-          </tr>
-        </thead>
-        <tbody>
-          {matches.map((m) => {
-            const partner = m.partnerIds[0]
-              ? playerById(m.partnerIds[0])?.displayName
-              : null;
-            const oppNames = m.opponentIds
-              .map((id) => playerById(id)?.displayName ?? id)
-              .join(" / ");
-            const scoreStr = m.court.sets
-              .map((s) => {
-                const me = m.wasHome ? s.home : s.away;
-                const them = m.wasHome ? s.away : s.home;
-                return `${me}-${them}`;
-              })
-              .join(", ");
-            return (
-              <tr key={m.court.id} className="border-t border-stone-100">
-                <td className="px-3 py-2 text-stone-600">
-                  {m.teamMatch.playedOn}
-                </td>
-                <td className="px-3 py-2 font-mono text-xs">
-                  {m.court.courtKind}
-                  {m.court.line}
-                </td>
-                <td className="px-3 py-2 text-stone-600">{partner ?? "—"}</td>
-                <td className="px-3 py-2 text-stone-600">{oppNames}</td>
-                <td className="px-3 py-2 font-mono">{scoreStr}</td>
-                <td
-                  className={`px-3 py-2 text-right font-semibold ${m.won ? "text-emerald-700" : "text-rose-600"}`}
-                >
-                  {m.won ? "W" : "L"}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div className="mt-1 text-3xl font-bold text-stone-900">{value}</div>
+      {sub && <div className="text-xs text-stone-500">{sub}</div>}
     </div>
   );
 }
