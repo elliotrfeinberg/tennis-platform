@@ -18,7 +18,16 @@
 import * as cheerio from "cheerio";
 
 export interface TennisrecordSet {
-  // From the row's player perspective: their games, opponent's games.
+  // ALWAYS from the MATCH winner's perspective, regardless of which
+  // side the page subject was on. Each set's two numbers are reported
+  // as "match-winner-games — match-loser-games", so for a match the
+  // page subject WON these are their games / opp games (winner first);
+  // for a match they LOST these are opp games / their games.
+  //
+  // Note: a set that the match winner LOST will still appear "first
+  // number < second" because the match winner had fewer games in that
+  // particular set (e.g. they lost set 1 4-6 → "4-6"). This is unusual
+  // — it's not "set-winner-first", it's "match-winner-first".
   playerGames: number;
   opponentGames: number;
 }

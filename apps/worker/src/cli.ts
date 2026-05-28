@@ -1029,13 +1029,11 @@ async function tennisrecordAggregateCmd(opts: {
           .filter((r): r is number => r !== undefined);
         if (oppRatings.length === 0) continue;
         const oppMean = oppRatings.reduce((a, b) => a + b, 0) / oppRatings.length;
-        // Canonical key from winner's perspective.
-        const winnerSets = row.won
-          ? row.sets
-          : row.sets.map((s) => ({
-              playerGames: s.opponentGames,
-              opponentGames: s.playerGames,
-            }));
+        // Canonical key: tennisrecord's Result column is ALWAYS shown
+        // in winner's perspective (winner-games first), regardless of
+        // which side the player on this page was on. So row.sets is
+        // already winner-perspective; no flip needed.
+        const winnerSets = row.sets;
         // Drop matches that we don't understand (no sets parsed).
         if (winnerSets.length === 0) continue;
         const sortedSets = [...winnerSets].sort((a, b) => {
