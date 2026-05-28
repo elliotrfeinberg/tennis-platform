@@ -21,16 +21,53 @@
 import { matchPerformance, type PerfSetScore } from "@tennis/ratings";
 import type { CapturesData, PlayerLabel } from "./loadCaptures.js";
 
+export interface PerfMatchPlayerRef {
+  key: string;
+  name: string;
+  // This player/opponent/partner's rolling rating going INTO this match.
+  preRating: number;
+}
+
 export interface PerfMatchEntry {
+  matchId: string;
   // Match date (the chronological key) and the per-match perf rating
   // this player earned in that match. Listed in chronological order.
   date: Date;
+  // Player's individual match rating for this match.
   perf: number;
-  // The opponent-side mean rating used as the anchor for this match.
-  // Useful for diagnostics / hover-state in a UI.
+  // Team-level match rating (same as perf for singles; for doubles, the
+  // mean of the two partners' individual perfs).
+  teamPerf: number;
+  // The player's rolling rating going INTO this match.
+  playerPreRating: number;
+  // The player's rolling rating AFTER this match (weighted mean of
+  // history up to and including this entry). Drives the UI sparkline.
+  playerPostRating: number;
+
+  // Mean of opponents' pre-match ratings (the anchor for team perf).
   opponentRating: number;
   // Game differential (+ if won, − if lost). Useful for diagnostics.
   gamesDiff: number;
+
+  // Opponents on the other side, with their pre-match ratings.
+  opponents: PerfMatchPlayerRef[];
+  // Doubles partner(s) on the same side, with their pre-match ratings.
+  // Empty for singles.
+  partners: PerfMatchPlayerRef[];
+
+  // Per-set scores from THIS PLAYER's perspective. Empty if no sets
+  // were played (default/forfeit).
+  sets: Array<{ playerGames: number; opponentGames: number }>;
+  // Whether this player's side won the match.
+  won: boolean;
+
+  // Team / opponent-team name strings from the scorecard (for the UI).
+  // Always the player's own team name first.
+  playerTeamName: string;
+  opponentTeamName: string;
+  // Line + kind (S/D) of the court.
+  line: number;
+  kind: "S" | "D";
 }
 
 export interface PerfRatingsResult {
@@ -176,36 +213,109 @@ export function computePerfRatings(
     //
     // Singles is the trivial case (one player, spread = 0).
     //
+    // Build PlayerRef arrays once per side so doubles partners' detail
+    // appears in each other's history.
+    const nameFor = (key: string): string =>
+      captures.players.get(key)?.name ?? "(unknown)";
+    const homeRefs: PerfMatchPlayerRef[] = m.homePlayerKeys.map((k, i) => ({
+      key: k,
+      name: nameFor(k),
+      preRating: homePre[i]!,
+    }));
+    const visitorRefs: PerfMatchPlayerRef[] = m.visitorPlayerKeys.map(
+      (k, i) => ({ key: k, name: nameFor(k), preRating: visitorPre[i]! })
+    );
+
     // Append to each player's history, then re-snapshot their current
-    // rating for use by later matches.
-    for (let i = 0; i < m.homePlayerKeys.length; i++) {
-      const key = m.homePlayerKeys[i]!;
-      const partnerPre = homePre[i]!;
-      const individualPerf = homePerf + (partnerPre - homeMean);
-      const entries = history.get(key) ?? [];
-      entries.push({
-        date: m.date,
-        perf: individualPerf,
-        opponentRating: visitorMean,
-        gamesDiff: gamesHome - gamesVisitor,
-      });
-      history.set(key, entries);
-      currentRating.set(key, computeCurrent(entries, lookupInitial(key)));
-    }
-    for (let i = 0; i < m.visitorPlayerKeys.length; i++) {
-      const key = m.visitorPlayerKeys[i]!;
-      const partnerPre = visitorPre[i]!;
-      const individualPerf = visitorPerf + (partnerPre - visitorMean);
-      const entries = history.get(key) ?? [];
-      entries.push({
-        date: m.date,
-        perf: individualPerf,
-        opponentRating: homeMean,
-        gamesDiff: gamesVisitor - gamesHome,
-      });
-      history.set(key, entries);
-      currentRating.set(key, computeCurrent(entries, lookupInitial(key)));
-    }
+    // rating for use by later matches. The match entry carries the
+    // player's pre-rating, their individual perf, and the post-rating
+    // (= the weighted-mean rating after this match is folded in).
+    const appendForSide = (
+      sideKeys: string[],
+      sidePre: number[],
+      sideMean: number,
+      sidePerf: number,
+      sideRefs: PerfMatchPlayerRef[],
+      oppRefs: PerfMatchPlayerRef[],
+      oppMean: number,
+      sideWon: boolean,
+      // Side-relative score: (player_games, opp_games) per set.
+      sideSetsSigned: Array<{ playerGames: number; opponentGames: number }>,
+      sideGamesDiff: number,
+      playerTeamName: string,
+      opponentTeamName: string
+    ) => {
+      for (let i = 0; i < sideKeys.length; i++) {
+        const key = sideKeys[i]!;
+        const partnerPre = sidePre[i]!;
+        const individualPerf = sidePerf + (partnerPre - sideMean);
+        const partners = sideRefs.filter((_, j) => j !== i);
+        const entries = history.get(key) ?? [];
+        // Provisional entry without post-rating; we patch it below
+        // once we recompute the new rolling mean.
+        const entry: PerfMatchEntry = {
+          matchId: m.matchId,
+          date: m.date,
+          perf: individualPerf,
+          teamPerf: sidePerf,
+          playerPreRating: partnerPre,
+          playerPostRating: 0, // patched right after we re-mean
+          opponentRating: oppMean,
+          gamesDiff: sideGamesDiff,
+          opponents: oppRefs,
+          partners,
+          sets: sideSetsSigned,
+          won: sideWon,
+          playerTeamName,
+          opponentTeamName,
+          line: m.line,
+          kind: m.kind,
+        };
+        entries.push(entry);
+        history.set(key, entries);
+        const newCurrent = computeCurrent(entries, lookupInitial(key));
+        entry.playerPostRating = newCurrent;
+        currentRating.set(key, newCurrent);
+      }
+    };
+
+    const homeSetsSigned = m.sets.map((s) => ({
+      playerGames: s.home,
+      opponentGames: s.visitor,
+    }));
+    const visitorSetsSigned = m.sets.map((s) => ({
+      playerGames: s.visitor,
+      opponentGames: s.home,
+    }));
+
+    appendForSide(
+      m.homePlayerKeys,
+      homePre,
+      homeMean,
+      homePerf,
+      homeRefs,
+      visitorRefs,
+      visitorMean,
+      m.homeWon,
+      homeSetsSigned,
+      gamesHome - gamesVisitor,
+      m.homeTeamName,
+      m.visitorTeamName
+    );
+    appendForSide(
+      m.visitorPlayerKeys,
+      visitorPre,
+      visitorMean,
+      visitorPerf,
+      visitorRefs,
+      homeRefs,
+      homeMean,
+      !m.homeWon,
+      visitorSetsSigned,
+      gamesVisitor - gamesHome,
+      m.visitorTeamName,
+      m.homeTeamName
+    );
   }
 
   // Final ratings: weighted mean of each player's full history (or the

@@ -740,6 +740,9 @@ async function ratingsFitPerf(
   const primary = aggregatePaths[0]!;
   const stem = primary.endsWith(".json") ? primary.slice(0, -5) : primary;
   const ratingsPath = `${stem}.perf-ratings.json`;
+  // Dump full chronological history per player. The web app reads
+  // this and uses it for both the players list (current rating)
+  // and the per-player detail page (full match log + sparkline).
   const dump = [...result.ratings.entries()].map(([key, perf]) => {
     const p = captures.players.get(key);
     const hist = result.history.get(key) ?? [];
@@ -751,12 +754,23 @@ async function ratingsFitPerf(
       teams: p?.teams ?? [],
       perfRating: perf,
       matches: hist.length,
-      // Recent 5 perf entries for spot-check.
-      recentMatches: hist.slice(-5).map((e) => ({
+      history: hist.map((e) => ({
+        matchId: e.matchId,
         date: e.date.toISOString().slice(0, 10),
-        perf: e.perf,
-        opponent: e.opponentRating,
+        won: e.won,
+        kind: e.kind,
+        line: e.line,
+        playerTeamName: e.playerTeamName,
+        opponentTeamName: e.opponentTeamName,
+        sets: e.sets,
         gamesDiff: e.gamesDiff,
+        opponents: e.opponents,
+        partners: e.partners,
+        opponentMean: e.opponentRating,
+        teamPerf: e.teamPerf,
+        perf: e.perf,
+        playerPreRating: e.playerPreRating,
+        playerPostRating: e.playerPostRating,
       })),
     };
   });

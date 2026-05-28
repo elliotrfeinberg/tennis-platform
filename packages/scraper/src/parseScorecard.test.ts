@@ -70,20 +70,32 @@ describe("parseScorecard (5/11/2026 vs ROUND HILL fixture)", () => {
     expect(d2.visitorPlayers).toEqual(["Linda Choi", "Isabella Feinberg"]);
   });
 
-  it("reads set scores for each court", () => {
+  it("reads set scores for each court, oriented home/visitor (NOT match-winner-first)", () => {
+    // USTA's scorecard renders set scores from the MATCH WINNER's
+    // perspective per set, regardless of which side is home. The
+    // parser detects homeWon from mark.gif and reorients to {home,
+    // visitor} so callers get a consistent home-vs-visitor view.
+
+    // D1: home won (mark on home spacer). Scores stay as parsed.
     const d1 = parsed.courts.find((c) => c.kind === "D" && c.line === 1)!;
+    expect(d1.homeWon).toBe(true);
     expect(d1.sets).toEqual([
       { home: 6, visitor: 2 },
       { home: 6, visitor: 0 },
     ]);
 
+    // S1: visitor won. The cell showed "6-2 6-2" from visitor's view;
+    // after orientation home has the smaller numbers.
     const s1 = parsed.courts.find((c) => c.kind === "S" && c.line === 1)!;
+    expect(s1.homeWon).toBe(false);
     expect(s1.sets).toEqual([
-      { home: 6, visitor: 2 },
-      { home: 6, visitor: 2 },
+      { home: 2, visitor: 6 },
+      { home: 2, visitor: 6 },
     ]);
 
+    // D3: home won.
     const d3 = parsed.courts.find((c) => c.kind === "D" && c.line === 3)!;
+    expect(d3.homeWon).toBe(true);
     expect(d3.sets).toEqual([
       { home: 6, visitor: 2 },
       { home: 7, visitor: 5 },
@@ -124,8 +136,10 @@ describe("parseScorecard (4/12/2026 fixture with court 4 retirement)", () => {
   const parsed = parseScorecard(RETIRED_FIXTURE);
 
   it("flags the retiring side and still infers the winner", () => {
-    // Charlotte Fisher (home, 2# Singles) retired after winning the first
-    // set 6-4; visitor takes the court via the mark.gif.
+    // Charlotte Fisher (home, 2# Singles) LOST the first set 4-6 to
+    // Rebecca Erickson, then retired before set 2. Visitor takes the
+    // court via the mark.gif. The scorecard cell shows "6-4" from
+    // Rebecca's (match-winner's) perspective; we orient to home-first.
     const s2 = parsed.courts.find(
       (c) => c.kind === "S" && c.line === 2
     )!;
@@ -136,7 +150,8 @@ describe("parseScorecard (4/12/2026 fixture with court 4 retirement)", () => {
     expect(s2.defaulted).toBeUndefined();
     expect(s2.homeWon).toBe(false);
     expect(s2.completed).toBe(false);
-    expect(s2.sets).toEqual([{ home: 6, visitor: 4 }]);
+    // After orientation: home (Charlotte) had 4, visitor (Rebecca) had 6.
+    expect(s2.sets).toEqual([{ home: 4, visitor: 6 }]);
   });
 
   it("leaves the other 4 courts unflagged", () => {

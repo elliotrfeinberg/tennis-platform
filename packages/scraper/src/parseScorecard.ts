@@ -189,7 +189,10 @@ function parseCourts($: CheerioAPI): ScorecardCourt[] {
 
     const homePlayers = playersIn($homeCell, ctlIndex, "Home", $);
     const visitorPlayers = playersIn($visitorCell, ctlIndex, "Visitor", $);
-    const sets = parseSetScores($scoresCell.html() ?? "");
+    // parseSetScores returns each set as "match-winner-games" /
+    // "match-loser-games" — the universal tennis-score notation. We
+    // orient to {home, visitor} after we know homeWon from mark.gif.
+    const setsAsWinnerLoser = parseSetScores($scoresCell.html() ?? "");
     const completed = /\bCompleted\b/i.test($homeCell.text());
 
     // "Retired" / "Default" / "Defaulted" appear as bare text inside the
@@ -215,6 +218,18 @@ function parseCourts($: CheerioAPI): ScorecardCourt[] {
     let homeWon: boolean | undefined;
     if (homeHasMark && !visitorHasMark) homeWon = true;
     else if (visitorHasMark && !homeHasMark) homeWon = false;
+
+    // Orient set scores from match-winner-first to {home, visitor}.
+    // If homeWon=true, the match winner IS home; first number = home.
+    // If homeWon=false, the match winner is visitor; first number = visitor.
+    // If homeWon is undefined (no mark on either side — usually a
+    // forfeit/default we can't attribute), default to home-first to
+    // preserve the parsed-order numbers; downstream callers should treat
+    // this match as "no winner" anyway.
+    const sets =
+      homeWon === false
+        ? setsAsWinnerLoser.map((s) => ({ home: s.visitor, visitor: s.home }))
+        : setsAsWinnerLoser;
 
     courts.push({
       line,
@@ -253,6 +268,14 @@ function playersIn(
   return out;
 }
 
+// Parse the set-scores cell into raw {home, visitor} pairs as they
+// appear in the cell. CAVEAT: USTA's score notation is
+// "match-winner-games-first" per set (universal tennis convention),
+// not "home-first". Callers must reorient using homeWon before using
+// these as home/visitor — `parseCourts` does this above.
+//
+// We retain the `{home, visitor}` field naming here because the values
+// AS PARSED end up reassigned correctly after orientation.
 function parseSetScores(cellHtml: string): ScorecardSet[] {
   // The cell looks like: " 6-2<BR> 6-0" (or with extra whitespace and BR
   // variants). Split on any <br>, then pull X-Y from each chunk.
@@ -265,6 +288,8 @@ function parseSetScores(cellHtml: string): ScorecardSet[] {
       .trim();
     const m = text.match(/(\d+)\s*-\s*(\d+)/);
     if (!m) continue;
+    // Raw numbers in cell order. `home` here is the FIRST number, which
+    // is the match winner's games — `parseCourts` reorients this.
     sets.push({ home: Number(m[1]), visitor: Number(m[2]) });
   }
   return sets;

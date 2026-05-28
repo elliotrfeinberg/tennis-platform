@@ -23,4 +23,5 @@ export {
   type ComputePerfRatingsOptions,
   type PerfRatingsResult,
   type PerfMatchEntry,
+  type PerfMatchPlayerRef,
 } from "./computePerfRatings.js";
