@@ -146,24 +146,44 @@ export function computePerfRatings(
     const gamesHome = gh;
     const gamesVisitor = gv;
 
+    // Doubles attribution: each partner's individual match rating is
+    // not simply the team perf. USTA's published DMR data (verified
+    // empirically from tennisrecord) preserves the partners' pre-match
+    // rating spread exactly:
+    //
+    //   partner_perf = team_perf + (partner_pre − team_mean_pre)
+    //
+    // So if A and B come in at 3.27 and 3.75 (mean 3.51) and the team
+    // performs at 3.41, A's match rating is 3.41 + (3.27 − 3.51) = 3.17
+    // and B's is 3.41 + (3.75 − 3.51) = 3.65 — exact match to USTA's
+    // numbers.
+    //
+    // Singles is the trivial case (one player, spread = 0).
+    //
     // Append to each player's history, then re-snapshot their current
     // rating for use by later matches.
-    for (const key of m.homePlayerKeys) {
+    for (let i = 0; i < m.homePlayerKeys.length; i++) {
+      const key = m.homePlayerKeys[i]!;
+      const partnerPre = homePre[i]!;
+      const individualPerf = homePerf + (partnerPre - homeMean);
       const entries = history.get(key) ?? [];
       entries.push({
         date: m.date,
-        perf: homePerf,
+        perf: individualPerf,
         opponentRating: visitorMean,
         gamesDiff: gamesHome - gamesVisitor,
       });
       history.set(key, entries);
       currentRating.set(key, computeCurrent(entries, lookupInitial(key)));
     }
-    for (const key of m.visitorPlayerKeys) {
+    for (let i = 0; i < m.visitorPlayerKeys.length; i++) {
+      const key = m.visitorPlayerKeys[i]!;
+      const partnerPre = visitorPre[i]!;
+      const individualPerf = visitorPerf + (partnerPre - visitorMean);
       const entries = history.get(key) ?? [];
       entries.push({
         date: m.date,
-        perf: visitorPerf,
+        perf: individualPerf,
         opponentRating: homeMean,
         gamesDiff: gamesVisitor - gamesHome,
       });

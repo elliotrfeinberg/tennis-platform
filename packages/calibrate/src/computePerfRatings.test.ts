@@ -207,7 +207,9 @@ describe("computePerfRatings", () => {
     expect(aHistory[0]!.gamesDiff).toBe(12); // 12-0 across 6-0, 6-0 in match 1
   });
 
-  it("doubles partners get the same per-match perf rating", () => {
+  it("doubles partners with the same pre-match rating get the same per-match perf rating", () => {
+    // When both partners come in at the same rating, individual_perf =
+    // team_perf + 0 = team_perf — so they get equal credit.
     const captures = mkCaptures(
       [
         { key: "A", name: "A", memberId: undefined, ntrp: 3.5, teams: [] },
@@ -226,5 +228,37 @@ describe("computePerfRatings", () => {
       result.history.get("D")![0]!.perf,
       6
     );
+  });
+
+  it("doubles partners with different pre-match ratings preserve their spread (USTA attribution)", () => {
+    // Verified against real tennisrecord DMR data: same match,
+    // partner A pre=3.27, B pre=3.75, team_perf=3.41 →
+    // A_perf=3.17, B_perf=3.65 (spread preserved at 0.48).
+    //
+    // Here: A_pre=3.27, B_pre=3.75 → mean 3.51. Opp at 3.795 (C=4.12,
+    // D=3.47). Loss 6-2, 6-0 → table delta 0.40 → A+B team_perf =
+    // 3.795 - 0.40 = 3.395. Then:
+    //   A_perf = 3.395 + (3.27 - 3.51) = 3.155
+    //   B_perf = 3.395 + (3.75 - 3.51) = 3.635
+    // Spread between A and B = 0.48 (matches pre-match spread exactly).
+    const captures = mkCaptures(
+      [
+        { key: "A", name: "A", memberId: undefined, ntrp: 3.27, teams: [] },
+        { key: "B", name: "B", memberId: undefined, ntrp: 3.75, teams: [] },
+        { key: "C", name: "C", memberId: undefined, ntrp: 4.12, teams: [] },
+        { key: "D", name: "D", memberId: undefined, ntrp: 3.47, teams: [] },
+      ],
+      [mkMatch(new Date(2026, 0, 1), ["A", "B"], ["C", "D"], [2, 6], [0, 6])]
+    );
+    const result = computePerfRatings(captures);
+    const aPerf = result.history.get("A")![0]!.perf;
+    const bPerf = result.history.get("B")![0]!.perf;
+    // Spread preserved between partners.
+    expect(bPerf - aPerf).toBeCloseTo(3.75 - 3.27, 6);
+    // Both partners' perfs sum to 2 * team_perf.
+    const opponentMean = (4.12 + 3.47) / 2;
+    const winnerTableValue = 0.4; // 6-0, 6-2 → 0.40 in TWO_SET_SWEEP_TABLE
+    const teamPerfExpected = opponentMean - winnerTableValue;
+    expect((aPerf + bPerf) / 2).toBeCloseTo(teamPerfExpected, 6);
   });
 });
