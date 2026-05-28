@@ -19,6 +19,7 @@ export {
 
 export {
   computePerfRatings,
+  ntrpBandMidpoint,
   type ComputePerfRatingsOptions,
   type PerfRatingsResult,
   type PerfMatchEntry,

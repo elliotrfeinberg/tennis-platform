@@ -60,9 +60,8 @@ function mkMatch(
 
 describe("computePerfRatings", () => {
   it("a single 6-0, 6-0 win shifts winner +0.48 above opponent's initial NTRP", () => {
-    // Opponent starts at 3.0 (NTRP label). Winner starts at 3.0 too,
-    // but their post-match perf history has one entry at 3.48
-    // (opponent_initial + 0.48, the empirical median for 6-0, 6-0).
+    // Both labeled 3.0 → initial rating = band midpoint 2.75 each.
+    // Winner perf = opp + 0.48 = 3.23. Loser perf = opp - 0.48 = 2.27.
     const captures = mkCaptures(
       [
         { key: "A", name: "A", memberId: undefined, ntrp: 3.0, teams: [] },
@@ -71,11 +70,12 @@ describe("computePerfRatings", () => {
       [mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [6, 0], [6, 0])]
     );
     const result = computePerfRatings(captures);
-    expect(result.ratings.get("A")!).toBeCloseTo(3.48, 6);
-    expect(result.ratings.get("B")!).toBeCloseTo(2.52, 6);
+    expect(result.ratings.get("A")!).toBeCloseTo(3.23, 6);
+    expect(result.ratings.get("B")!).toBeCloseTo(2.27, 6);
   });
 
   it("a 7-6, 7-6 sweep lands per the table at ±0.05", () => {
+    // Both labeled 3.5 → initial = 3.25. Winner perf = 3.30, loser = 3.20.
     const captures = mkCaptures(
       [
         { key: "A", name: "A", memberId: undefined, ntrp: 3.5, teams: [] },
@@ -84,8 +84,8 @@ describe("computePerfRatings", () => {
       [mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [7, 6], [7, 6])]
     );
     const result = computePerfRatings(captures);
-    expect(result.ratings.get("A")!).toBeCloseTo(3.55, 6);
-    expect(result.ratings.get("B")!).toBeCloseTo(3.45, 6);
+    expect(result.ratings.get("A")!).toBeCloseTo(3.3, 6);
+    expect(result.ratings.get("B")!).toBeCloseTo(3.2, 6);
   });
 
   it("winning by retirement after losing more games still credits the winner", () => {
@@ -130,9 +130,10 @@ describe("computePerfRatings", () => {
     const a = result.ratings.get("A")!;
     const b = result.ratings.get("B")!;
     expect(a).toBeGreaterThan(b);
-    // Both stay within ±0.1 of opp — close match, soft win.
-    expect(Math.abs(a - 3.5)).toBeLessThan(0.1);
-    expect(Math.abs(b - 3.5)).toBeLessThan(0.1);
+    // Both labeled 3.5 → opp anchor = midpoint 3.25. Both stay within
+    // ±0.15 of that — close match, soft win.
+    expect(Math.abs(a - 3.25)).toBeLessThan(0.15);
+    expect(Math.abs(b - 3.25)).toBeLessThan(0.15);
   });
 
   it("a player with no matches keeps their NTRP-label initial rating", () => {
@@ -172,14 +173,15 @@ describe("computePerfRatings", () => {
       ]
     );
     const result = computePerfRatings(captures);
-    // A consistently beats B 6-4 — A drifts above 3.0, B below.
-    expect(result.ratings.get("A")!).toBeGreaterThan(3.0);
-    expect(result.ratings.get("B")!).toBeLessThan(3.0);
-    expect(result.ratings.get("A")!).toBeLessThan(3.5);
-    // C drifts above 4.0, D below.
-    expect(result.ratings.get("C")!).toBeGreaterThan(4.0);
-    expect(result.ratings.get("D")!).toBeLessThan(4.0);
-    expect(result.ratings.get("D")!).toBeGreaterThan(3.5);
+    // A consistently beats B 6-4 — A drifts above the 3.0 band midpoint
+    // (2.75), B below. Both stay within the 3.0 band (roughly).
+    expect(result.ratings.get("A")!).toBeGreaterThan(2.75);
+    expect(result.ratings.get("B")!).toBeLessThan(2.75);
+    expect(result.ratings.get("A")!).toBeLessThan(3.25);
+    // C drifts above 3.75 (4.0 band midpoint), D below.
+    expect(result.ratings.get("C")!).toBeGreaterThan(3.75);
+    expect(result.ratings.get("D")!).toBeLessThan(3.75);
+    expect(result.ratings.get("D")!).toBeGreaterThan(3.25);
     // Critically: C remains clearly higher than A — clusters stay
     // anchored to their respective NTRP bands.
     expect(result.ratings.get("C")! - result.ratings.get("A")!).toBeGreaterThan(0.5);
@@ -202,8 +204,8 @@ describe("computePerfRatings", () => {
     expect(aHistory).toHaveLength(3);
     expect(aHistory[0]!.date.getTime()).toBeLessThan(aHistory[1]!.date.getTime());
     expect(aHistory[1]!.date.getTime()).toBeLessThan(aHistory[2]!.date.getTime());
-    // Diagnostic fields are populated.
-    expect(aHistory[0]!.opponentRating).toBeCloseTo(3.5, 6);
+    // Diagnostic fields are populated. Opp anchor = 3.5 band midpoint.
+    expect(aHistory[0]!.opponentRating).toBeCloseTo(3.25, 6);
     expect(aHistory[0]!.gamesDiff).toBe(12); // 12-0 across 6-0, 6-0 in match 1
   });
 
@@ -235,7 +237,11 @@ describe("computePerfRatings", () => {
     // partner A pre=3.27, B pre=3.75, team_perf=3.41 →
     // A_perf=3.17, B_perf=3.65 (spread preserved at 0.48).
     //
-    // Here: A_pre=3.27, B_pre=3.75 → mean 3.51. Opp at 3.795 (C=4.12,
+    // Note: ntrp values here are CONTINUOUS pre-match ratings (not band
+    // labels), so we pass explicit initialRating to use them verbatim
+    // rather than the band-midpoint default (which would subtract 0.25).
+    //
+    // A_pre=3.27, B_pre=3.75 → mean 3.51. Opp at 3.795 (C=4.12,
     // D=3.47). Loss 6-2, 6-0 → table delta 0.40 → A+B team_perf =
     // 3.795 - 0.40 = 3.395. Then:
     //   A_perf = 3.395 + (3.27 - 3.51) = 3.155
@@ -250,7 +256,9 @@ describe("computePerfRatings", () => {
       ],
       [mkMatch(new Date(2026, 0, 1), ["A", "B"], ["C", "D"], [2, 6], [0, 6])]
     );
-    const result = computePerfRatings(captures);
+    const result = computePerfRatings(captures, {
+      initialRating: (p) => p.ntrp ?? 3.25,
+    });
     const aPerf = result.history.get("A")![0]!.perf;
     const bPerf = result.history.get("B")![0]!.perf;
     // Spread preserved between partners.

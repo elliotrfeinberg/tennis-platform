@@ -47,6 +47,7 @@ import {
   labeledRows,
   loadCaptures,
   loadCapturesMulti,
+  ntrpBandMidpoint,
   DEFAULT_NTRP_TO_GLICKO_PRIOR,
 } from "@tennis/calibrate";
 import { fitCalibration, glickoToNtrp } from "@tennis/ratings";
@@ -699,28 +700,39 @@ async function ratingsFitPerf(
     console.error("No labeled players to summarize. Aborting.");
     process.exit(1);
   }
-  // Per-band stats.
-  console.error("Predicted NTRP by labeled level (no fit step — output IS NTRP):");
+  // Per-band stats. NTRP bands are continuous half-open ranges; a
+  // typical player at band N has true rating ~(N - 0.25). So an
+  // "average" 3.5 player is 3.25, not 3.5.
+  console.error(
+    "Predicted NTRP by labeled level (output IS NTRP; compare to band midpoint):"
+  );
   const byLevel = new Map<number, number[]>();
   for (const r of labeled) {
     const arr = byLevel.get(r.ntrp) ?? [];
     arr.push(r.perfRating);
     byLevel.set(r.ntrp, arr);
   }
-  // Overall RMSE: predicted vs label.
+  // Overall RMSE: predicted vs band MIDPOINT (not the label, which is
+  // the band's upper edge).
   let sse = 0;
-  for (const r of labeled) sse += (r.perfRating - r.ntrp) ** 2;
+  for (const r of labeled) {
+    sse += (r.perfRating - ntrpBandMidpoint(r.ntrp)) ** 2;
+  }
   const rmse = Math.sqrt(sse / labeled.length);
-  console.error(`  overall RMSE ${rmse.toFixed(4)} over ${labeled.length} players`);
+  console.error(
+    `  overall RMSE ${rmse.toFixed(4)} vs band-midpoint, over ${labeled.length} players`
+  );
   for (const level of [...byLevel.keys()].sort()) {
     const preds = byLevel.get(level)!;
+    const midpoint = ntrpBandMidpoint(level);
     const mean = preds.reduce((a, b) => a + b, 0) / preds.length;
     const sorted = [...preds].sort((a, b) => a - b);
     const median = sorted[Math.floor(sorted.length / 2)]!;
     const p10 = sorted[Math.floor(sorted.length * 0.1)]!;
     const p90 = sorted[Math.floor(sorted.length * 0.9)]!;
     console.error(
-      `  label ${level}: n=${preds.length} mean=${mean.toFixed(3)} ` +
+      `  label ${level} (midpoint ${midpoint.toFixed(2)}): ` +
+        `n=${preds.length} mean=${mean.toFixed(3)} ` +
         `median=${median.toFixed(3)} p10=${p10.toFixed(3)} p90=${p90.toFixed(3)}`
     );
   }

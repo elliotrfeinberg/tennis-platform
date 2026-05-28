@@ -57,12 +57,28 @@ export interface ComputePerfRatingsOptions {
 // current-form signal to dominate while still smoothing single bad days.
 const DEFAULT_WEIGHT_FN = (k: number): number => (k < 10 ? 1 : 0);
 
+// NTRP bands are continuous half-open ranges:
+//   3.0 band = (2.5001, 3.0000]  → midpoint 2.75
+//   3.5 band = (3.0001, 3.5000]  → midpoint 3.25
+//   4.0 band = (3.5001, 4.0000]  → midpoint 3.75
+// So the published band label (3.5) is the UPPER edge of the range,
+// not the typical true rating of players in the band. The expected
+// continuous rating for a typical player at band N is (N - 0.25).
+export function ntrpBandMidpoint(label: number): number {
+  return label - 0.25;
+}
+
 export function computePerfRatings(
   captures: CapturesData,
   opts: ComputePerfRatingsOptions = {}
 ): PerfRatingsResult {
+  // Default cold-start: each labeled player begins at their NTRP band's
+  // MIDPOINT (label - 0.25), not the label itself. Initializing at the
+  // label inflated all ratings by ~0.25 in earlier runs.
   const initialRatingFn =
-    opts.initialRating ?? ((p: PlayerLabel) => p.ntrp ?? 3.5);
+    opts.initialRating ??
+    ((p: PlayerLabel) =>
+      p.ntrp !== undefined ? ntrpBandMidpoint(p.ntrp) : 3.25);
   const weightFn = opts.weightFn ?? DEFAULT_WEIGHT_FN;
 
   // Per-player chronological match history.
