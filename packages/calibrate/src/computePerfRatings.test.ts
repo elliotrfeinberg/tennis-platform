@@ -59,10 +59,10 @@ function mkMatch(
 }
 
 describe("computePerfRatings", () => {
-  it("a single 6-0, 6-0 win shifts winner +0.5 above opponent's initial NTRP", () => {
+  it("a single 6-0, 6-0 win shifts winner +0.48 above opponent's initial NTRP", () => {
     // Opponent starts at 3.0 (NTRP label). Winner starts at 3.0 too,
-    // but their post-match perf history has one entry at 3.5
-    // (opponent_initial + 0.5).
+    // but their post-match perf history has one entry at 3.48
+    // (opponent_initial + 0.48, the empirical median for 6-0, 6-0).
     const captures = mkCaptures(
       [
         { key: "A", name: "A", memberId: undefined, ntrp: 3.0, teams: [] },
@@ -71,8 +71,8 @@ describe("computePerfRatings", () => {
       [mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [6, 0], [6, 0])]
     );
     const result = computePerfRatings(captures);
-    expect(result.ratings.get("A")!).toBeCloseTo(3.5, 6);
-    expect(result.ratings.get("B")!).toBeCloseTo(2.5, 6);
+    expect(result.ratings.get("A")!).toBeCloseTo(3.48, 6);
+    expect(result.ratings.get("B")!).toBeCloseTo(2.52, 6);
   });
 
   it("a 7-6, 7-6 sweep lands per the table at ±0.05", () => {

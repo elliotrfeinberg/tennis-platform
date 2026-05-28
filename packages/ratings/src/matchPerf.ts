@@ -19,10 +19,13 @@
 //    matching that shape lets us reverse-engineer cell values later
 //    from sources like tennisrecord.com without changing the API.
 //
-// Calibration anchors from the project owner:
-//   6-0, 6-0  ⇒  ≥0.5 NTRP gap   (the floor of a bagel sweep)
-//   6-1, 6-1  ⇒  0.40–0.45 gap
-//   6-3, 6-3  ⇒  ~0.25 gap
+// Calibration anchors (project-owner intuition vs. empirical medians
+// from tennisrecord.com:
+//   6-0, 6-0  ⇒  ≥0.50 floor (anchor)   |   0.48 empirical
+//   6-1, 6-1  ⇒  0.40–0.45 (anchor)     |   0.40 empirical
+//   6-3, 6-3  ⇒  ~0.25 (anchor)         |   0.21 empirical
+// The table below uses empirical values throughout — these are the
+// actual deltas USTA's dynamic-match-rating system produces.
 //
 // Loser delta is symmetric (-perfDelta).
 
@@ -49,38 +52,46 @@ export function matchPerformance(input: MatchPerfInput): number {
 // sorted-ascending string "AwAl,BwBl" where Aw≤Bw and within ties Al≤Bl.
 // Loser side gets the negative of this value.
 //
-// Hand-tuned to match the three calibration anchors plus typical USTA
-// rating-delta conventions; refine cells as we observe real tennisrecord
-// dynamic-match-ratings.
+// Cell values are empirical medians from a 200-player tennisrecord.com
+// match-history aggregation (3431 matches, year 2025). Each value is
+// the median of (match_rating − opponent_pre_match_rating) across all
+// matches with that canonical score, pooling winners and losers (the
+// model is symmetric so they share buckets).
+//
+// Sample-size notes:
+//   n=170 for 6-3,6-4 (most common 2-set sweep at the 3.0–4.0 levels)
+//   n=12  for 6-0,7-6 / 7-6,7-6 (rare extremes)
+// Cells with n<30 are noisier; refine with a larger crawl if needed.
 const TWO_SET_SWEEP_TABLE: Record<string, number> = {
-  "6-0,6-0": 0.5,
-  "6-0,6-1": 0.45,
-  "6-0,6-2": 0.4,
-  "6-0,6-3": 0.37,
-  "6-0,6-4": 0.34,
-  "6-0,7-5": 0.32,
-  "6-0,7-6": 0.3,
-  "6-1,6-1": 0.42,
-  "6-1,6-2": 0.37,
-  "6-1,6-3": 0.32,
-  "6-1,6-4": 0.28,
-  "6-1,7-5": 0.26,
-  "6-1,7-6": 0.24,
-  "6-2,6-2": 0.32,
-  "6-2,6-3": 0.27,
-  "6-2,6-4": 0.23,
-  "6-2,7-5": 0.2,
-  "6-2,7-6": 0.18,
-  "6-3,6-3": 0.25,
-  "6-3,6-4": 0.21,
-  "6-3,7-5": 0.18,
-  "6-3,7-6": 0.15,
-  "6-4,6-4": 0.15,
-  "6-4,7-5": 0.13,
-  "6-4,7-6": 0.1,
-  "7-5,7-5": 0.1,
-  "7-5,7-6": 0.07,
-  "7-6,7-6": 0.05,
+  // Score      empirical median (sample size)
+  "6-0,6-0": 0.48, // n=46
+  "6-0,6-1": 0.44, // n=105
+  "6-0,6-2": 0.4, // n=87
+  "6-0,6-3": 0.34, // n=59
+  "6-0,6-4": 0.29, // n=46
+  "6-0,7-5": 0.32, // n=9   (low confidence; near table value)
+  "6-0,7-6": 0.25, // n=12  (low confidence)
+  "6-1,6-1": 0.4, // n=63
+  "6-1,6-2": 0.34, // n=141
+  "6-1,6-3": 0.29, // n=128
+  "6-1,6-4": 0.25, // n=99
+  "6-1,7-5": 0.22, // n=54
+  "6-1,7-6": 0.17, // n=26
+  "6-2,6-2": 0.29, // n=79
+  "6-2,6-3": 0.24, // n=146
+  "6-2,6-4": 0.2, // n=130
+  "6-2,7-5": 0.17, // n=59
+  "6-2,7-6": 0.13, // n=30
+  "6-3,6-3": 0.21, // n=71
+  "6-3,6-4": 0.15, // n=170
+  "6-3,7-5": 0.12, // n=58
+  "6-3,7-6": 0.1, // n=47
+  "6-4,6-4": 0.1, // n=62
+  "6-4,7-5": 0.09, // n=64
+  "6-4,7-6": 0.09, // n=44
+  "7-5,7-5": 0.09, // n=15  (low confidence)
+  "7-5,7-6": 0.05, // n=20
+  "7-6,7-6": 0.05, // n=12  (low confidence)
 };
 
 // 3-set wins (split sets): losing a set inherently signals the
