@@ -28,6 +28,9 @@ export default function RootLayout({
               <Link href="/teams" className="hover:underline">
                 Teams
               </Link>
+              <Link href="/ratings" className="hover:underline">
+                Ratings
+              </Link>
               <Link href="/captain" className="font-medium text-court-700 hover:underline">
                 Captain tools
               </Link>
