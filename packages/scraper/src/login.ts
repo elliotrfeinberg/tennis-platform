@@ -35,24 +35,39 @@ export async function loginAndCaptureSession(
     const page = await ctx.newPage();
 
     await page.goto(ENTRY, { waitUntil: "domcontentloaded" });
-    // Auth-walled → redirect to Auth0. (A pre-existing valid context would
-    // skip this, but we start fresh, so login is expected.)
+    // Auth-walled → redirect chain to Auth0. Wait for the form to hydrate
+    // rather than racing the fill against the redirects.
     await page
-      .waitForURL(LOGIN_HOST_RE, { timeout: 30000 })
+      .waitForLoadState("networkidle", { timeout: 30000 })
       .catch(() => undefined);
 
-    if (LOGIN_HOST_RE.test(page.url())) {
-      await page.fill("#username", opts.username);
-      await page.fill("#password", opts.password);
-      const nav = page
-        .waitForURL(APP_HOST_RE, { timeout: 60000 })
-        .catch(() => undefined);
-      // Auth0's primary button is type=submit; fall back to name=action.
-      await page
-        .click("button[type=submit]")
-        .catch(() => page.click("button[name=action]"));
-      await nav;
+    const userField = page.locator("#username");
+    try {
+      await userField.waitFor({ state: "visible", timeout: 30000 });
+    } catch {
+      throw new Error(
+        `Auth0 username field not found. Landed on ${page.url()} ` +
+          `(title: "${await page.title().catch(() => "?")}"). ` +
+          `If this is a CAPTCHA/bot challenge, retry with --headed to solve it.`
+      );
     }
+
+    await userField.fill(opts.username);
+    const passField = page.locator("#password");
+    await passField.fill(opts.password);
+    const nav = page
+      .waitForURL(APP_HOST_RE, { timeout: 60000 })
+      .catch(() => undefined);
+    // Submit via Enter — robust to Auth0's submit-button markup (the button
+    // often lacks an explicit type=submit attribute). Click the primary
+    // action button as a fallback.
+    await passField.press("Enter");
+    await page
+      .locator("button[name=action], button[type=submit]")
+      .first()
+      .click({ timeout: 5000 })
+      .catch(() => undefined);
+    await nav;
 
     await page
       .waitForLoadState("networkidle", { timeout: 30000 })
