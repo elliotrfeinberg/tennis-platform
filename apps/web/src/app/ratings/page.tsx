@@ -39,10 +39,10 @@ function filterEntries(
 function sortEntries(entries: PerfRatingEntry[], sort: SortKey): PerfRatingEntry[] {
   const out = [...entries];
   if (sort === "perf") {
-    out.sort((a, b) => b.perfRating - a.perfRating);
+    out.sort((a, b) => (b.perfRating ?? 0) - (a.perfRating ?? 0));
   } else if (sort === "delta") {
     const d = (e: PerfRatingEntry) =>
-      e.ntrpLabel === undefined ? -Infinity : e.perfRating - e.ntrpLabel;
+      e.ntrpLabel === undefined || e.perfRating === null ? -Infinity : e.perfRating - e.ntrpLabel;
     out.sort((a, b) => d(b) - d(a));
   } else if (sort === "matches") {
     out.sort((a, b) => b.matches - a.matches);
@@ -180,7 +180,9 @@ export default async function RatingsPage({
           <tbody>
             {sorted.map((p) => {
               const delta =
-                p.ntrpLabel !== undefined ? p.perfRating - p.ntrpLabel : null;
+                p.ntrpLabel !== undefined && p.perfRating !== null
+                  ? p.perfRating - p.ntrpLabel
+                  : null;
               const sign = delta !== null && delta >= 0 ? "+" : "";
               const recent = p.history.slice(-3).reverse();
               return (
@@ -196,7 +198,7 @@ export default async function RatingsPage({
                     {p.ntrpLabel !== undefined ? p.ntrpLabel.toFixed(1) : "—"}
                   </td>
                   <td className="px-3 py-2 text-right font-mono">
-                    {p.perfRating.toFixed(2)}
+                    {p.perfRating !== null ? p.perfRating.toFixed(2) : "—"}
                   </td>
                   <td
                     className={`px-3 py-2 text-right font-mono ${

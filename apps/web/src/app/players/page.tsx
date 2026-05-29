@@ -20,6 +20,10 @@ function parseParams(p: { sort?: string; q?: string; band?: string }) {
   return { sort, q, band };
 }
 
+function displayRating(e: PerfRatingEntry): number | null {
+  return e.perfRating;
+}
+
 function filterAndSort(
   entries: PerfRatingEntry[],
   q: string,
@@ -34,7 +38,8 @@ function filterAndSort(
     }
     return true;
   });
-  if (sort === "perf") filtered.sort((a, b) => b.perfRating - a.perfRating);
+  if (sort === "perf")
+    filtered.sort((a, b) => (displayRating(b) ?? 0) - (displayRating(a) ?? 0));
   else if (sort === "matches") filtered.sort((a, b) => b.matches - a.matches);
   else {
     filtered.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
@@ -173,7 +178,12 @@ export default async function PlayersPage({
                   {p.ntrpLabel !== undefined ? p.ntrpLabel.toFixed(1) : "—"}
                 </td>
                 <td className="px-3 py-2 text-right font-mono">
-                  {p.perfRating.toFixed(2)}
+                  {displayRating(p) !== null
+                    ? displayRating(p)!.toFixed(2)
+                    : "—"}
+                  {p.adultRating === null && p.mixedRating !== null && (
+                    <span className="ml-1 text-xs text-stone-400">M</span>
+                  )}
                 </td>
                 <td className="px-3 py-2 text-right font-mono text-stone-600">
                   {p.matches}

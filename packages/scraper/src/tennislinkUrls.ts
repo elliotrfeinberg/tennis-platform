@@ -147,6 +147,32 @@ export function ratingSearchResultsUrl(s: RatingSearchScope): string {
   return `${BASE}/Leagues/Reports/NTRP/SearchResults.aspx?${params}`;
 }
 
+// District-wide rating search: every player in a (year × section ×
+// district), across all divisions / flights / genders / levels. Verified
+// that NationalNodeID + SubDistrictNodeID (and division/flight/gender) can
+// be omitted — section + district alone scope the result. One GET returns
+// the whole district (~20k players for NorCal), with each row's NTRP band,
+// rating type (C/S/A/…), and player par1 token.
+export function districtRatingSearchUrl(s: {
+  cYear: number;
+  sectionNodeId: string;
+  districtNodeId: string;
+}): string {
+  const params = new URLSearchParams();
+  params.set("Search", "TreeNode");
+  params.set("update", "1");
+  params.set("NationalNodeID", "");
+  params.set("CYear", String(s.cYear));
+  params.set("SectionNodeID", s.sectionNodeId);
+  params.set("DistrictNodeID", s.districtNodeId);
+  params.set("SubDistrictNodeID", "");
+  params.set("DivisionNodeID", "");
+  params.set("FlightNodeID", "");
+  params.set("GenderCode", "");
+  params.set("NTRPRating", "");
+  return `${BASE}/Leagues/Reports/NTRP/SearchResults.aspx?${params}`;
+}
+
 // Player-record page: all matches a player played in a given year,
 // grouped by team-context. par1 is the player's hex token — different
 // namespace from team par1s (34 chars vs ~42), discovered by clicking

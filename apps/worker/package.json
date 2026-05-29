@@ -17,7 +17,8 @@
     "@tennis/calibrate": "workspace:*",
     "@tennis/db": "workspace:*",
     "@tennis/ratings": "workspace:*",
-    "@tennis/scraper": "workspace:*"
+    "@tennis/scraper": "workspace:*",
+    "drizzle-orm": "^0.36.4"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

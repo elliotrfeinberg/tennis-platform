@@ -20,8 +20,12 @@ export {
 export {
   computePerfRatings,
   ntrpBandMidpoint,
+  clampToBand,
   type ComputePerfRatingsOptions,
   type PerfRatingsResult,
   type PerfMatchEntry,
   type PerfMatchPlayerRef,
+  type PlayerPerfRatings,
 } from "./computePerfRatings.js";
+
+export { classifyLeague, type MatchCategory } from "./classifyLeague.js";

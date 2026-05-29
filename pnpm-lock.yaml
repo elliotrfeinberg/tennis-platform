@@ -75,6 +75,9 @@ importers:
       '@tennis/scraper':
         specifier: workspace:*
         version: link:../../packages/scraper
+      drizzle-orm:
+        specifier: ^0.36.4
+        version: 0.36.4(@types/react@19.2.15)(postgres@3.4.9)(react@19.2.6)
     devDependencies:
       '@types/node':
         specifier: ^22.10.2

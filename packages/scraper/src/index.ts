@@ -33,6 +33,7 @@ export {
   scorecardUrl,
   playerProfileUrl,
   ratingSearchResultsUrl,
+  districtRatingSearchUrl,
   type SearchCriteria,
   type TeamRef,
   type ScorecardRef,
@@ -45,6 +46,12 @@ export {
   type ParsedRatingSearch,
   type RatingSearchRow,
 } from "./parseRatingSearch.js";
+
+export {
+  parseMatchSummary,
+  type ParsedMatchSummary,
+  type MatchSummaryRow,
+} from "./parseMatchSummary.js";
 
 export {
   parseTeamSearch,

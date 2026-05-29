@@ -185,94 +185,113 @@ export class BrowserFetcher implements CrawlFetcher {
       try {
         const resp = await page.goto(url, { waitUntil: "domcontentloaded" });
         // The search controls live inside a jQuery-UI accordion that's
-        // collapsed by default. Click the teams header and wait for the
-        // slide-down to finish (the panel uses jQuery .slideDown so the
-        // selects are visible-but-mid-animation immediately after click).
-        await page
-          .locator('#accordion h3:has-text("SEARCH FOR TEAMS")')
-          .click({ timeout: 10000 });
-        await page.waitForTimeout(400);
-        // Set all dropdowns via DOM in one synchronous frame and fire
-        // change events explicitly. Playwright's selectOption uses
-        // input-actionability checks that, on this accordion form,
-        // appear to drop the section's value before the server-side
-        // ViewState observes it. Direct DOM set + change-event dispatch
-        // matches what a real user click triggers.
-        // Evaluate a stringified function to bypass tsx/esbuild's
-        // `__name()` helper injection (`--keepNames`), which breaks
-        // when the function is shipped into the browser context.
-        // Embed criteria as JSON literals because page.evaluate(string)
-        // doesn't take args (and using a function form trips tsx's
-        // __name keepNames helper). The IIFE shape ensures the script
-        // is an expression that returns immediately.
-        const criteriaJson = JSON.stringify({
-          year: String(criteria.year),
-          section: criteria.section,
-          division: criteria.division,
-          gender: criteria.gender,
-          level: criteria.level ?? null,
-        });
-        // ddlSection has onchange="setTimeout(__doPostBack('ddlSection',''),0)"
-        // — selecting it triggers a full ASP.NET page postback that
-        // races and discards our subsequent selections. We set values
-        // by writing the property only (NO change event). The values
-        // still get included in the form POST when submit fires; the
-        // server's ViewState rehydrates them like any other field.
-        const script = `(() => {
-          const c = ${criteriaJson};
-          const ids = [
-            ["ctl00_mainContent_ddlChampYear", c.year],
-            ["ctl00_mainContent_ddlSection", c.section],
-            ["ctl00_mainContent_ddlDivisionForTeams", c.division],
-            ["ctl00_mainContent_ddlGender", c.gender],
-          ];
-          if (c.level) ids.push(["ctl00_mainContent_ddlNTRPLevel", c.level]);
-          for (const [id, label] of ids) {
-            const el = document.getElementById(id);
-            if (!el) return { ok: false, missingId: id, reason: "no element" };
-            let matched = false;
+        // collapsed by default and re-collapses after every AutoPostBack
+        // page reload. Idempotent: only click the header when the panel
+        // (here proxied by the section dropdown) isn't already visible.
+        const expandAccordion = async () => {
+          const open = await page
+            .locator("#ctl00_mainContent_ddlSection")
+            .isVisible()
+            .catch(() => false);
+          if (!open) {
+            await page
+              .locator('#accordion h3:has-text("SEARCH FOR TEAMS")')
+              .click({ timeout: 10000 })
+              .catch(() => undefined);
+            await page.waitForTimeout(400);
+          }
+        };
+
+        // Set a <select> by visible-label text via direct DOM write. We
+        // pass a stringified IIFE (not a function arg) to dodge tsx/esbuild's
+        // __name() helper injection, which breaks inside page.evaluate.
+        const setByLabel = async (id: string, label: string) => {
+          const js = `(() => {
+            const el = document.getElementById(${JSON.stringify(id)});
+            if (!el) return { ok: false, reason: "no element" };
+            for (const o of Array.from(el.options)) o.selected = false;
             for (const opt of Array.from(el.options)) {
-              if (opt.text.trim() === label) {
-                el.value = opt.value;
-                // Mark the matching option's selected attribute too so
-                // the value survives any DOM reflow before submit. Skip
-                // dispatchEvent('change'): on ddlSection that would
-                // fire AutoPostBack and reset our other selections.
-                for (const o of Array.from(el.options)) o.selected = false;
+              if (opt.text.trim() === ${JSON.stringify(label)}) {
                 opt.selected = true;
-                matched = true;
-                break;
+                el.value = opt.value;
+                return { ok: true };
               }
             }
-            if (!matched) {
-              return {
-                ok: false,
-                missingId: id,
-                wanted: label,
-                got: Array.from(el.options).map((o) => o.text.trim()).slice(0, 10),
-              };
-            }
-          }
-          return { ok: true };
-        })()`;
-        const result = (await page.evaluate(script)) as {
-          ok: boolean;
-          missingId?: string;
-          wanted?: string;
-          got?: string[];
-          reason?: string;
+            return {
+              ok: false,
+              reason: "no matching option",
+              got: Array.from(el.options).map((o) => o.text.trim()).slice(0, 20),
+            };
+          })()`;
+          return (await page.evaluate(js)) as {
+            ok: boolean;
+            reason?: string;
+            got?: string[];
+          };
         };
-        if (!result.ok) {
-          throw new Error(
-            `submitTeamSearch: dropdown set failed on ${result.missingId} wanted="${
-              result.wanted
-            }" reason="${result.reason ?? ""}" sample=${JSON.stringify(
-              result.got
-            )}`
-          );
+
+        // Whether a control fires an ASP.NET AutoPostBack on change (its
+        // onchange invokes __doPostBack). Section — and usually year and
+        // division — cascade this way to repopulate the dropdowns below.
+        const autoPostsBack = async (id: string) => {
+          const js = `(() => {
+            const el = document.getElementById(${JSON.stringify(id)});
+            const oc = (el && el.getAttribute("onchange")) || "";
+            return /__doPostBack|WebForm_PostBack|setTimeout/.test(oc);
+          })()`;
+          return (await page.evaluate(js)) as boolean;
+        };
+
+        // Set a criterion and, when it AutoPostBacks, dispatch the change
+        // and wait for the full-page postback + downstream re-render.
+        //
+        // Cascade order is load-bearing: selecting the SECTION posts back
+        // and repopulates THAT section's divisions; selecting the DIVISION
+        // posts back and repopulates its NTRP levels. The old code set all
+        // values without firing these postbacks, so the server's ViewState
+        // never loaded NorCal's divisions — our section/division values were
+        // invalid and silently dropped, yielding a NATIONAL result set.
+        const setCascading = async (id: string, label: string) => {
+          await expandAccordion();
+          const set = await setByLabel(id, label);
+          if (!set.ok) {
+            throw new Error(
+              `submitTeamSearch: ${id} set failed wanted="${label}" reason="${
+                set.reason ?? ""
+              }" sample=${JSON.stringify(set.got)}`
+            );
+          }
+          if (await autoPostsBack(id)) {
+            const loadP = page
+              .waitForEvent("load", { timeout: 30000 })
+              .catch(() => undefined);
+            await page.evaluate(
+              `(() => { const el = document.getElementById(${JSON.stringify(
+                id
+              )}); if (el) el.dispatchEvent(new Event("change", { bubbles: true })); })()`
+            );
+            await loadP;
+            await page
+              .waitForLoadState("networkidle", { timeout: 30000 })
+              .catch(() => undefined);
+          }
+        };
+
+        await setCascading(
+          "ctl00_mainContent_ddlChampYear",
+          String(criteria.year)
+        );
+        await setCascading("ctl00_mainContent_ddlSection", criteria.section);
+        await setCascading(
+          "ctl00_mainContent_ddlDivisionForTeams",
+          criteria.division
+        );
+        await setCascading("ctl00_mainContent_ddlGender", criteria.gender);
+        if (criteria.level) {
+          await setCascading("ctl00_mainContent_ddlNTRPLevel", criteria.level);
         }
-        // No wait needed: we skipped the change event, so no
-        // AutoPostBack fires; the values sit in the DOM until submit.
+        // Ensure the panel is open so the submit button is clickable.
+        await expandAccordion();
         // Click "Find Teams". Despite the name btnSearchTeamByName, it
         // also accepts the criteria dropdowns — submitting with an
         // empty txtTeamName runs a pure criteria search. The other
@@ -383,6 +402,204 @@ export class BrowserFetcher implements CrawlFetcher {
           extractedPar1,
           extractedTeamName,
         };
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  // Read the visible-text option labels for the team-search dropdowns
+  // (year / section / division / gender / NTRP level). Used by the
+  // NorCal orchestrator to discover exact labels (e.g. the precise
+  // "Adult 18 & Over" spelling and the NorCal section label) instead of
+  // hardcoding strings that drift between years. Reads the initial DOM
+  // after expanding the accordion — no postback fired, so these are the
+  // statically-rendered options.
+  async listTeamSearchOptions(): Promise<{
+    years: string[];
+    sections: string[];
+    divisions: string[];
+    genders: string[];
+    levels: string[];
+  }> {
+    const url =
+      "https://tennislink.usta.com/Leagues/Main/StatsAndStandings.aspx?SearchType=3";
+    return this.runOnHost(new URL(url).host, async () => {
+      const page = await this.openPage();
+      try {
+        await page.goto(url, { waitUntil: "domcontentloaded" });
+        await page
+          .locator('#accordion h3:has-text("SEARCH FOR TEAMS")')
+          .click({ timeout: 10000 });
+        await page.waitForTimeout(400);
+        const script = `(() => {
+          const read = (id) => {
+            const el = document.getElementById(id);
+            if (!el) return [];
+            return Array.from(el.options)
+              .map((o) => o.text.trim())
+              .filter((t) => t.length > 0);
+          };
+          return {
+            years: read("ctl00_mainContent_ddlChampYear"),
+            sections: read("ctl00_mainContent_ddlSection"),
+            divisions: read("ctl00_mainContent_ddlDivisionForTeams"),
+            genders: read("ctl00_mainContent_ddlGender"),
+            levels: read("ctl00_mainContent_ddlNTRPLevel"),
+          };
+        })()`;
+        return (await page.evaluate(script)) as {
+          years: string[];
+          sections: string[];
+          divisions: string[];
+          genders: string[];
+          levels: string[];
+        };
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  // Discover the rating-search tree node IDs for a (year, section,
+  // district) on the public NTRP AdvancedSearch page. These IDs feed
+  // ratingSearchResultsUrl. They change per year, so we read them live
+  // rather than hardcoding. National + subdistrict are NOT required for a
+  // district-wide search (verified), so we only resolve section+district.
+  //
+  // Mechanism: ddlCYear and ddlSectionNodeID each AutoPostBack. Selecting
+  // the year repopulates the section list; selecting the section populates
+  // ddlDistrict with that section's districts (option value = node id).
+  async discoverRatingSearchScope(opts: {
+    year: number;
+    sectionLabel: string; // e.g. "USTA/NO. CALIFORNIA"
+    districtLabel: string; // e.g. "NO. CALIFORNIA"
+  }): Promise<{
+    cYear: number;
+    sectionNodeId: string;
+    districtNodeId: string;
+  }> {
+    const url =
+      "https://tennislink.usta.com/Leagues/Reports/NTRP/AdvancedSearch.aspx";
+    return this.runOnHost(new URL(url).host, async () => {
+      const page = await this.openPage();
+      try {
+        await page.goto(url, { waitUntil: "domcontentloaded" });
+
+        const setByLabel = async (id: string, label: string) =>
+          (await page.evaluate(
+            `(() => { const el=document.getElementById(${JSON.stringify(
+              id
+            )}); if(!el) return {ok:false,reason:"no element"}; for(const o of Array.from(el.options)) o.selected=false; for(const opt of Array.from(el.options)){ if(opt.text.trim()===${JSON.stringify(
+              label
+            )}){opt.selected=true; el.value=opt.value; return {ok:true,value:opt.value};}} return {ok:false, got:Array.from(el.options).map(o=>o.text.trim()).slice(0,12)};})()`
+          )) as { ok: boolean; value?: string; reason?: string; got?: string[] };
+        const fireChange = async (id: string) => {
+          const loadP = page
+            .waitForEvent("load", { timeout: 30000 })
+            .catch(() => undefined);
+          await page.evaluate(
+            `(() => { const el=document.getElementById(${JSON.stringify(
+              id
+            )}); if(el) el.dispatchEvent(new Event("change",{bubbles:true})); })()`
+          );
+          await loadP;
+          await page
+            .waitForLoadState("networkidle", { timeout: 30000 })
+            .catch(() => undefined);
+        };
+
+        const yr = await setByLabel(
+          "ctl00_mainContent_ddlCYear",
+          String(opts.year)
+        );
+        if (!yr.ok) {
+          throw new Error(
+            `discoverRatingSearchScope: year ${opts.year} not selectable (got ${JSON.stringify(
+              yr.got
+            )})`
+          );
+        }
+        await fireChange("ctl00_mainContent_ddlCYear");
+
+        const sec = await setByLabel(
+          "ctl00_mainContent_ddlSectionNodeID",
+          opts.sectionLabel
+        );
+        if (!sec.ok || !sec.value) {
+          throw new Error(
+            `discoverRatingSearchScope: section "${opts.sectionLabel}" not found (got ${JSON.stringify(
+              sec.got
+            )})`
+          );
+        }
+        await fireChange("ctl00_mainContent_ddlSectionNodeID");
+
+        // After the section postback, ddlDistrict is populated; read the
+        // option value matching the district label (no need to select it).
+        const districtNodeId = (await page.evaluate(
+          `(() => { const el=document.getElementById("ctl00_mainContent_ddlDistrict"); if(!el) return null; for(const opt of Array.from(el.options)){ if(opt.text.trim()===${JSON.stringify(
+            opts.districtLabel
+          )}) return opt.value; } return null; })()`
+        )) as string | null;
+        if (!districtNodeId) {
+          throw new Error(
+            `discoverRatingSearchScope: district "${opts.districtLabel}" not found under "${opts.sectionLabel}" for ${opts.year}`
+          );
+        }
+
+        // Re-read the section value (the postback may have re-rendered it).
+        const sectionNodeId = (await page.evaluate(
+          `(() => { const el=document.getElementById("ctl00_mainContent_ddlSectionNodeID"); return el ? el.value : null; })()`
+        )) as string | null;
+        if (!sectionNodeId) {
+          throw new Error(
+            "discoverRatingSearchScope: section node id missing after postback"
+          );
+        }
+
+        return { cYear: opts.year, sectionNodeId, districtNodeId };
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  // Render a flight's "Match Summary" view on the StatsAndStandings t=T-0
+  // SPA and return the post-render HTML. The view is selected by a
+  // client-side fragment `#&&s=<token>`; on load the page's JS fires an
+  // ASP.NET ScriptManager UpdatePanel postback (EVENTARGUMENT "s=<token>")
+  // that renders the match table. We just navigate to the fragment URL and
+  // wait for the table to appear, then scrape the DOM.
+  //
+  // par1 is the player/league token from the rating-search row; sToken is
+  // the opaque view token captured from the Flights/Match-Summary tab.
+  async fetchMatchSummary(
+    par1: string,
+    sToken: string
+  ): Promise<BrowserFetchResult> {
+    const base =
+      "https://tennislink.usta.com/Leagues/Main/StatsAndStandings.aspx";
+    const url = `${base}?t=T-0&par1=${encodeURIComponent(
+      par1
+    )}&e=1#&&s=${sToken}`;
+    return this.runOnHost(new URL(url).host, async () => {
+      const page = await this.openPage();
+      try {
+        const resp = await page.goto(url, { waitUntil: "domcontentloaded" });
+        await page
+          .waitForLoadState("networkidle", { timeout: 30000 })
+          .catch(() => undefined);
+        // The match table renders after the UpdatePanel postback; wait for
+        // its header text to show up (bounded — fall through on timeout).
+        await page
+          .waitForFunction(
+            `/Match ID/i.test(document.body ? document.body.innerText : "")`,
+            { timeout: 30000 }
+          )
+          .catch(() => undefined);
+        const body = await page.content();
+        return { status: resp?.status() ?? 0, body, finalUrl: page.url() };
       } finally {
         await page.close();
       }

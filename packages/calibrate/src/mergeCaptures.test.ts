@@ -2,13 +2,25 @@ import { describe, expect, it } from "vitest";
 import { mergeCaptures } from "./loadCaptures.js";
 import type { CapturesData, CourtMatch, PlayerLabel } from "./loadCaptures.js";
 
+type PlayerSpec = Omit<PlayerLabel, "ntrpByYear" | "ratingType"> & {
+  ntrpByYear?: Map<number, number>;
+  ratingType?: string;
+};
+
 function mk(
-  players: PlayerLabel[],
+  players: PlayerSpec[],
   matches: CourtMatch[],
   overrides: Partial<CapturesData> = {}
 ): CapturesData {
   const pmap = new Map<string, PlayerLabel>();
-  for (const p of players) pmap.set(p.key, p);
+  for (const p of players) {
+    const ntrpByYear =
+      p.ntrpByYear ??
+      (p.ntrp !== undefined
+        ? new Map<number, number>([[2026, p.ntrp]])
+        : new Map<number, number>());
+    pmap.set(p.key, { ...p, ntrpByYear, ratingType: p.ratingType });
+  }
   return {
     year: 2026,
     ownTeamName: "Primary",
@@ -46,6 +58,8 @@ function mkCourt(
     gamesHome: undefined,
     gamesVisitor: undefined,
     sets: [],
+    league: undefined,
+    seasonYear: date.getFullYear(),
   };
 }
 
@@ -117,6 +131,39 @@ describe("mergeCaptures", () => {
     expect(bob.memberId).toBe("5555");
     expect(bob.ntrp).toBe(4);
     expect(bob.teams.sort()).toEqual(["C", "D"]);
+  });
+
+  it("unions per-year band labels across aggregates for the same player", () => {
+    const y2025 = mk(
+      [
+        {
+          key: "1001",
+          name: "Alice",
+          memberId: "1001",
+          ntrp: 3,
+          ntrpByYear: new Map([[2025, 3]]),
+          teams: ["2025-team"],
+        },
+      ],
+      []
+    );
+    const y2026 = mk(
+      [
+        {
+          key: "1001",
+          name: "Alice",
+          memberId: "1001",
+          ntrp: 3.5,
+          ntrpByYear: new Map([[2026, 3.5]]),
+          teams: ["2026-team"],
+        },
+      ],
+      []
+    );
+    const merged = mergeCaptures([y2025, y2026]);
+    const alice = merged.players.get("1001")!;
+    expect(alice.ntrpByYear.get(2025)).toBe(3);
+    expect(alice.ntrpByYear.get(2026)).toBe(3.5);
   });
 
   it("dedups matches on matchId#line#kind", () => {

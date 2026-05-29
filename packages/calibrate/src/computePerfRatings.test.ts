@@ -1,15 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { computePerfRatings } from "./computePerfRatings.js";
+import {
+  computePerfRatings,
+  type PerfMatchEntry,
+} from "./computePerfRatings.js";
 import type { CapturesData, CourtMatch, PlayerLabel } from "./loadCaptures.js";
 
 function mkCaptures(
-  players: Array<Omit<PlayerLabel, "key"> & { key: string }>,
-  matches: CourtMatch[]
+  players: Array<
+    Omit<PlayerLabel, "key" | "ntrpByYear" | "ratingType"> & {
+      key: string;
+      ntrpByYear?: Map<number, number>;
+      ratingType?: string;
+    }
+  >,
+  matches: CourtMatch[],
+  year = 2026
 ): CapturesData {
   const pmap = new Map<string, PlayerLabel>();
-  for (const p of players) pmap.set(p.key, p);
+  for (const p of players) {
+    const ntrpByYear =
+      p.ntrpByYear ??
+      (p.ntrp !== undefined
+        ? new Map<number, number>([[year, p.ntrp]])
+        : new Map<number, number>());
+    pmap.set(p.key, { ...p, ntrpByYear, ratingType: p.ratingType });
+  }
   return {
-    year: 2026,
+    year,
     ownTeamName: "Test",
     ownTeamId: "0",
     players: pmap,
@@ -29,7 +46,8 @@ function mkMatch(
   visitor: string[],
   set1: [number, number],
   set2: [number, number],
-  set3?: [number, number]
+  set3?: [number, number],
+  league?: string
 ): CourtMatch {
   const sets = set3 !== undefined ? [set1, set2, set3] : [set1, set2];
   let gh = 0;
@@ -55,6 +73,8 @@ function mkMatch(
     gamesHome: gh,
     gamesVisitor: gv,
     sets: sets.map(([h, v]) => ({ home: h, visitor: v })),
+    league: league ?? "ADULT 18&Over",
+    seasonYear: date.getFullYear(),
   };
 }
 
@@ -117,6 +137,8 @@ describe("computePerfRatings", () => {
             { home: 3, visitor: 6 },
             { home: 3, visitor: 2 },
           ],
+          league: "ADULT 18&Over",
+          seasonYear: 2026,
         },
       ]
     );
@@ -268,5 +290,427 @@ describe("computePerfRatings", () => {
     const winnerTableValue = 0.4; // 6-0, 6-2 → 0.40 in TWO_SET_SWEEP_TABLE
     const teamPerfExpected = opponentMean - winnerTableValue;
     expect((aPerf + bPerf) / 2).toBeCloseTo(teamPerfExpected, 6);
+  });
+
+  it("mixed match updates mixed rating, not adult", () => {
+    const captures = mkCaptures(
+      [
+        { key: "A", name: "A", memberId: undefined, ntrp: 3.5, teams: [] },
+        { key: "B", name: "B", memberId: undefined, ntrp: 3.5, teams: [] },
+      ],
+      [
+        mkMatch(
+          new Date(2026, 0, 1),
+          ["A"],
+          ["B"],
+          [6, 3],
+          [6, 3],
+          undefined,
+          "Mixed 18&Over"
+        ),
+      ]
+    );
+    const result = computePerfRatings(captures);
+    const pr = result.playerRatings.get("A")!;
+    expect(pr.mixed).toBeDefined();
+    expect(pr.adult).toBeUndefined();
+    expect(pr.mixedMatches).toBe(1);
+    expect(pr.adultMatches).toBe(0);
+  });
+
+  it("combo match doesn't update either rating but appears in history", () => {
+    const captures = mkCaptures(
+      [
+        { key: "A", name: "A", memberId: undefined, ntrp: 3.5, teams: [] },
+        { key: "B", name: "B", memberId: undefined, ntrp: 3.5, teams: [] },
+      ],
+      [
+        // First: an adult match so A has an adult rating.
+        mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [6, 3], [6, 3]),
+        // Then: a combo match.
+        mkMatch(
+          new Date(2026, 0, 10),
+          ["A"],
+          ["B"],
+          [6, 2],
+          [6, 2],
+          undefined,
+          "Combo 7.5"
+        ),
+      ]
+    );
+    const result = computePerfRatings(captures);
+    const pr = result.playerRatings.get("A")!;
+    // Adult rating stays at the value from the first match only.
+    expect(pr.adultMatches).toBe(1);
+    expect(pr.mixedMatches).toBe(0);
+    expect(pr.otherMatches).toBe(1);
+    // Full history has both matches.
+    const hist = result.history.get("A")!;
+    expect(hist).toHaveLength(2);
+    const comboEntry = hist[1]!;
+    expect(comboEntry.affectsRating).toBe(false);
+    expect(comboEntry.category).toBe("combo");
+    // Shadow perf was still computed (non-null).
+    expect(typeof comboEntry.perf).toBe("number");
+  });
+
+  it("combo match shadow perf uses adult rating when present", () => {
+    const captures = mkCaptures(
+      [
+        { key: "A", name: "A", memberId: undefined, ntrp: 3.5, teams: [] },
+        { key: "B", name: "B", memberId: undefined, ntrp: 3.0, teams: [] },
+      ],
+      [
+        // Adult matches to establish ratings: A ~3.40, B ~3.10.
+        mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [6, 3], [6, 3]),
+        // Combo match with A and B.
+        mkMatch(
+          new Date(2026, 0, 10),
+          ["A"],
+          ["B"],
+          [6, 3],
+          [6, 3],
+          undefined,
+          "Combo 7.5"
+        ),
+      ]
+    );
+    const result = computePerfRatings(captures);
+    const hist = result.history.get("A")!;
+    const comboEntry = hist[1]!;
+    expect(comboEntry.perfBasis).toBe("adult");
+    // The opponent rating in the combo entry should be based on B's
+    // current adult rating (not zero or cold-start).
+    expect(comboEntry.opponentRating).toBeGreaterThan(2.5);
+    expect(comboEntry.opponentRating).toBeLessThan(3.5);
+  });
+
+  it("combo match falls back to mixed basis when player has no adult rating", () => {
+    const captures = mkCaptures(
+      [
+        { key: "A", name: "A", memberId: undefined, ntrp: 3.5, teams: [] },
+        { key: "B", name: "B", memberId: undefined, ntrp: 3.5, teams: [] },
+      ],
+      [
+        // Mixed match first → A gets a mixed rating but no adult rating.
+        mkMatch(
+          new Date(2026, 0, 1),
+          ["A"],
+          ["B"],
+          [6, 3],
+          [6, 3],
+          undefined,
+          "Mixed 18&Over"
+        ),
+        // Combo match next.
+        mkMatch(
+          new Date(2026, 0, 10),
+          ["A"],
+          ["B"],
+          [6, 2],
+          [6, 2],
+          undefined,
+          "Combo 7.5"
+        ),
+      ]
+    );
+    const result = computePerfRatings(captures);
+    const hist = result.history.get("A")!;
+    const comboEntry = hist[1]!;
+    expect(comboEntry.perfBasis).toBe("mixed");
+  });
+
+  it("display rating prefers adult over mixed when both are present", () => {
+    const captures = mkCaptures(
+      [
+        { key: "A", name: "A", memberId: undefined, ntrp: 3.5, teams: [] },
+        { key: "B", name: "B", memberId: undefined, ntrp: 3.5, teams: [] },
+      ],
+      [
+        mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [6, 3], [6, 3]),
+        mkMatch(
+          new Date(2026, 0, 5),
+          ["A"],
+          ["B"],
+          [6, 3],
+          [6, 3],
+          undefined,
+          "Mixed 18&Over"
+        ),
+      ]
+    );
+    const result = computePerfRatings(captures);
+    const pr = result.playerRatings.get("A")!;
+    expect(pr.adult).toBeDefined();
+    expect(pr.mixed).toBeDefined();
+    // Display is adult, not mixed.
+    expect(pr.display).toBe(pr.adult);
+  });
+
+  describe("year-boundary carry-over", () => {
+    const in2026 = (entries: PerfMatchEntry[]) =>
+      entries.filter((e) => e.date.getFullYear() === 2026);
+
+    it("carries a rating within the new band over unchanged", () => {
+      // A stays inside the 3.5 band (3.0, 3.5] across both seasons; the
+      // 2026 carry-in should equal the 2025 final rating, untouched.
+      const captures = mkCaptures(
+        [
+          {
+            key: "A",
+            name: "A",
+            memberId: undefined,
+            ntrp: 3.5,
+            ntrpByYear: new Map([
+              [2025, 3.5],
+              [2026, 3.5],
+            ]),
+            teams: [],
+          },
+          {
+            key: "B",
+            name: "B",
+            memberId: undefined,
+            ntrp: 3.5,
+            ntrpByYear: new Map([
+              [2025, 3.5],
+              [2026, 3.5],
+            ]),
+            teams: [],
+          },
+        ],
+        [
+          mkMatch(new Date(2025, 0, 1), ["A"], ["B"], [6, 4], [6, 4]),
+          mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [6, 4], [6, 4]),
+        ]
+      );
+      const result = computePerfRatings(captures);
+      const hist = result.history.get("A")!;
+      const last2025 = hist[0]!;
+      const first2026 = in2026(hist)[0]!;
+      // Within band, so no clamp: carry-in == prior-year final.
+      expect(first2026.playerPreRating).toBeCloseTo(last2025.playerPostRating, 6);
+      expect(last2025.playerPostRating).toBeGreaterThan(3.0);
+      expect(last2025.playerPostRating).toBeLessThanOrEqual(3.5);
+    });
+
+    it("clamps a carried rating down to the new band's top edge", () => {
+      // A ends 2025 well above 3.5 but is a 3.5 in 2026 → carry-in clamps
+      // to the band ceiling (3.5).
+      const captures = mkCaptures(
+        [
+          {
+            key: "A",
+            name: "A",
+            memberId: undefined,
+            ntrp: 4.0,
+            ntrpByYear: new Map([
+              [2025, 4.0],
+              [2026, 3.5],
+            ]),
+            teams: [],
+          },
+          {
+            key: "B",
+            name: "B",
+            memberId: undefined,
+            ntrp: 4.0,
+            ntrpByYear: new Map([
+              [2025, 4.0],
+              [2026, 4.0],
+            ]),
+            teams: [],
+          },
+        ],
+        [
+          mkMatch(new Date(2025, 0, 1), ["A"], ["B"], [6, 0], [6, 0]),
+          mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [6, 0], [6, 0]),
+        ]
+      );
+      const result = computePerfRatings(captures);
+      const hist = result.history.get("A")!;
+      expect(hist[0]!.playerPostRating).toBeGreaterThan(3.5);
+      expect(in2026(hist)[0]!.playerPreRating).toBeCloseTo(3.5, 6);
+      // The synthetic carry-in seed is NOT counted as a played match.
+      expect(result.playerRatings.get("A")!.adultMatches).toBe(2);
+    });
+
+    it("clamps a carried rating up to the new band's bottom edge", () => {
+      // A ends 2025 below 3.0 but is registered 3.5 in 2026 → carry-in
+      // clamps up to the band floor (3.0).
+      const captures = mkCaptures(
+        [
+          {
+            key: "A",
+            name: "A",
+            memberId: undefined,
+            ntrp: 2.5,
+            ntrpByYear: new Map([
+              [2025, 2.5],
+              [2026, 3.5],
+            ]),
+            teams: [],
+          },
+          {
+            key: "B",
+            name: "B",
+            memberId: undefined,
+            ntrp: 2.5,
+            ntrpByYear: new Map([
+              [2025, 2.5],
+              [2026, 2.5],
+            ]),
+            teams: [],
+          },
+        ],
+        [
+          mkMatch(new Date(2025, 0, 1), ["A"], ["B"], [0, 6], [0, 6]),
+          mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [0, 6], [0, 6]),
+        ]
+      );
+      const result = computePerfRatings(captures);
+      const hist = result.history.get("A")!;
+      expect(hist[0]!.playerPostRating).toBeLessThan(3.0);
+      expect(in2026(hist)[0]!.playerPreRating).toBeCloseTo(3.0, 6);
+    });
+
+    it("reseeds the rolling window at the boundary (carry-in + new matches only)", () => {
+      // Three lopsided 2025 wins would, without a reset, dominate the
+      // last-10 window into 2026. With reseeding, the first 2026 rating
+      // is exactly the mean of the clamped carry-in and that match's perf.
+      const captures = mkCaptures(
+        [
+          {
+            key: "A",
+            name: "A",
+            memberId: undefined,
+            ntrp: 4.0,
+            ntrpByYear: new Map([
+              [2025, 4.0],
+              [2026, 3.5],
+            ]),
+            teams: [],
+          },
+          {
+            key: "B",
+            name: "B",
+            memberId: undefined,
+            ntrp: 4.0,
+            ntrpByYear: new Map([
+              [2025, 4.0],
+              [2026, 4.0],
+            ]),
+            teams: [],
+          },
+        ],
+        [
+          mkMatch(new Date(2025, 0, 1), ["A"], ["B"], [6, 0], [6, 0]),
+          mkMatch(new Date(2025, 0, 8), ["A"], ["B"], [6, 0], [6, 0]),
+          mkMatch(new Date(2025, 0, 15), ["A"], ["B"], [6, 0], [6, 0]),
+          mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [6, 3], [6, 3]),
+        ]
+      );
+      const result = computePerfRatings(captures);
+      const first2026 = in2026(result.history.get("A")!)[0]!;
+      // post == mean(carry-in=3.5, this match's perf), proving the window
+      // was reseeded (only seed + 1 entry contribute, not the 3 prior).
+      expect(first2026.playerPostRating).toBeCloseTo(
+        (3.5 + first2026.perf) / 2,
+        6
+      );
+    });
+  });
+
+  describe("confidence-weighted anchor", () => {
+    // N (band 3.5, prior 3.25) wins big in match 1, jumping their rolling
+    // rating well above the band prior. When N then anchors an opponent's
+    // perf in match 2 — still only N's 2nd match — their inflated rating
+    // must be DISCOUNTED toward the prior, not trusted at face value.
+    it("discounts a provisional player's rating toward their band prior when anchoring", () => {
+      const captures = mkCaptures(
+        [
+          { key: "N", name: "N", memberId: undefined, ntrp: 3.5, teams: [] },
+          { key: "X", name: "X", memberId: undefined, ntrp: 3.5, teams: [] },
+          { key: "E", name: "E", memberId: undefined, ntrp: 3.5, teams: [] },
+        ],
+        [
+          // Match 1: N crushes X → N's rolling jumps to 3.25 + 0.48 = 3.73.
+          mkMatch(new Date(2026, 0, 1), ["N"], ["X"], [6, 0], [6, 0]),
+          // Match 2: E vs N. N now has 1 prior match → confidence 1/3.
+          mkMatch(new Date(2026, 0, 5), ["E"], ["N"], [6, 4], [6, 4]),
+        ]
+      );
+      const result = computePerfRatings(captures);
+      const nRolling = 3.25 + 0.48; // 3.73
+      const expectedAnchor = (1 / 3) * nRolling + (2 / 3) * 3.25; // 3.41
+      // E's match-2 entry was computed against the DISCOUNTED N anchor.
+      const eEntry = result.history.get("E")![0]!;
+      expect(eEntry.opponentRating).toBeCloseTo(expectedAnchor, 6);
+      // Sanity: that's a real discount off N's raw rolling rating.
+      expect(eEntry.opponentRating).toBeLessThan(nRolling - 0.2);
+    });
+
+    it("trusts a player's full rating as an anchor once established (>=3 matches)", () => {
+      const captures = mkCaptures(
+        [
+          { key: "N", name: "N", memberId: undefined, ntrp: 3.5, teams: [] },
+          { key: "X", name: "X", memberId: undefined, ntrp: 3.5, teams: [] },
+          { key: "E", name: "E", memberId: undefined, ntrp: 3.5, teams: [] },
+        ],
+        [
+          // N plays 3 matches vs X to become established.
+          mkMatch(new Date(2026, 0, 1), ["N"], ["X"], [6, 3], [6, 3]),
+          mkMatch(new Date(2026, 0, 5), ["N"], ["X"], [6, 3], [6, 3]),
+          mkMatch(new Date(2026, 0, 9), ["N"], ["X"], [6, 3], [6, 3]),
+          // 4th match: E vs N. N has 3 prior matches → confidence 1.
+          mkMatch(new Date(2026, 0, 13), ["E"], ["N"], [6, 4], [6, 4]),
+        ]
+      );
+      const result = computePerfRatings(captures);
+      // N's rolling rating going into match 4 == the anchor E saw (no
+      // discount), since N is now fully established.
+      const nHist = result.history.get("N")!;
+      const nRollingBeforeMatch4 = nHist[2]!.playerPostRating;
+      const eEntry = result.history.get("E")![0]!;
+      expect(eEntry.opponentRating).toBeCloseTo(nRollingBeforeMatch4, 6);
+    });
+
+    it("self-rated players stay discounted longer than computer-rated", () => {
+      // Two identical histories; the only difference is rating type. After
+      // exactly 3 matches a computer-rate is fully trusted (c=1) while a
+      // self-rate is not (c=3/5), so the self-rate's anchor is pulled
+      // further toward the band prior.
+      const mk = (type: string | undefined) =>
+        mkCaptures(
+          [
+            {
+              key: "N",
+              name: "N",
+              memberId: undefined,
+              ntrp: 3.5,
+              ratingType: type,
+              teams: [],
+            },
+            { key: "X", name: "X", memberId: undefined, ntrp: 3.5, teams: [] },
+            { key: "E", name: "E", memberId: undefined, ntrp: 3.5, teams: [] },
+          ],
+          [
+            mkMatch(new Date(2026, 0, 1), ["N"], ["X"], [6, 2], [6, 2]),
+            mkMatch(new Date(2026, 0, 5), ["N"], ["X"], [6, 2], [6, 2]),
+            mkMatch(new Date(2026, 0, 9), ["N"], ["X"], [6, 2], [6, 2]),
+            mkMatch(new Date(2026, 0, 13), ["E"], ["N"], [6, 4], [6, 4]),
+          ]
+        );
+      const comp = computePerfRatings(mk("C"));
+      const self = computePerfRatings(mk("S"));
+      const compAnchor = comp.history.get("E")![0]!.opponentRating;
+      const selfAnchor = self.history.get("E")![0]!.opponentRating;
+      // N has been winning, so rolling > prior (3.25). The self-rate is
+      // discounted toward the prior, landing strictly below the trusted
+      // computer-rate anchor.
+      expect(selfAnchor).toBeLessThan(compAnchor);
+      expect(selfAnchor).toBeGreaterThan(3.25);
+    });
   });
 });

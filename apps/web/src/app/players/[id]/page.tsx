@@ -7,6 +7,7 @@ import {
   findPlayerBySlug,
   playerSlug,
   type PerfMatchEntry,
+  type PerfRatingEntry,
 } from "@/lib/perfRatings";
 
 function formatScore(sets: PerfMatchEntry["sets"]): string {
@@ -24,6 +25,14 @@ function bandEdges(
   return { low: label - 0.5, high: label };
 }
 
+// Which rating stream should drive the sparkline + post-rating display?
+// Adult if present, otherwise mixed.
+function displayStream(player: PerfRatingEntry): "adult" | "mixed" | null {
+  if (player.adultRating !== null) return "adult";
+  if (player.mixedRating !== null) return "mixed";
+  return null;
+}
+
 export default async function PlayerProfilePage({
   params,
 }: {
@@ -34,22 +43,30 @@ export default async function PlayerProfilePage({
   if (!player) notFound();
 
   const history = player.history; // chronological
-  const last = history[history.length - 1];
-  const first = history[0];
-  const ratingDelta = first && last
-    ? last.playerPostRating - first.playerPreRating
-    : 0;
+  const stream = displayStream(player);
+
+  // Filter history to just the display stream for sparkline.
+  const sparkHistory = stream
+    ? history.filter((m) => m.category === stream)
+    : [];
+
+  const last = sparkHistory[sparkHistory.length - 1];
+  const first = sparkHistory[0];
+  const ratingDelta =
+    first && last ? last.playerPostRating - first.playerPreRating : 0;
   const ratingDeltaSign = ratingDelta >= 0 ? "+" : "";
 
   const edges = bandEdges(player.ntrpLabel);
 
-  const sparkData = history.map((m) => ({
+  const sparkData = sparkHistory.map((m) => ({
     x: new Date(m.date).getTime(),
     y: m.playerPostRating,
     label: `${m.date} → ${m.playerPostRating.toFixed(2)} (${
       m.won ? "W" : "L"
     } ${formatScore(m.sets)})`,
   }));
+
+  const totalMatches = player.adultMatches + player.mixedMatches + player.otherMatches;
 
   return (
     <div className="space-y-8">
@@ -71,7 +88,7 @@ export default async function PlayerProfilePage({
         </p>
       </div>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-4">
         <Stat
           label="Roster band"
           value={
@@ -84,15 +101,29 @@ export default async function PlayerProfilePage({
           }
         />
         <Stat
-          label="Current perf rating"
-          value={player.perfRating.toFixed(3)}
+          label="Adult rating"
+          value={player.adultRating !== null ? player.adultRating.toFixed(3) : "—"}
+          sub={
+            player.adultMatches > 0
+              ? `${player.adultMatches} adult match${player.adultMatches !== 1 ? "es" : ""}`
+              : "no adult matches"
+          }
         />
         <Stat
-          label="Matches played"
-          value={String(player.matches)}
+          label="Mixed rating"
+          value={player.mixedRating !== null ? player.mixedRating.toFixed(3) : "—"}
           sub={
-            history.length > 0
-              ? `${ratingDeltaSign}${ratingDelta.toFixed(2)} since first match`
+            player.mixedMatches > 0
+              ? `${player.mixedMatches} mixed match${player.mixedMatches !== 1 ? "es" : ""}`
+              : "no mixed matches"
+          }
+        />
+        <Stat
+          label="Total matches"
+          value={String(totalMatches)}
+          sub={
+            sparkHistory.length > 0
+              ? `${ratingDeltaSign}${ratingDelta.toFixed(2)} since first ${stream ?? ""} match`
               : ""
           }
         />
@@ -100,35 +131,47 @@ export default async function PlayerProfilePage({
 
       <section className="rounded-lg border border-stone-200 bg-white p-4">
         <div className="mb-2 flex items-baseline justify-between">
-          <h2 className="text-sm font-medium text-stone-700">Rating over time</h2>
+          <h2 className="text-sm font-medium text-stone-700">
+            {stream === "adult"
+              ? "Adult rating over time"
+              : stream === "mixed"
+              ? "Mixed rating over time"
+              : "Rating over time"}
+          </h2>
           <span className="text-xs text-stone-400">
-            {history.length > 0
-              ? `${history[0]!.date} → ${history[history.length - 1]!.date}`
+            {sparkHistory.length > 0
+              ? `${sparkHistory[0]!.date} → ${sparkHistory[sparkHistory.length - 1]!.date}`
               : "no data"}
           </span>
         </div>
-        <Sparkline
-          data={sparkData}
-          width={640}
-          height={120}
-          yRefs={
-            edges
-              ? [
-                  {
-                    y: edges.low,
-                    color: "#d6d3d1",
-                    label: `band ${edges.low.toFixed(1)}`,
-                  },
-                  {
-                    y: edges.high,
-                    color: "#d6d3d1",
-                    label: `band ${edges.high.toFixed(1)}`,
-                  },
-                ]
-              : []
-          }
-          ariaLabel={`${player.name} rating history`}
-        />
+        {sparkHistory.length > 0 ? (
+          <Sparkline
+            data={sparkData}
+            width={640}
+            height={120}
+            yRefs={
+              edges
+                ? [
+                    {
+                      y: edges.low,
+                      color: "#d6d3d1",
+                      label: `band ${edges.low.toFixed(1)}`,
+                    },
+                    {
+                      y: edges.high,
+                      color: "#d6d3d1",
+                      label: `band ${edges.high.toFixed(1)}`,
+                    },
+                  ]
+                : []
+            }
+            ariaLabel={`${player.name} rating history`}
+          />
+        ) : (
+          <div className="flex h-[120px] items-center justify-center text-sm text-stone-400">
+            No matches in the displayed rating stream.
+          </div>
+        )}
       </section>
 
       <section className="overflow-hidden rounded-lg border border-stone-200 bg-white">
@@ -138,6 +181,7 @@ export default async function PlayerProfilePage({
         <table className="w-full text-sm">
           <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
             <tr>
+              <th className="px-3 py-2">Cat</th>
               <th className="px-3 py-2">Date</th>
               <th className="px-3 py-2">Court</th>
               <th className="px-3 py-2">Opponent(s)</th>
@@ -150,9 +194,15 @@ export default async function PlayerProfilePage({
           </thead>
           <tbody>
             {[...history].reverse().map((m, i) => {
-              const oppNames = m.opponents.map((o) => o.name).join(" / ");
+              const isCombo = !m.affectsRating;
               return (
-                <tr key={i} className="border-t border-stone-100 align-top">
+                <tr
+                  key={i}
+                  className={`border-t border-stone-100 align-top ${isCombo ? "opacity-60" : ""}`}
+                >
+                  <td className="px-3 py-2">
+                    <CategoryBadge category={m.category} />
+                  </td>
                   <td className="px-3 py-2 font-mono text-xs text-stone-600">
                     {m.date}
                   </td>
@@ -213,16 +263,21 @@ export default async function PlayerProfilePage({
                   </td>
                   <td className="px-3 py-2 text-right font-mono">
                     {m.perf.toFixed(2)}
+                    {isCombo && (
+                      <span className="ml-1 text-xs text-stone-400">shadow</span>
+                    )}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono text-stone-700">
-                    {m.playerPostRating.toFixed(2)}
+                  <td
+                    className={`px-3 py-2 text-right font-mono ${isCombo ? "italic text-stone-400" : "text-stone-700"}`}
+                  >
+                    {m.affectsRating ? m.playerPostRating.toFixed(2) : "—"}
                   </td>
                 </tr>
               );
             })}
             {history.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-stone-400">
+                <td colSpan={9} className="px-3 py-8 text-center text-stone-400">
                   No matches in the crawled data.
                 </td>
               </tr>
@@ -231,6 +286,28 @@ export default async function PlayerProfilePage({
         </table>
       </section>
     </div>
+  );
+}
+
+function CategoryBadge({ category }: { category: PerfMatchEntry["category"] }) {
+  if (category === "adult") {
+    return (
+      <span className="inline-block rounded px-1 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700">
+        A
+      </span>
+    );
+  }
+  if (category === "mixed") {
+    return (
+      <span className="inline-block rounded px-1 py-0.5 text-xs font-medium bg-purple-100 text-purple-700">
+        M
+      </span>
+    );
+  }
+  return (
+    <span className="inline-block rounded px-1 py-0.5 text-xs font-medium bg-stone-100 text-stone-500">
+      C
+    </span>
   );
 }
 

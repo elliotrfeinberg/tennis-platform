@@ -1,0 +1,26 @@
+# Local Postgres for the tennis platform. Bring it up with:
+#   colima start            # if using colima as the Docker runtime
+#   docker compose up -d
+# Then apply the schema:
+#   cd packages/db && DATABASE_URL=postgres://tennis:tennis@localhost:5432/tennis pnpm migrate
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tennis-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tennis
+      POSTGRES_PASSWORD: tennis
+      POSTGRES_DB: tennis
+    ports:
+      - "5432:5432"
+    volumes:
+      - tennis_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tennis -d tennis"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  tennis_pgdata:

@@ -40,6 +40,17 @@ export interface PlayerLabel {
   // Labeled NTRP level from at least one team roster (e.g. 3.5).
   // Undefined if every roster entry for this player was blank.
   ntrp: number | undefined;
+  // Per-season roster band, keyed by season year. A player who plays in
+  // both 2025 and 2026 has an entry for each — the perf model uses this
+  // to clamp a carried-over rating into the correct year's band. `ntrp`
+  // above is the first-seen value; this map preserves the full history.
+  ntrpByYear: Map<number, number>;
+  // USTA rating type from a year-end dump when available: "C" computer,
+  // "S" self-rated, "A" appealed, etc. Undefined when no dump was loaded
+  // or the player wasn't in it. The perf model trusts self-rates ("S")
+  // less as an anchor for other players' ratings. Roster crawls don't
+  // expose this — it only comes from the rating-search dump.
+  ratingType: string | undefined;
   // Subflight team names this player appears on (usually length 1).
   teams: string[];
 }
@@ -71,6 +82,14 @@ export interface CourtMatch {
   // sets were played (default before any games). The perf model uses
   // this for table-based score → rating-diff lookup.
   sets: Array<{ home: number; visitor: number }>;
+  // Raw league string from the scorecard header (e.g. "2026 ADULT 18&Over
+  // - Women's 3.5"). Used by classifyLeague to route matches to adult /
+  // mixed / combo / other rating streams.
+  league: string | undefined;
+  // Season year this match belongs to (from the source aggregate, NOT
+  // the calendar year of `date` — USTA seasons can spill across the new
+  // year). Drives the perf model's year-boundary carry-over.
+  seasonYear: number;
 }
 
 export interface CapturesData {
@@ -137,6 +156,13 @@ export interface LoadCapturesOptions {
   // the level a player *registered at*; year-end ratings reflect what
   // USTA's algorithm finally placed them at.
   yearEndLabelsPath?: string;
+  // Directory of per-season rating dumps named `{year}.json` (the output
+  // of `tennis-scrape crawl norcal`). When set, each aggregate resolves
+  // its labels from `{ratingsDir}/{agg.year}.json` — so a multi-year load
+  // picks the right season's bands + rating types per aggregate. Ignored
+  // for a given aggregate if that year's file is missing. `yearEndLabelsPath`
+  // takes precedence when both are set.
+  ratingsDir?: string;
   // Only use year-end rows of these rating types. Defaults to ["C"]
   // (computer-rated) since those are the most reliable. Set to undefined
   // to accept all types (S, A, D, etc. — useful for debugging but adds
@@ -158,21 +184,30 @@ export async function loadCaptures(
     string,
     { ntrp: number; type: string | undefined }
   >();
-  if (opts.yearEndLabelsPath) {
-    const parsed = JSON.parse(
-      await readFile(opts.yearEndLabelsPath, "utf8")
-    ) as ParsedRatingSearch;
-    const allowed = opts.yearEndRatingTypes ?? ["C"];
-    const allowAll = opts.yearEndRatingTypes === undefined;
+  // Which rating types are trusted enough to OVERRIDE the roster band.
+  // Self-rates/appeals are still recorded (for the perf confidence model)
+  // but don't replace the roster-derived NTRP label unless explicitly
+  // allowed.
+  const yearEndAllowed = opts.yearEndRatingTypes ?? ["C"];
+  const yearEndAllowAll = opts.yearEndRatingTypes === undefined;
+  // Resolve the labels file: an explicit path wins; otherwise fall back to
+  // the per-year dump in ratingsDir for THIS aggregate's season.
+  const labelsPath =
+    opts.yearEndLabelsPath ??
+    (opts.ratingsDir ? join(opts.ratingsDir, `${agg.year}.json`) : undefined);
+  if (labelsPath) {
+    const text = await readFile(labelsPath, "utf8").catch(() => undefined);
+    const parsed = text
+      ? (JSON.parse(text) as ParsedRatingSearch)
+      : { context: undefined, rows: [] };
     for (const row of parsed.rows) {
       if (row.ntrpLevel === undefined) continue;
       if (row.ntrpLevel === 0) continue; // unrated placeholder
-      if (!allowAll && !allowed.includes(row.ratingType ?? "")) continue;
       const key = lastnameCommaFirstToNorm(row.name);
       if (!key) continue;
-      // Keep the highest-confidence entry on collisions (multiple
-      // identically-named players — rare but possible). C beats S beats
-      // everything; if both types match, last write wins, which is fine.
+      // Record every type (S/C/A/...) so the confidence model can see
+      // self-rates; the override loop below decides whether to also
+      // adopt the value as the band label. Last write wins on collisions.
       yearEndByName.set(key, { ntrp: row.ntrpLevel, type: row.ratingType });
     }
   }
@@ -228,12 +263,19 @@ export async function loadCaptures(
         if (existing.ntrp === undefined && entry.ntrp !== undefined) {
           existing.ntrp = entry.ntrp;
         }
+        if (entry.ntrp !== undefined && !existing.ntrpByYear.has(agg.year)) {
+          existing.ntrpByYear.set(agg.year, entry.ntrp);
+        }
       } else {
+        const ntrpByYear = new Map<number, number>();
+        if (entry.ntrp !== undefined) ntrpByYear.set(agg.year, entry.ntrp);
         players.set(key, {
           key,
           name: entry.name,
           memberId,
           ntrp: entry.ntrp,
+          ntrpByYear,
+          ratingType: undefined,
           teams: [team.teamName],
         });
       }
@@ -250,8 +292,14 @@ export async function loadCaptures(
       if (!hit) continue;
       yearEndMatchedKeys.add(key);
       yearEndLabelMatches += 1;
-      if (p.ntrp !== hit.ntrp) yearEndLabelOverrides += 1;
-      p.ntrp = hit.ntrp;
+      // Always record the rating type (drives the perf confidence model).
+      p.ratingType = hit.type;
+      // Only trusted types replace the band label / per-year band.
+      if (yearEndAllowAll || yearEndAllowed.includes(hit.type ?? "")) {
+        if (p.ntrp !== hit.ntrp) yearEndLabelOverrides += 1;
+        p.ntrp = hit.ntrp;
+        p.ntrpByYear.set(agg.year, hit.ntrp);
+      }
     }
   }
 
@@ -304,6 +352,8 @@ export async function loadCaptures(
           sets: court.sets
             ? court.sets.map((s) => ({ home: s.home, visitor: s.visitor }))
             : [],
+          league: header.league,
+          seasonYear: agg.year,
         });
       }
     }
@@ -373,7 +423,11 @@ export function mergeCaptures(parts: CapturesData[]): CapturesData {
   // collisions, and we don't want to leak that into the caller's input.
   const players = new Map<string, PlayerLabel>();
   for (const [k, p] of first.players) {
-    players.set(k, { ...p, teams: [...p.teams] });
+    players.set(k, {
+      ...p,
+      teams: [...p.teams],
+      ntrpByYear: new Map(p.ntrpByYear),
+    });
   }
   const matchesByKey = new Map<string, CourtMatch>();
   for (const m of first.matches) {
@@ -398,8 +452,18 @@ export function mergeCaptures(parts: CapturesData[]): CapturesData {
         if (existing.memberId === undefined && p.memberId !== undefined) {
           existing.memberId = p.memberId;
         }
+        if (existing.ratingType === undefined && p.ratingType !== undefined) {
+          existing.ratingType = p.ratingType;
+        }
+        for (const [yr, lvl] of p.ntrpByYear) {
+          if (!existing.ntrpByYear.has(yr)) existing.ntrpByYear.set(yr, lvl);
+        }
       } else {
-        players.set(key, { ...p, teams: [...p.teams] });
+        players.set(key, {
+          ...p,
+          teams: [...p.teams],
+          ntrpByYear: new Map(p.ntrpByYear),
+        });
       }
     }
     for (const m of next.matches) {
@@ -472,6 +536,8 @@ function resolveName(
       name,
       memberId: undefined,
       ntrp: undefined,
+      ntrpByYear: new Map<number, number>(),
+      ratingType: undefined,
       teams: [],
     });
   }

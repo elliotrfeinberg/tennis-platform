@@ -166,6 +166,40 @@ export const players = pgTable(
   ]
 );
 
+// Per-season published-rating snapshot from the public NTRP rating search
+// (phase-1 "load players" output). Raw ingest data — distinct from the
+// derived perf/Glicko ratings tables below. Holds the per-year NTRP band +
+// rating type AND the par1 token that is the entry point for phase-2 match
+// crawling. One row per (player, year).
+export const playerYearRatings = pgTable(
+  "player_year_ratings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    year: integer("year").notNull(),
+    // Published NTRP for that year (e.g. 3.5). NULL when unrated.
+    ntrp: doublePrecision("ntrp"),
+    // USTA rating type: "C" computer, "S" self, "A" appeal, etc.
+    ratingType: varchar("rating_type", { length: 8 }),
+    ratingDate: timestamp("rating_date", { withTimezone: true }),
+    // URL-routable par1 token for this player (decoded form). Entry point
+    // for the player's league flights / Match Summary crawl.
+    tennislinkPar1: text("tennislink_par1"),
+    gender: genderEnum("gender"),
+    city: text("city"),
+    state: varchar("state", { length: 8 }),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("player_year_ratings_player_year_uq").on(t.playerId, t.year),
+    index("player_year_ratings_year_idx").on(t.year),
+  ]
+);
+
 // ---- teams ----
 
 export const teams = pgTable(

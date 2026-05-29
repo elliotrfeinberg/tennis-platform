@@ -5,11 +5,24 @@ import type { CapturesData, CourtMatch, PlayerLabel } from "./loadCaptures.js";
 // Build a tiny synthetic CapturesData for unit-testing the chronological
 // driver. Player keys are stable so we can assert on them.
 function mkCaptures(
-  players: Array<Omit<PlayerLabel, "key"> & { key: string }>,
+  players: Array<
+    Omit<PlayerLabel, "key" | "ntrpByYear" | "ratingType"> & {
+      key: string;
+      ntrpByYear?: Map<number, number>;
+      ratingType?: string;
+    }
+  >,
   matches: CourtMatch[]
 ): CapturesData {
   const pmap = new Map<string, PlayerLabel>();
-  for (const p of players) pmap.set(p.key, p);
+  for (const p of players) {
+    const ntrpByYear =
+      p.ntrpByYear ??
+      (p.ntrp !== undefined
+        ? new Map<number, number>([[2026, p.ntrp]])
+        : new Map<number, number>());
+    pmap.set(p.key, { ...p, ntrpByYear, ratingType: p.ratingType });
+  }
   return {
     year: 2026,
     ownTeamName: "Test Team A",
@@ -44,6 +57,8 @@ function mkMatch(
     gamesHome: undefined,
     gamesVisitor: undefined,
     sets: [],
+    league: undefined,
+    seasonYear: date.getFullYear(),
   };
 }
 
@@ -93,6 +108,8 @@ describe("computeRatings", () => {
           gamesHome: undefined,
           gamesVisitor: undefined,
           sets: [],
+          league: undefined,
+          seasonYear: 2026,
         },
       ]
     );

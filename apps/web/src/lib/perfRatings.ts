@@ -33,6 +33,9 @@ export interface PerfMatchEntry {
   perf: number;
   playerPreRating: number;
   playerPostRating: number;
+  category: "adult" | "mixed" | "combo" | "other";
+  affectsRating: boolean;
+  perfBasis: "adult" | "mixed";
 }
 
 export interface PerfRatingEntry {
@@ -41,7 +44,14 @@ export interface PerfRatingEntry {
   memberId: string | undefined;
   ntrpLabel: number | undefined;
   teams: string[];
-  perfRating: number;
+  // Display rating: adult ?? mixed. Back-compat field for pages that
+  // just want one number.
+  perfRating: number | null;
+  adultRating: number | null;
+  mixedRating: number | null;
+  adultMatches: number;
+  mixedMatches: number;
+  otherMatches: number;
   matches: number;
   history: PerfMatchEntry[];
 }
@@ -57,6 +67,30 @@ function resolveRatingsPath(): string {
 
 let cached: { path: string; entries: PerfRatingEntry[] } | undefined;
 
+// Backfill fields added in the per-category refactor so the UI works
+// with both old and new perf-ratings JSON files. Old files have only
+// `perfRating` + `matches`; new files also have `adultRating`,
+// `mixedRating`, per-category counts, and per-entry `category` /
+// `affectsRating` / `perfBasis`.
+function normalize(raw: Record<string, unknown>): PerfRatingEntry {
+  const entry = raw as PerfRatingEntry & Record<string, unknown>;
+  // Top-level rating fields.
+  if (!("adultRating" in raw)) entry.adultRating = entry.perfRating ?? null;
+  if (!("mixedRating" in raw)) entry.mixedRating = null;
+  if (!("adultMatches" in raw)) entry.adultMatches = entry.matches ?? 0;
+  if (!("mixedMatches" in raw)) entry.mixedMatches = 0;
+  if (!("otherMatches" in raw)) entry.otherMatches = 0;
+  // Per-history-entry fields.
+  if (Array.isArray(entry.history)) {
+    for (const h of entry.history as unknown as Array<Record<string, unknown>>) {
+      if (!("category" in h)) h["category"] = "adult";
+      if (!("affectsRating" in h)) h["affectsRating"] = true;
+      if (!("perfBasis" in h)) h["perfBasis"] = "adult";
+    }
+  }
+  return entry;
+}
+
 export async function loadPerfRatings(): Promise<{
   path: string;
   entries: PerfRatingEntry[];
@@ -64,7 +98,8 @@ export async function loadPerfRatings(): Promise<{
   const path = resolveRatingsPath();
   if (cached && cached.path === path) return cached;
   const text = await readFile(path, "utf8");
-  const entries = JSON.parse(text) as PerfRatingEntry[];
+  const raw = JSON.parse(text) as Array<Record<string, unknown>>;
+  const entries = raw.map(normalize);
   cached = { path, entries };
   return cached;
 }

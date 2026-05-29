@@ -34,6 +34,8 @@ import {
   parseRobots,
   parseTeamSearch,
   parseTennisrecordHistory,
+  parseMatchSummary,
+  districtRatingSearchUrl,
   playerProfileUrl,
   teamProfileUrl,
   tennisrecordHistoryUrl,
@@ -51,6 +53,7 @@ import {
   DEFAULT_NTRP_TO_GLICKO_PRIOR,
 } from "@tennis/calibrate";
 import { fitCalibration, glickoToNtrp } from "@tennis/ratings";
+import { loadPlayers } from "./loadPlayers.js";
 
 const ENV_CONTACT = process.env.TENNIS_CONTACT_EMAIL;
 const ENV_UA = process.env.TENNIS_USER_AGENT ?? "TennisPlatform/0.1";
@@ -334,12 +337,59 @@ async function crawlTeamCmd(
 //   raw/{ownTeamId}-subflight/{ts}/teams/{teamId}/team-profile.html
 //   raw/{ownTeamId}-subflight/{ts}/teams/{teamId}/match-{id}.html
 //   parsed/{ownTeamId}-subflight/{ts}.json
+interface SubflightCrawlSummary {
+  ownTeamName: string;
+  ownTeamId: string | undefined;
+  // Normalized team names whose matches were crawled in this run (own +
+  // every flightmate). The orchestrator uses this to mark a whole flight
+  // covered so it doesn't re-seed a crawl from one of its members.
+  coveredTeamNames: string[];
+  parsedFile: string;
+  successCount: number;
+  totalTeams: number;
+}
+
+// Thin wrapper: owns a BrowserFetcher + PoliteFetcher for a single
+// subflight crawl, then closes the browser. Use runSubflightCrawl
+// directly when you want to share fetchers across many crawls (the
+// NorCal orchestrator does this).
 async function crawlSubflightCmd(
   par1: string,
   year: number,
   opts: { rootDir: string; includePlayers: boolean }
-) {
+): Promise<SubflightCrawlSummary> {
   const session = await loadSession();
+  const browser = new BrowserFetcher({
+    session,
+    minDelayMs: 3000,
+    maxDelayMs: 5000,
+  });
+  const fetcher = new PoliteFetcher({
+    userAgent: session.userAgent,
+    contactEmail: session.contactEmail,
+    cookieHeader: session.cookieHeader,
+    minDelayMs: 3000,
+    maxDelayMs: 5000,
+  });
+  try {
+    return await runSubflightCrawl(browser, fetcher, par1, year, opts);
+  } finally {
+    await browser.close();
+  }
+}
+
+// Crawl one team's entire subflight: harvest flightmate par1s via the
+// browser, then crawl each team's scorecards via the PoliteFetcher.
+// Does NOT own the browser/fetcher — the caller constructs and closes
+// them (so a long orchestrator can reuse one Chromium across hundreds
+// of flights).
+async function runSubflightCrawl(
+  browser: BrowserFetcher,
+  fetcher: PoliteFetcher,
+  par1: string,
+  year: number,
+  opts: { rootDir: string; includePlayers: boolean }
+): Promise<SubflightCrawlSummary> {
   const ownProfileUrl = teamProfileUrl({ par1, year });
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
   const stagingKey = `par1-${par1.slice(0, 12)}-subflight`;
@@ -349,16 +399,6 @@ async function crawlSubflightCmd(
   console.error(`  staging dir: ${subflightDir}`);
   console.error(`  include players: ${opts.includePlayers}`);
   const totalPhases = opts.includePlayers ? 4 : 2;
-
-  // Browser stays alive across all Playwright phases — Phase 1 (opponent
-  // par1 harvest) and, if --include-players, Phase 3 (player par1
-  // harvest). Closed in the outer finally.
-  const browser = new BrowserFetcher({
-    session,
-    minDelayMs: 3000,
-    maxDelayMs: 5000,
-  });
-  try {
 
   // Phase 1: harvest opponent par1s via browser.
   console.error(`Phase 1/${totalPhases}: harvesting opponent par1s via Chromium...`);
@@ -380,13 +420,6 @@ async function crawlSubflightCmd(
 
   // Phase 2: run crawlTeam against each team via PoliteFetcher.
   console.error(`Phase 2/${totalPhases}: crawling each team via PoliteFetcher...`);
-  const fetcher = new PoliteFetcher({
-    userAgent: session.userAgent,
-    contactEmail: session.contactEmail,
-    cookieHeader: session.cookieHeader,
-    minDelayMs: 3000,
-    maxDelayMs: 5000,
-  });
   const allTargets: Array<{ teamName: string; par1: string }> = [
     ...(harvest.ownPar1
       ? [{ teamName: harvest.ownTeamName, par1: harvest.ownPar1 }]
@@ -623,6 +656,125 @@ async function crawlSubflightCmd(
         ? `, ${playerResults.filter((p) => p.ok).length}/${playerResults.length} players ok`
         : "")
   );
+
+  const coveredTeamNames = new Set<string>([harvest.ownTeamName]);
+  for (const t of teamResults) coveredTeamNames.add(t.teamName);
+
+  return {
+    ownTeamName: harvest.ownTeamName,
+    ownTeamId,
+    coveredTeamNames: [...coveredTeamNames],
+    parsedFile,
+    successCount,
+    totalTeams: teamResults.length,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// NorCal rating-search ingestion. One public GET per year returns every
+// player in the NorCal district (all divisions / genders / levels) with
+// their NTRP band, rating type (C/S/A/…), and player par1 token — the same
+// shape parseRatingSearch / loadCaptures' year-end-labels path consume.
+//
+// Per year: discover the (section, district) tree node IDs from the public
+// AdvancedSearch form (they change yearly), GET the district-wide
+// SearchResults page, parse it, and write a per-year dump under
+// {rootDir}/ratings/{year}.json (+ raw .html).
+// ---------------------------------------------------------------------------
+async function ratingsCrawlCmd(opts: {
+  years: number[];
+  rootDir: string;
+  sectionLabel: string;
+  districtLabel: string;
+}) {
+  const session = await loadSession();
+  const browser = new BrowserFetcher({
+    session,
+    minDelayMs: 3000,
+    maxDelayMs: 5000,
+  });
+  const fetcher = new PoliteFetcher({
+    userAgent: session.userAgent,
+    contactEmail: session.contactEmail,
+    cookieHeader: session.cookieHeader,
+    minDelayMs: 3000,
+    maxDelayMs: 5000,
+  });
+  try {
+    for (const year of opts.years) {
+      console.error(
+        `\n=== ${year}  ${opts.sectionLabel} / ${opts.districtLabel} ===`
+      );
+      console.error("Discovering tree node IDs (AdvancedSearch)...");
+      const scope = await browser.discoverRatingSearchScope({
+        year,
+        sectionLabel: opts.sectionLabel,
+        districtLabel: opts.districtLabel,
+      });
+      console.error(
+        `  section=${scope.sectionNodeId} district=${scope.districtNodeId}`
+      );
+      const url = districtRatingSearchUrl(scope);
+      const res = await fetcher.fetch(url);
+      if (!res.body) {
+        throw new Error(`rating search returned empty body (status ${res.status})`);
+      }
+      const rawPath = join(opts.rootDir, "ratings", `${year}.html`);
+      await mkdir(dirname(rawPath), { recursive: true });
+      await writeFile(rawPath, res.body, "utf8");
+      const parsed = parseRatingSearch(res.body);
+      const jsonPath = join(opts.rootDir, "ratings", `${year}.json`);
+      await writeFile(
+        jsonPath,
+        JSON.stringify(parsed, null, 2) + "\n",
+        "utf8"
+      );
+      const byType = new Map<string, number>();
+      for (const r of parsed.rows) {
+        const t = r.ratingType ?? "?";
+        byType.set(t, (byType.get(t) ?? 0) + 1);
+      }
+      const typeStr = [...byType.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([t, n]) => `${t}=${n}`)
+        .join(" ");
+      console.error(`  parsed ${parsed.rows.length} players  [${typeStr}]`);
+      console.error(`  wrote ${jsonPath}`);
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
+// Render a flight's Match Summary (StatsAndStandings t=T-0 SPA) and write
+// the post-render HTML. par1 is a player/league token, sToken the opaque
+// view token from the Match Summary tab. Used to develop/validate the
+// per-flight match backfill before wiring up flight enumeration.
+async function flightMatchesCmd(
+  par1: string,
+  sToken: string,
+  outHtml: string
+) {
+  const session = await loadSession();
+  const browser = new BrowserFetcher({ session });
+  try {
+    console.error(`Rendering Match Summary par1=${par1.slice(0, 12)}… s=${sToken.slice(0, 12)}…`);
+    const res = await browser.fetchMatchSummary(par1, sToken);
+    console.error(`  status=${res.status} bytes=${res.body?.length ?? 0}`);
+    if (!res.body) {
+      console.error("No body.");
+      return;
+    }
+    await mkdir(dirname(outHtml), { recursive: true });
+    await writeFile(outHtml, res.body, "utf8");
+    console.error(`Wrote ${outHtml}`);
+    const parsed = parseMatchSummary(res.body);
+    const jsonPath = outHtml.replace(/\.html?$/i, "") + ".matches.json";
+    await writeFile(jsonPath, JSON.stringify(parsed, null, 2) + "\n", "utf8");
+    const dated = parsed.rows.filter((r) => r.date).length;
+    console.error(
+      `  parsed ${parsed.rows.length} matches (${dated} dated) → ${jsonPath}`
+    );
   } finally {
     await browser.close();
   }
@@ -671,30 +823,32 @@ async function ratingsFitPerf(
   );
   const result = computePerfRatings(captures);
   console.error(
-    `  computed ${result.ratings.size} ratings; skipped ${result.skipped} matches (no winner)`
+    `  computed ${result.playerRatings.size} ratings; skipped ${result.skipped} matches (no winner)`
   );
-  // Filter to labeled players with enough match history for the report.
+  // Filter to labeled players with ≥minMatches adult matches for the report.
   const labeled: Array<{
     key: string;
     name: string;
     ntrp: number;
-    matches: number;
+    adultMatches: number;
     perfRating: number;
   }> = [];
   for (const p of captures.players.values()) {
     if (p.ntrp === undefined) continue;
-    const hist = result.history.get(p.key);
-    if (!hist || hist.length < minMatches) continue;
+    const ratings = result.playerRatings.get(p.key);
+    if (!ratings || ratings.adultMatches < minMatches) continue;
+    const displayRating = ratings.display;
+    if (displayRating === undefined) continue;
     labeled.push({
       key: p.key,
       name: p.name,
       ntrp: p.ntrp,
-      matches: hist.length,
-      perfRating: result.ratings.get(p.key)!,
+      adultMatches: ratings.adultMatches,
+      perfRating: displayRating,
     });
   }
   console.error(
-    `  ${labeled.length} players with NTRP label and ≥${minMatches} matches`
+    `  ${labeled.length} players with NTRP label and ≥${minMatches} adult matches`
   );
   if (labeled.length === 0) {
     console.error("No labeled players to summarize. Aborting.");
@@ -704,7 +858,7 @@ async function ratingsFitPerf(
   // typical player at band N has true rating ~(N - 0.25). So an
   // "average" 3.5 player is 3.25, not 3.5.
   console.error(
-    "Predicted NTRP by labeled level (output IS NTRP; compare to band midpoint):"
+    "Predicted Adult NTRP by labeled level (output IS NTRP; compare to band midpoint):"
   );
   const byLevel = new Map<number, number[]>();
   for (const r of labeled) {
@@ -743,7 +897,7 @@ async function ratingsFitPerf(
   // Dump full chronological history per player. The web app reads
   // this and uses it for both the players list (current rating)
   // and the per-player detail page (full match log + sparkline).
-  const dump = [...result.ratings.entries()].map(([key, perf]) => {
+  const dump = [...result.playerRatings.entries()].map(([key, ratings]) => {
     const p = captures.players.get(key);
     const hist = result.history.get(key) ?? [];
     return {
@@ -752,8 +906,13 @@ async function ratingsFitPerf(
       memberId: p?.memberId,
       ntrpLabel: p?.ntrp,
       teams: p?.teams ?? [],
-      perfRating: perf,
-      matches: hist.length,
+      adultRating: ratings.adult ?? null,
+      mixedRating: ratings.mixed ?? null,
+      perfRating: ratings.display ?? null,
+      adultMatches: ratings.adultMatches,
+      mixedMatches: ratings.mixedMatches,
+      otherMatches: ratings.otherMatches,
+      matches: ratings.adultMatches + ratings.mixedMatches + ratings.otherMatches,
       history: hist.map((e) => ({
         matchId: e.matchId,
         date: e.date.toISOString().slice(0, 10),
@@ -771,6 +930,9 @@ async function ratingsFitPerf(
         perf: e.perf,
         playerPreRating: e.playerPreRating,
         playerPostRating: e.playerPostRating,
+        category: e.category,
+        affectsRating: e.affectsRating,
+        perfBasis: e.perfBasis,
       })),
     };
   });
@@ -788,6 +950,7 @@ async function ratingsFitCmd(
   opts: {
     minMatches: number;
     labelsPath?: string;
+    ratingsDir?: string;
     priorFromNtrp: boolean;
     model: "glicko" | "perf";
   }
@@ -801,8 +964,12 @@ async function ratingsFitCmd(
   if (opts.labelsPath) {
     console.error(`  with year-end labels: ${opts.labelsPath}`);
   }
+  if (opts.ratingsDir) {
+    console.error(`  with per-year rating dumps from: ${opts.ratingsDir}`);
+  }
   const captures = await loadCapturesMulti(aggregatePaths, {
     yearEndLabelsPath: opts.labelsPath,
+    ratingsDir: opts.ratingsDir,
   });
   console.error(
     `  ${captures.players.size} players, ${captures.matches.length} court matches`
@@ -812,7 +979,7 @@ async function ratingsFitCmd(
       `  ${captures.unresolvedNames.length} unresolved scorecard names (won't get NTRP labels)`
     );
   }
-  if (opts.labelsPath) {
+  if (opts.labelsPath || opts.ratingsDir) {
     console.error(
       `  year-end labels: ${captures.yearEndLabelMatches} matched (${captures.yearEndLabelOverrides} differed from roster), ${captures.yearEndUnmatched} dump rows unmatched`
     );
@@ -1155,7 +1322,10 @@ function usage(): never {
   tennis-scrape session check [probe-url]
   tennis-scrape crawl team <par1> <year> [--out <dir>]   (default --out: ./captures)
   tennis-scrape crawl subflight <par1> <year> [--out <dir>] [--include-players]
-  tennis-scrape ratings fit <subflight-aggregate.json> [<more-aggregates.json>...] [--min-matches N] [--labels <year-end.json>] [--prior-from-ntrp] [--model glicko|perf]
+  tennis-scrape crawl norcal [--years 2025,2026] [--out <dir>] [--section LABEL] [--district LABEL]
+                       (per year: discovers the section/district tree node IDs from the public NTRP AdvancedSearch, then GETs the district-wide SearchResults page and writes {out}/ratings/{year}.json — every player with NTRP band, rating type (C/S/A), and par1 token. Default --out: ./captures/norcal, section USTA/NO. CALIFORNIA, district NO. CALIFORNIA)
+  tennis-scrape ratings fit <subflight-aggregate.json> [<more-aggregates.json>...] [--min-matches N] [--labels <year-end.json>] [--ratings-dir <dir with {year}.json>] [--prior-from-ntrp] [--model glicko|perf]
+                       (--ratings-dir points at crawl-norcal output; each aggregate auto-loads {dir}/{its year}.json for per-year bands + rating types)
   tennis-scrape tennisrecord aggregate <subflight-aggregate.json> [<more-aggregates.json>...] --year YEAR --out OUTPUT.json [--max-players N] [--min-delay MS] [--max-delay MS]
                        (fetches tennisrecord match histories for rostered players, aggregates empirical score → perf-delta stats; polite delays default 2000–4000 ms)
                        (--prior-from-ntrp seeds initial Glicko per player from their NTRP band — required for multi-band fits across disjoint subflights, otherwise the bands collapse to one prior)
@@ -1192,6 +1362,47 @@ async function main() {
       case "browser-postback": {
         if (!sub || rest.length !== 2) usage();
         await browserPostback(sub, rest[0]!, rest[1]!);
+        break;
+      }
+      case "flight-matches": {
+        // <par1> <sToken> <out-html>
+        if (!sub || rest.length !== 2) usage();
+        await flightMatchesCmd(sub, rest[0]!, rest[1]!);
+        break;
+      }
+      case "db": {
+        if (sub !== "load-players") usage();
+        let ratingsDir = "captures/norcal/ratings";
+        let years = [2025, 2026];
+        let databaseUrl = process.env.DATABASE_URL;
+        for (let i = 0; i < rest.length; i++) {
+          const arg = rest[i]!;
+          const next = () => {
+            const n = rest[i + 1];
+            if (!n) usage();
+            i += 1;
+            return n!;
+          };
+          if (arg === "--ratings-dir") ratingsDir = next();
+          else if (arg === "--years") {
+            years = next()
+              .split(",")
+              .map((y) => Number(y.trim()))
+              .filter((y) => Number.isFinite(y));
+          } else if (arg === "--database-url") databaseUrl = next();
+          else usage();
+        }
+        if (!databaseUrl) {
+          console.error(
+            "Missing DATABASE_URL (env or --database-url). e.g. postgres://tennis:tennis@localhost:5432/tennis"
+          );
+          process.exit(2);
+        }
+        if (years.length === 0) usage();
+        console.error(
+          `Loading players from ${ratingsDir} for years ${years.join(", ")}`
+        );
+        await loadPlayers({ databaseUrl, ratingsDir, years });
         break;
       }
       case "parse":
@@ -1268,6 +1479,7 @@ async function main() {
         const positional: string[] = [];
         let minMatches = 3;
         let labelsPath: string | undefined;
+        let ratingsDir: string | undefined;
         let priorFromNtrp = false;
         let model: "glicko" | "perf" = "glicko";
         for (let i = 0; i < rest.length; i++) {
@@ -1282,6 +1494,11 @@ async function main() {
             const next = rest[i + 1];
             if (!next) usage();
             labelsPath = next;
+            i += 1;
+          } else if (arg === "--ratings-dir") {
+            const next = rest[i + 1];
+            if (!next) usage();
+            ratingsDir = next;
             i += 1;
           } else if (arg === "--prior-from-ntrp") {
             priorFromNtrp = true;
@@ -1298,6 +1515,7 @@ async function main() {
         await ratingsFitCmd(positional, {
           minMatches,
           labelsPath,
+          ratingsDir,
           priorFromNtrp,
           model,
         });
@@ -1345,6 +1563,38 @@ async function main() {
         break;
       }
       case "crawl": {
+        if (sub === "norcal") {
+          let outDir = "captures/norcal";
+          let years = [2025, 2026];
+          let sectionLabel = "USTA/NO. CALIFORNIA";
+          let districtLabel = "NO. CALIFORNIA";
+          for (let i = 0; i < rest.length; i++) {
+            const arg = rest[i]!;
+            const next = () => {
+              const n = rest[i + 1];
+              if (!n) usage();
+              i += 1;
+              return n!;
+            };
+            if (arg === "--out") outDir = next();
+            else if (arg === "--years") {
+              years = next()
+                .split(",")
+                .map((y) => Number(y.trim()))
+                .filter((y) => Number.isFinite(y));
+            } else if (arg === "--section") sectionLabel = next();
+            else if (arg === "--district") districtLabel = next();
+            else usage();
+          }
+          if (years.length === 0) usage();
+          await ratingsCrawlCmd({
+            years,
+            rootDir: outDir,
+            sectionLabel,
+            districtLabel,
+          });
+          break;
+        }
         if (sub !== "team" && sub !== "subflight") usage();
         const positional: string[] = [];
         let outDir = "captures";
