@@ -388,6 +388,61 @@ export const calibrations = pgTable("calibrations", {
     .defaultNow(),
 });
 
+// ---- perf ratings (per-category NTRP-scale model output) ----
+//
+// Output of computePerfRatings over the DB matches. Separate from the legacy
+// Glicko tables above (which the perf model doesn't use). One current-rating
+// row per player + one history row per court the player appeared on.
+
+export const playerPerfRatings = pgTable("player_perf_ratings", {
+  playerId: uuid("player_id")
+    .primaryKey()
+    .references(() => players.id, { onDelete: "cascade" }),
+  // Per-category ratings on the NTRP scale; null when no matches in that
+  // stream. display = adult ?? mixed.
+  adult: doublePrecision("adult"),
+  mixed: doublePrecision("mixed"),
+  display: doublePrecision("display"),
+  adultMatches: integer("adult_matches").notNull().default(0),
+  mixedMatches: integer("mixed_matches").notNull().default(0),
+  otherMatches: integer("other_matches").notNull().default(0),
+  computedAt: timestamp("computed_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const perfMatchResults = pgTable(
+  "perf_match_results",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    courtMatchId: uuid("court_match_id")
+      .notNull()
+      .references(() => courtMatches.id, { onDelete: "cascade" }),
+    playedOn: timestamp("played_on", { withTimezone: true }),
+    // adult | mixed | combo | other (MatchCategory from @tennis/calibrate)
+    category: varchar("category", { length: 8 }).notNull(),
+    perf: doublePrecision("perf").notNull(),
+    teamPerf: doublePrecision("team_perf"),
+    preRating: doublePrecision("pre_rating"),
+    postRating: doublePrecision("post_rating"),
+    opponentRating: doublePrecision("opponent_rating"),
+    won: boolean("won").notNull(),
+    // false for combo/other (shadow perf that doesn't move a rating stream)
+    affectsRating: boolean("affects_rating").notNull().default(true),
+    perfBasis: varchar("perf_basis", { length: 8 }), // adult | mixed
+  },
+  (t) => [
+    uniqueIndex("perf_match_results_player_court_uq").on(
+      t.playerId,
+      t.courtMatchId
+    ),
+    index("perf_match_results_player_idx").on(t.playerId),
+  ]
+);
+
 // ---- captain workspace ----
 
 export const lineups = pgTable(

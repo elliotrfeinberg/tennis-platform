@@ -1593,6 +1593,7 @@ async function main() {
         }
         if (sub === "compute-ratings") {
           let minMatches = 3;
+          let persist = false;
           let databaseUrl = process.env.DATABASE_URL;
           for (let i = 0; i < rest.length; i++) {
             const arg = rest[i]!;
@@ -1603,6 +1604,7 @@ async function main() {
               return n!;
             };
             if (arg === "--min-matches") minMatches = Number(next());
+            else if (arg === "--persist") persist = true;
             else if (arg === "--database-url") databaseUrl = next();
             else usage();
           }
@@ -1610,7 +1612,7 @@ async function main() {
             console.error("Missing DATABASE_URL (env or --database-url).");
             process.exit(2);
           }
-          await computeRatingsFromDb({ databaseUrl, minMatches });
+          await computeRatingsFromDb({ databaseUrl, minMatches, persist });
           break;
         }
         usage();

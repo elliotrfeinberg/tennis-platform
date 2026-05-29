@@ -17,6 +17,8 @@ import {
   subflights,
   flights,
   leagues,
+  playerPerfRatings,
+  perfMatchResults,
 } from "@tennis/db";
 import { alias } from "drizzle-orm/pg-core";
 import { eq } from "drizzle-orm";
@@ -30,9 +32,20 @@ import {
 
 const SECTION = "USTA/NO. CALIFORNIA";
 
+async function inChunks<T>(
+  rows: T[],
+  size: number,
+  fn: (chunk: T[]) => Promise<void>
+): Promise<void> {
+  for (let i = 0; i < rows.length; i += size) {
+    await fn(rows.slice(i, i + size));
+  }
+}
+
 export async function computeRatingsFromDb(opts: {
   databaseUrl: string;
   minMatches: number;
+  persist?: boolean;
 }): Promise<void> {
   const db = createClient(opts.databaseUrl);
 
@@ -112,10 +125,14 @@ export async function computeRatingsFromDb(opts: {
     });
   }
 
-  // Court matches → calibrate CourtMatch (one per court).
+  // Court matches → calibrate CourtMatch (one per court). Also map
+  // (matchId#kind#line) → court_match id so persisted perf rows can link
+  // back to the court.
   const matches: CourtMatch[] = [];
+  const courtIdByKey = new Map<string, string>();
   for (const c of await db
     .select({
+      id: courtMatches.id,
       teamMatchId: courtMatches.teamMatchId,
       kind: courtMatches.courtKind,
       line: courtMatches.line,
@@ -129,6 +146,7 @@ export async function computeRatingsFromDb(opts: {
     .from(courtMatches)) {
     const tm = tmMap.get(c.teamMatchId);
     if (!tm) continue;
+    courtIdByKey.set(`${tm.matchId}#${c.kind}#${c.line}`, c.id);
     const sets = (c.sets as Array<{ home: number; visitor: number }>) ?? [];
     let gh = 0;
     let gv = 0;
@@ -204,6 +222,55 @@ export async function computeRatingsFromDb(opts: {
     );
   }
   if (result.skipped) console.error(`(skipped ${result.skipped} matches)`);
+
+  if (opts.persist) {
+    // Full recompute → replace all perf rows.
+    await db.delete(perfMatchResults);
+    await db.delete(playerPerfRatings);
+
+    const prRows = [...result.playerRatings.entries()].map(([playerId, pr]) => ({
+      playerId,
+      adult: pr.adult ?? null,
+      mixed: pr.mixed ?? null,
+      display: pr.display ?? null,
+      adultMatches: pr.adultMatches,
+      mixedMatches: pr.mixedMatches,
+      otherMatches: pr.otherMatches,
+    }));
+    await inChunks(prRows, 500, async (chunk) => {
+      await db.insert(playerPerfRatings).values(chunk);
+    });
+
+    const mrRows: Array<typeof perfMatchResults.$inferInsert> = [];
+    for (const [playerId, hist] of result.history) {
+      for (const e of hist) {
+        const courtMatchId = courtIdByKey.get(
+          `${e.matchId}#${e.kind}#${e.line}`
+        );
+        if (!courtMatchId) continue;
+        mrRows.push({
+          playerId,
+          courtMatchId,
+          playedOn: e.date,
+          category: e.category,
+          perf: e.perf,
+          teamPerf: e.teamPerf,
+          preRating: e.playerPreRating,
+          postRating: e.playerPostRating,
+          opponentRating: e.opponentRating,
+          won: e.won,
+          affectsRating: e.affectsRating,
+          perfBasis: e.perfBasis,
+        });
+      }
+    }
+    await inChunks(mrRows, 500, async (chunk) => {
+      await db.insert(perfMatchResults).values(chunk);
+    });
+    console.error(
+      `\nPersisted ${prRows.length} player_perf_ratings + ${mrRows.length} perf_match_results.`
+    );
+  }
 
   await (
     db as unknown as { $client: { end: () => Promise<void> } }
