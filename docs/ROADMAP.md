@@ -118,11 +118,16 @@ tennisrecord has **no** match predictor, appeal calculator, or what-if tools
 - **Scorecard backfill** → `db backfill-scorecards-db` (t=7 per match);
   `--shard i/N` enables multi-account parallelism (no bulk score endpoint
   exists on TennisLink — per-match scorecard is the unit).
-- **Pipeline:** enumerate → backfill-scorecards → normalize-matches →
+- **Pipeline (initial):** enumerate → backfill-scorecards → normalize-matches →
   compute-ratings --persist.
-- **Future:** phase-3 incremental (re-scan flight Match Summaries, ingest only
-  matches with date > last seen — `flight_matches.played_on` drives this);
-  real sub-flight grouping (currently one synthetic subflight per flight).
+- **Incremental (done)** → `db incremental [--year 2026] [--refresh-flights]`:
+  daily delta crawl keyed on `flight_matches.played_on` — fetches only DUE +
+  unfetched scorecards (minutes/day), then normalize + recompute. Run
+  `--refresh-flights` weekly to pick up newly scheduled matches. Schedule via
+  cron/launchd. (Scorecard backfill only marks a match done when it has
+  results, so scheduled-but-unplayed matches retry automatically.)
+- **Future:** real sub-flight grouping (currently one synthetic subflight per
+  flight); distinguish defaulted/no-play matches from not-yet-played.
 
 ---
 
