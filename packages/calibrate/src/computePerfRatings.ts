@@ -18,11 +18,14 @@
 // performance ratings per stream. The CURRENT rating reported back to the
 // caller is a weighted mean of that stream's history.
 //
-// Doubles: side rating = mean of the two partners' current ratings, same
-// as Glicko. Both partners get the same per-match perf rating (their
-// side's collective performance), with individual attribution preserved.
+// Doubles: side rating = mean of the two partners' current ratings. The
+// per-match team perf is a SYMMETRIC, zero-sum update (winner_team −
+// loser_team == the score-table gap, both centered on the match midpoint),
+// not the old "opponent + full delta" anchor. Individual attribution then
+// moves every partner equally from their own pre-rating, preserving the
+// partner spread. See the teamPerf computation below for the formula.
 
-import { matchPerformance, type PerfSetScore } from "@tennis/ratings";
+import { scoreToPerfDelta, type PerfSetScore } from "@tennis/ratings";
 import type { CapturesData, PlayerLabel } from "./loadCaptures.js";
 import { classifyLeague, type MatchCategory } from "./classifyLeague.js";
 
@@ -377,16 +380,28 @@ export function computePerfRatings(
       lost: s.home,
     }));
 
-    const homePerf = matchPerformance({
-      opponentRating: visitorAnchorMean,
-      matchWon: m.homeWon,
-      sets: homeSets,
-    });
-    const visitorPerf = matchPerformance({
-      opponentRating: homeAnchorMean,
-      matchWon: !m.homeWon,
-      sets: visitorSets,
-    });
+    // Symmetric, zero-sum team perf (per project owner's doubles model).
+    //
+    // The score-table value `delta` is the rating GAP the score implies
+    // between the two sides — NOT the winner's offset above the opponent.
+    // We split the SURPRISE (implied gap − current court gap) evenly: each
+    // side's team perf is the match midpoint plus half the signed delta.
+    //
+    //   teamPerf_side = (ownMean + oppMean)/2 + signedDelta/2
+    //
+    // so winner_team − loser_team == delta, centered on the shared midpoint.
+    // Worked example: A/B(mean 3.40) beat C/D(mean 3.30), 6-4 6-4 → delta
+    // 0.10. midpoint 3.35 → A/B = 3.40, C/D = 3.30 (won exactly as the gap
+    // predicted ⇒ no move). Were delta 0.16, surprise 0.06 splits ±0.03 →
+    // A/B 3.43, C/D 3.27. Per-player attribution below moves every partner
+    // equally from their own pre-rating, preserving the partner spread.
+    //
+    // The opponent side uses the confidence-blended anchor mean (provisional
+    // opponents pulled toward their band prior); our own side uses raw means.
+    const homeDelta = scoreToPerfDelta(homeSets, m.homeWon); // + if home won
+    const visitorDelta = scoreToPerfDelta(visitorSets, !m.homeWon); // opposite sign
+    const homePerf = (homeMean + visitorAnchorMean) / 2 + homeDelta / 2;
+    const visitorPerf = (visitorMean + homeAnchorMean) / 2 + visitorDelta / 2;
 
     // Pre-compute game-diff for diagnostics in history entries.
     let gh = 0;
@@ -399,13 +414,15 @@ export function computePerfRatings(
     const gamesVisitor = gv;
 
     // Doubles attribution: each partner's individual match rating is
-    // not simply the team perf. USTA's published DMR data (verified
-    // empirically from tennisrecord) preserves the partners' pre-match
-    // rating spread exactly:
+    // not simply the team perf. We preserve the partners' pre-match rating
+    // spread exactly, so each player moves from THEIR OWN pre-rating by the
+    // same amount (= teamPerf − team_mean_pre):
     //
     //   partner_perf = team_perf + (partner_pre − team_mean_pre)
     //
-    // Singles is the trivial case (one player, spread = 0).
+    // With the symmetric teamPerf above this means every player on a side
+    // shifts by ±(surprise)/2 from their own pre-rating. Singles is the
+    // trivial case (one player, spread = 0).
     const nameFor = (key: string): string =>
       captures.players.get(key)?.name ?? "(unknown)";
     const homeRefs: PerfMatchPlayerRef[] = m.homePlayerKeys.map((k, i) => ({

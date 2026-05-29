@@ -75,6 +75,14 @@ export {
 } from "./parseMatchSummary.js";
 
 export {
+  parsePlayerRecord,
+  flightCodeFromTeamName,
+  flightKeyOf,
+  type ParsedPlayerRecord,
+  type PlayerRecordTeam,
+} from "./parsePlayerRecord.js";
+
+export {
   parseTeamSearch,
   type ParsedTeamSearch,
   type TeamSearchRow,

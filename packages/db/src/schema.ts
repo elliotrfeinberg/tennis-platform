@@ -517,3 +517,73 @@ export const rawScorecards = pgTable(
   },
   (t) => [index("raw_scorecards_year_idx").on(t.year)]
 );
+
+// ---- phase-2 flight enumeration ----
+//
+// USTA flights aren't directly addressable: there's no "list all flights"
+// endpoint. The only way to a flight's complete Match Summary is to start
+// from a *player* (the rating-search par1 token → t=T-0 player record page),
+// click one of that player's teams, then the Flight tab, then the flight-level
+// Match Summary. So we DISCOVER flights by walking players and dedupe them
+// into this catalog. Each row records how to reach the flight again (the
+// player par1 + that player's team-link anchor id on the t=T-0 page).
+export const flightCatalog = pgTable(
+  "flight_catalog",
+  {
+    // Stable dedupe key: "{year}|{league}|{flightName}", e.g.
+    // "2026|2026 ADULT 40&Over|Men's 3.5".
+    flightKey: text("flight_key").primaryKey(),
+    year: integer("year").notNull(),
+    league: text("league").notNull(), // "2026 ADULT 40&Over"
+    flightName: text("flight_name").notNull(), // "Men's 3.5"
+    // Base team code without the per-cluster letter, e.g. "40AM3.5".
+    flightCode: varchar("flight_code", { length: 32 }),
+    // How to re-reach this flight's Match Summary.
+    reachPar1: text("reach_par1").notNull(),
+    reachTeamAnchorId: text("reach_team_anchor_id").notNull(),
+    reachTeamName: text("reach_team_name"),
+    // Filled in by backfill-flight-matches.
+    matchCount: integer("match_count"),
+    matchSummaryAt: timestamp("match_summary_at", { withTimezone: true }),
+    discoveredAt: timestamp("discovered_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("flight_catalog_year_idx").on(t.year)]
+);
+
+// Match list scraped from each flight's Match Summary: match id + date +
+// team names. This is the canonical (cheap) match index — the date column
+// drives phase-3 incremental, and scorecardFetched tracks which still need
+// their t=7 scorecard pulled into raw_scorecards. One row per match.
+export const flightMatches = pgTable(
+  "flight_matches",
+  {
+    ustaMatchId: varchar("usta_match_id", { length: 32 }).primaryKey(),
+    flightKey: text("flight_key").notNull(),
+    year: integer("year").notNull(),
+    playedOn: timestamp("played_on", { withTimezone: true }),
+    homeTeam: text("home_team"),
+    visitorTeam: text("visitor_team"),
+    scorecardFetched: boolean("scorecard_fetched").notNull().default(false),
+    discoveredAt: timestamp("discovered_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("flight_matches_flight_idx").on(t.flightKey),
+    index("flight_matches_fetched_idx").on(t.scorecardFetched),
+  ]
+);
+
+// Resumability log for the enumeration walk: which player par1 tokens we've
+// already loaded (so a re-run skips them) and what each yielded.
+export const flightEnumVisits = pgTable("flight_enum_visits", {
+  par1: text("par1").primaryKey(),
+  visitedAt: timestamp("visited_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  teamsFound: integer("teams_found").notNull().default(0),
+  newFlights: integer("new_flights").notNull().default(0),
+  error: text("error"),
+});

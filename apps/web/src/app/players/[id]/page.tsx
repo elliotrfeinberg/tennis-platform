@@ -153,6 +153,7 @@ export default async function PlayerProfilePage({
               <th className="px-3 py-2">Date</th>
               <th className="px-3 py-2">Cat</th>
               <th className="px-3 py-2">Court</th>
+              <th className="px-3 py-2">Partner</th>
               <th className="px-3 py-2">Opponent(s)</th>
               <th className="px-3 py-2">W/L · Score</th>
               <th className="px-3 py-2 text-right">Opp</th>
@@ -179,7 +180,36 @@ export default async function PlayerProfilePage({
                   {m.line}
                 </td>
                 <td className="px-3 py-2 text-xs">
-                  <div>{m.opponents.join(" / ") || "—"}</div>
+                  {m.partners.length === 0
+                    ? "—"
+                    : m.partners.map((p, j) => (
+                        <span key={j}>
+                          {j > 0 && " / "}
+                          {p.name}
+                          {p.rating != null && (
+                            <span className="ml-1 font-mono text-stone-400">
+                              ({p.rating.toFixed(2)})
+                            </span>
+                          )}
+                        </span>
+                      ))}
+                </td>
+                <td className="px-3 py-2 text-xs">
+                  <div>
+                    {m.opponents.length === 0
+                      ? "—"
+                      : m.opponents.map((o, j) => (
+                          <span key={j}>
+                            {j > 0 && " / "}
+                            {o.name}
+                            {o.rating != null && (
+                              <span className="ml-1 font-mono text-stone-400">
+                                ({o.rating.toFixed(2)})
+                              </span>
+                            )}
+                          </span>
+                        ))}
+                  </div>
                   {m.opponentTeam && (
                     <div className="text-stone-400">{m.opponentTeam}</div>
                   )}
@@ -218,7 +248,7 @@ export default async function PlayerProfilePage({
             ))}
             {player.matchLog.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-stone-400">
+                <td colSpan={9} className="px-3 py-8 text-center text-stone-400">
                   No matches ingested for this player yet.
                 </td>
               </tr>

@@ -162,7 +162,13 @@ export interface MatchLogEntry {
   won: boolean;
   affectsRating: boolean;
   sets: Array<{ player: number; opponent: number }>;
-  opponents: string[];
+  // Each opponent on the court, with their snapshotted (pre-match) perf
+  // rating at the time this match was played. rating is null if the opponent
+  // had no rating computed for this court.
+  opponents: Array<{ name: string; rating: number | null }>;
+  // Doubles partner(s) on the player's own side, with the same snapshotted
+  // pre-match rating. Empty for singles.
+  partners: Array<{ name: string; rating: number | null }>;
   opponentTeam: string | null;
 }
 
@@ -222,6 +228,7 @@ export async function findPlayer(id: string): Promise<PlayerDetail | null> {
       opponentRating: perfMatchResults.opponentRating,
       won: perfMatchResults.won,
       affectsRating: perfMatchResults.affectsRating,
+      courtId: perfMatchResults.courtMatchId,
       kind: courtMatches.courtKind,
       line: courtMatches.line,
       sets: courtMatches.sets,
@@ -238,20 +245,24 @@ export async function findPlayer(id: string): Promise<PlayerDetail | null> {
     .where(eq(perfMatchResults.playerId, id))
     .orderBy(asc(perfMatchResults.playedOn));
 
-  const oppPlayerIds = new Set<string>();
+  // Collect every OTHER player on the player's courts — opponents AND doubles
+  // partners — for one name lookup + one snapshot lookup.
+  const otherPlayerIds = new Set<string>();
   const teamIds = new Set<string>();
   for (const r of mr) {
     const isHome = id === r.h1 || id === r.h2;
-    for (const o of isHome ? [r.v1, r.v2] : [r.h1, r.h2]) if (o) oppPlayerIds.add(o);
+    for (const o of isHome ? [r.v1, r.v2] : [r.h1, r.h2]) if (o) otherPlayerIds.add(o);
+    for (const p of isHome ? [r.h1, r.h2] : [r.v1, r.v2])
+      if (p && p !== id) otherPlayerIds.add(p);
     const ot = isHome ? r.visitorTeamId : r.homeTeamId;
     if (ot) teamIds.add(ot);
   }
   const nameById = new Map<string, string>();
-  if (oppPlayerIds.size) {
+  if (otherPlayerIds.size) {
     for (const row of await d
       .select({ id: players.id, name: players.displayName })
       .from(players)
-      .where(inArray(players.id, [...oppPlayerIds]))) {
+      .where(inArray(players.id, [...otherPlayerIds]))) {
       nameById.set(row.id, row.name);
     }
   }
@@ -265,10 +276,36 @@ export async function findPlayer(id: string): Promise<PlayerDetail | null> {
     }
   }
 
+  // Each opponent's SNAPSHOTTED (pre-match) rating: every player on a court
+  // has their own perf_match_results row carrying preRating for that court,
+  // so we look opponents up by (courtMatchId, playerId) — no extra storage.
+  const courtIds = mr.map((r) => r.courtId);
+  const snapByCourtPlayer = new Map<string, number | null>();
+  if (courtIds.length && otherPlayerIds.size) {
+    for (const row of await d
+      .select({
+        courtId: perfMatchResults.courtMatchId,
+        playerId: perfMatchResults.playerId,
+        preRating: perfMatchResults.preRating,
+      })
+      .from(perfMatchResults)
+      .where(
+        and(
+          inArray(perfMatchResults.courtMatchId, courtIds),
+          inArray(perfMatchResults.playerId, [...otherPlayerIds])
+        )
+      )) {
+      snapByCourtPlayer.set(`${row.courtId}:${row.playerId}`, row.preRating);
+    }
+  }
+
   const matchLog: MatchLogEntry[] = mr.map((r) => {
     const isHome = id === r.h1 || id === r.h2;
     const oppIds = (isHome ? [r.v1, r.v2] : [r.h1, r.h2]).filter(
       (x): x is string => !!x
+    );
+    const partnerIds = (isHome ? [r.h1, r.h2] : [r.v1, r.v2]).filter(
+      (x): x is string => !!x && x !== id
     );
     const oppTeamId = isHome ? r.visitorTeamId : r.homeTeamId;
     const rawSets =
@@ -289,7 +326,14 @@ export async function findPlayer(id: string): Promise<PlayerDetail | null> {
       won: r.won,
       affectsRating: r.affectsRating,
       sets,
-      opponents: oppIds.map((o) => nameById.get(o) ?? "(unknown)"),
+      opponents: oppIds.map((o) => ({
+        name: nameById.get(o) ?? "(unknown)",
+        rating: snapByCourtPlayer.get(`${r.courtId}:${o}`) ?? null,
+      })),
+      partners: partnerIds.map((p) => ({
+        name: nameById.get(p) ?? "(unknown)",
+        rating: snapByCourtPlayer.get(`${r.courtId}:${p}`) ?? null,
+      })),
       opponentTeam: oppTeamId ? teamNameById.get(oppTeamId) ?? null : null,
     };
   });

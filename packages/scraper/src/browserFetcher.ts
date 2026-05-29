@@ -606,6 +606,121 @@ export class BrowserFetcher implements CrawlFetcher {
     });
   }
 
+  // Fetch a player's t=T-0 "Individual Player Record" page (the landing for a
+  // rating-search par1 token). Renders the per-year list of teams the member
+  // is on — the discovery surface for flight enumeration. Pair with
+  // parsePlayerRecord. par1 is the decoded token, e.g. "25CMH…/2Jdw==".
+  async fetchPlayerRecord(par1: string): Promise<BrowserFetchResult> {
+    const base =
+      "https://tennislink.usta.com/Leagues/Main/StatsAndStandings.aspx";
+    const url = `${base}?t=T-0&par1=${encodeURIComponent(par1)}&e=1`;
+    return this.runOnHost(new URL(url).host, async () => {
+      const page = await this.openPage();
+      try {
+        const resp = await page.goto(url, { waitUntil: "domcontentloaded" });
+        await page
+          .waitForLoadState("networkidle", { timeout: 30000 })
+          .catch(() => undefined);
+        // The teams table renders the team links (…rptPlayerName…LinkButton4)
+        // and/or the "Individual Player Record" header. Wait for either.
+        await page
+          .waitForFunction(
+            `!!document.querySelector("a[id*='rptPlayerName'][id$='LinkButton4']") || /Individual Player Record/i.test(document.body ? document.body.innerText : "")`,
+            { timeout: 30000 }
+          )
+          .catch(() => undefined);
+        const body = await page.content();
+        return { status: resp?.status() ?? 0, body, finalUrl: page.url() };
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
+  // Drive the flight-level Match Summary for the flight a given team belongs
+  // to. Starting from the player record page, this clicks the team anchor
+  // (→ team/subflight context), then the Flight tab (→ flight context, all
+  // sub-flights), then the flight-level "Match Summary" tab (→ every match in
+  // the flight, with dates). Returns the Match Summary HTML for
+  // parseMatchSummary, plus the league/flight labels read from the flight
+  // context.
+  //
+  // We must drive real clicks: calling __doPostBack from page.evaluate trips
+  // MS-Ajax's strict-mode `arguments.callee` access. The view is a partial
+  // UpdatePanel render (no navigation); the URL only gains a #&&s=<token>
+  // fragment, which we ignore.
+  async fetchFlightMatchSummary(
+    par1: string,
+    teamAnchorId: string
+  ): Promise<BrowserFetchResult & { leagueLabel?: string; flightLabel?: string }> {
+    const base =
+      "https://tennislink.usta.com/Leagues/Main/StatsAndStandings.aspx";
+    const url = `${base}?t=T-0&par1=${encodeURIComponent(par1)}&e=1`;
+    const FLIGHT_TAB = "ctl00_mainContent_lnkFlightForTeams";
+    const FLIGHT_MATCH_SUMMARY = "ctl00_mainContent_lnkMatchSummaryForFlight";
+    const LEAGUE_ANCHOR = "ctl00_mainContent_lnkLeagueForFlightAnchor";
+    return this.runOnHost(new URL(url).host, async () => {
+      const page = await this.openPage();
+      try {
+        const resp = await page.goto(url, { waitUntil: "domcontentloaded" });
+        await page
+          .waitForLoadState("networkidle", { timeout: 30000 })
+          .catch(() => undefined);
+
+        // 1) Click the player's team → team/subflight context.
+        await page.waitForSelector(`#${cssEscape(teamAnchorId)}`, {
+          timeout: 30000,
+        });
+        await page.click(`#${cssEscape(teamAnchorId)}`);
+        // The Flight tab appears once the team context renders.
+        await page.waitForSelector(`#${FLIGHT_TAB}`, { timeout: 30000 });
+
+        // 2) Click the Flight tab → flight-wide context (all sub-flights).
+        await page.click(`#${FLIGHT_TAB}`);
+        await page.waitForSelector(`#${FLIGHT_MATCH_SUMMARY}`, {
+          timeout: 30000,
+        });
+
+        // Capture the labels while in flight context.
+        const leagueLabel = (
+          await page
+            .locator(`#${LEAGUE_ANCHOR}`)
+            .textContent()
+            .catch(() => null)
+        )
+          ?.replace(/\s+/g, " ")
+          .trim();
+        const flightLabel = (
+          await page
+            .locator(`#${FLIGHT_TAB}`)
+            .textContent()
+            .catch(() => null)
+        )
+          ?.replace(/\s+/g, " ")
+          .trim();
+
+        // 3) Click the flight-level Match Summary tab → every flight match.
+        await page.click(`#${FLIGHT_MATCH_SUMMARY}`);
+        await page
+          .waitForFunction(
+            `/Match ID/i.test(document.body ? document.body.innerText : "") && !!document.querySelector("#tblMatchSummarySearch, [id*='MatchSummarySearch']")`,
+            { timeout: 30000 }
+          )
+          .catch(() => undefined);
+        const body = await page.content();
+        return {
+          status: resp?.status() ?? 0,
+          body,
+          finalUrl: page.url(),
+          leagueLabel: leagueLabel || undefined,
+          flightLabel: flightLabel || undefined,
+        };
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
   async close(): Promise<void> {
     if (this.context) {
       await this.context.close();

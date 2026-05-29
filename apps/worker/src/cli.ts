@@ -61,7 +61,11 @@ import {
 } from "@tennis/calibrate";
 import { fitCalibration, glickoToNtrp } from "@tennis/ratings";
 import { loadPlayers } from "./loadPlayers.js";
-import { backfillScorecards } from "./backfillScorecards.js";
+import {
+  backfillScorecards,
+  backfillScorecardsFromDb,
+} from "./backfillScorecards.js";
+import { enumerateFlights, backfillFlightMatches } from "./enumerateFlights.js";
 import { normalizeMatches } from "./normalizeMatches.js";
 import { computeRatingsFromDb } from "./computeRatingsDb.js";
 import { accountReauth } from "./accountReauth.js";
@@ -1443,8 +1447,14 @@ function usage(): never {
                        (renders a flight's Match Summary (t=T-0 SPA) and writes {out}.matches.json: matchId + date + teams)
   tennis-scrape db load-players [--ratings-dir <dir>] [--years 2025,2026]
                        (loads crawl-norcal rating dumps into Postgres: players + player_year_ratings. players permanent, years additive)
+  tennis-scrape db enumerate-flights [--years 2025,2026] [--limit-players N] [--stop-after-barren N] [--min-delay MS] [--max-delay MS]
+                       (walks players (rating-search par1 → t=T-0 record) to DISCOVER every flight, scraping each new flight's Match Summary into flight_catalog + flight_matches; resumable + self-terminating on saturation. --years restricts to those season years (a record page lists all years a member played). Defaults: 500 players, stop after 150 barren. Set TENNIS_ACCOUNT for auto-login.)
+  tennis-scrape db backfill-flight-matches [--limit N] [--refresh] [--min-delay MS] [--max-delay MS]
+                       (retry/refresh the Match Summary scrape for catalogued flights with no matches yet; --refresh re-scrapes all)
+  tennis-scrape db backfill-scorecards-db [--year N] [--limit N] [--min-delay MS] [--max-delay MS]
+                       (DB-driven: fetches t=7 scorecards for unfetched flight_matches → raw_scorecards, marking them done. The wide-crawl path.)
   tennis-scrape db backfill-scorecards <matches.json> --year N [--limit N] [--min-delay MS] [--max-delay MS]
-                       (fetches each match's scorecard (t=7), parses, upserts into raw_scorecards staging — resumable, polite)
+                       (one-flight variant: fetches each match's scorecard (t=7), parses, upserts into raw_scorecards staging — resumable, polite)
   tennis-scrape db normalize-matches [--limit N]
                        (DB→DB: raw_scorecards → leagues/flights/subflights/teams/team_matches/court_matches with player resolution)
   tennis-scrape db compute-ratings [--min-matches N]
@@ -1563,6 +1573,124 @@ async function main() {
             matchesPath: positional[0]!,
             year: year!,
             limit,
+            minDelayMs,
+            maxDelayMs,
+          });
+          break;
+        }
+        if (sub === "enumerate-flights") {
+          // Walk players → discover flights → scrape each flight's Match
+          // Summary into flight_catalog + flight_matches. Resumable.
+          let limitPlayers = 500;
+          let stopAfterBarren = 150;
+          let minDelayMs = 3000;
+          let maxDelayMs = 5000;
+          let years: number[] = [];
+          let databaseUrl = process.env.DATABASE_URL;
+          for (let i = 0; i < rest.length; i++) {
+            const arg = rest[i]!;
+            const next = () => {
+              const n = rest[i + 1];
+              if (!n) usage();
+              i += 1;
+              return n!;
+            };
+            if (arg === "--limit-players") limitPlayers = Number(next());
+            else if (arg === "--stop-after-barren") stopAfterBarren = Number(next());
+            else if (arg === "--years") {
+              years = next()
+                .split(",")
+                .map((y) => Number(y.trim()))
+                .filter((y) => Number.isFinite(y));
+            } else if (arg === "--min-delay") minDelayMs = Number(next());
+            else if (arg === "--max-delay") maxDelayMs = Number(next());
+            else if (arg === "--database-url") databaseUrl = next();
+            else usage();
+          }
+          if (!databaseUrl) {
+            console.error("Missing DATABASE_URL (env or --database-url).");
+            process.exit(2);
+          }
+          await ensureAccountSession();
+          await enumerateFlights({
+            databaseUrl,
+            limitPlayers,
+            stopAfterBarren,
+            minDelayMs,
+            maxDelayMs,
+            years,
+          });
+          break;
+        }
+        if (sub === "backfill-flight-matches") {
+          // Retry/refresh Match Summary scrape for catalogued flights.
+          let limit = Number.POSITIVE_INFINITY;
+          let refresh = false;
+          let minDelayMs = 3000;
+          let maxDelayMs = 5000;
+          let databaseUrl = process.env.DATABASE_URL;
+          for (let i = 0; i < rest.length; i++) {
+            const arg = rest[i]!;
+            const next = () => {
+              const n = rest[i + 1];
+              if (!n) usage();
+              i += 1;
+              return n!;
+            };
+            if (arg === "--limit") limit = Number(next());
+            else if (arg === "--refresh") refresh = true;
+            else if (arg === "--min-delay") minDelayMs = Number(next());
+            else if (arg === "--max-delay") maxDelayMs = Number(next());
+            else if (arg === "--database-url") databaseUrl = next();
+            else usage();
+          }
+          if (!databaseUrl) {
+            console.error("Missing DATABASE_URL (env or --database-url).");
+            process.exit(2);
+          }
+          if (Number.isNaN(limit)) usage();
+          await ensureAccountSession();
+          await backfillFlightMatches({
+            databaseUrl,
+            limit,
+            refresh,
+            minDelayMs,
+            maxDelayMs,
+          });
+          break;
+        }
+        if (sub === "backfill-scorecards-db") {
+          // Fetch t=7 scorecards for unfetched flight_matches → raw_scorecards.
+          let limit = Number.POSITIVE_INFINITY;
+          let year: number | undefined;
+          let minDelayMs = 3000;
+          let maxDelayMs = 5000;
+          let databaseUrl = process.env.DATABASE_URL;
+          for (let i = 0; i < rest.length; i++) {
+            const arg = rest[i]!;
+            const next = () => {
+              const n = rest[i + 1];
+              if (!n) usage();
+              i += 1;
+              return n!;
+            };
+            if (arg === "--limit") limit = Number(next());
+            else if (arg === "--year") year = Number(next());
+            else if (arg === "--min-delay") minDelayMs = Number(next());
+            else if (arg === "--max-delay") maxDelayMs = Number(next());
+            else if (arg === "--database-url") databaseUrl = next();
+            else usage();
+          }
+          if (!databaseUrl) {
+            console.error("Missing DATABASE_URL (env or --database-url).");
+            process.exit(2);
+          }
+          if (Number.isNaN(limit)) usage();
+          await ensureAccountSession();
+          await backfillScorecardsFromDb({
+            databaseUrl,
+            limit,
+            year,
             minDelayMs,
             maxDelayMs,
           });
