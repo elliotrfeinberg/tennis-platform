@@ -1,0 +1,29 @@
+# MatchMetric — incremental crawl schedule (production).
+#
+# Install on the production host with:  crontab scripts/crontab.example
+# (edit the absolute paths + season year first).
+#
+# Requirements on the host:
+#   - node on PATH (or nvm installed), repo checked out, `pnpm install` run
+#   - DATABASE_URL + TENNIS_CONTACT_EMAIL set in <repo>/.env (or the crontab
+#     environment below); a logged-in bot account session at
+#     ~/.tennis-platform/sessions/<account>.json (the job auto-relogins via
+#     Playwright if expired, so the account's creds must be in accounts.json)
+#   - the season --year updated each new league year (2026 -> 2027 -> ...)
+#
+# Cron runs with a minimal PATH; set one so `node`/Playwright resolve. Adjust.
+PATH=/usr/local/bin:/usr/bin:/bin
+TENNIS_ACCOUNT=norcal
+
+# Daily delta (06:00): fetch only matches played since the last run (due +
+# unfetched), normalize, recompute ratings. Cheap — a few minutes most days.
+0 6 * * *  /srv/tennis-platform/scripts/incremental.sh --year 2026 >> /var/log/matchmetric/incremental.log 2>&1
+
+# Weekly refresh (Sun 05:00): re-scan active flights' Match Summaries to pick up
+# newly scheduled / rescheduled matches before the daily delta runs. ~30 min.
+0 5 * * 0  /srv/tennis-platform/scripts/incremental.sh --year 2026 --refresh-flights >> /var/log/matchmetric/incremental.log 2>&1
+
+# To parallelize a large (re)backfill across K bot accounts instead, run K
+# sharded one-offs (not via cron), e.g.:
+#   TENNIS_ACCOUNT=acct1 .../apps/worker dev db backfill-scorecards-db --year 2026 --shard 0/4
+#   TENNIS_ACCOUNT=acct2 ... --shard 1/4   (etc.)
