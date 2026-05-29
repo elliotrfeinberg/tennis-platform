@@ -1451,8 +1451,9 @@ function usage(): never {
                        (walks players (rating-search par1 → t=T-0 record) to DISCOVER every flight, scraping each new flight's Match Summary into flight_catalog + flight_matches; resumable + self-terminating on saturation. --years restricts to those season years (a record page lists all years a member played). Defaults: 500 players, stop after 150 barren. Set TENNIS_ACCOUNT for auto-login.)
   tennis-scrape db backfill-flight-matches [--limit N] [--refresh] [--min-delay MS] [--max-delay MS]
                        (retry/refresh the Match Summary scrape for catalogued flights with no matches yet; --refresh re-scrapes all)
-  tennis-scrape db backfill-scorecards-db [--year N] [--limit N] [--min-delay MS] [--max-delay MS]
+  tennis-scrape db backfill-scorecards-db [--year N] [--shard i/N] [--limit N] [--min-delay MS] [--max-delay MS]
                        (DB-driven: fetches t=7 scorecards for unfetched flight_matches → raw_scorecards, marking them done. The wide-crawl path.)
+                       (--shard i/N takes a disjoint hash slice — run K workers with different accounts (TENNIS_ACCOUNT=acctK ... --shard 0/4, 1/4, …) to cut wall time ~K×. Collision-free across shards.)
   tennis-scrape db backfill-scorecards <matches.json> --year N [--limit N] [--min-delay MS] [--max-delay MS]
                        (one-flight variant: fetches each match's scorecard (t=7), parses, upserts into raw_scorecards staging — resumable, polite)
   tennis-scrape db normalize-matches [--limit N]
@@ -1663,6 +1664,7 @@ async function main() {
           // Fetch t=7 scorecards for unfetched flight_matches → raw_scorecards.
           let limit = Number.POSITIVE_INFINITY;
           let year: number | undefined;
+          let shard: { index: number; total: number } | undefined;
           let minDelayMs = 3000;
           let maxDelayMs = 5000;
           let databaseUrl = process.env.DATABASE_URL;
@@ -1676,7 +1678,23 @@ async function main() {
             };
             if (arg === "--limit") limit = Number(next());
             else if (arg === "--year") year = Number(next());
-            else if (arg === "--min-delay") minDelayMs = Number(next());
+            else if (arg === "--shard") {
+              // "i/N": this worker handles matches where hash % N == i.
+              const [iStr, nStr] = next().split("/");
+              const index = Number(iStr);
+              const total = Number(nStr);
+              if (
+                !Number.isInteger(index) ||
+                !Number.isInteger(total) ||
+                total < 1 ||
+                index < 0 ||
+                index >= total
+              ) {
+                console.error("--shard must be i/N with 0 <= i < N (e.g. 0/4).");
+                process.exit(2);
+              }
+              shard = { index, total };
+            } else if (arg === "--min-delay") minDelayMs = Number(next());
             else if (arg === "--max-delay") maxDelayMs = Number(next());
             else if (arg === "--database-url") databaseUrl = next();
             else usage();
@@ -1691,6 +1709,7 @@ async function main() {
             databaseUrl,
             limit,
             year,
+            shard,
             minDelayMs,
             maxDelayMs,
           });

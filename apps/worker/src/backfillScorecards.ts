@@ -15,7 +15,7 @@ import {
   scorecardUrl,
   parseScorecard,
 } from "@tennis/scraper";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { parseUsDate } from "./ingestUtils.js";
 import { accountReauth } from "./accountReauth.js";
 
@@ -118,16 +118,22 @@ export async function backfillScorecardsFromDb(opts: {
   databaseUrl: string;
   limit: number;
   year?: number; // optional season filter
+  // Disjoint-slice sharding for running K accounts in parallel: each worker
+  // takes matches where hash(matchId) % total == index. Deterministic +
+  // collision-free across shards, so N polite workers cut wall time by ~N.
+  shard?: { index: number; total: number };
   minDelayMs: number;
   maxDelayMs: number;
 }): Promise<void> {
   const db = createClient(opts.databaseUrl);
-  const where = opts.year
-    ? and(
-        eq(flightMatches.scorecardFetched, false),
-        eq(flightMatches.year, opts.year)
-      )
-    : eq(flightMatches.scorecardFetched, false);
+  const conds = [eq(flightMatches.scorecardFetched, false)];
+  if (opts.year) conds.push(eq(flightMatches.year, opts.year));
+  if (opts.shard) {
+    conds.push(
+      sql`abs(hashtext(${flightMatches.ustaMatchId})) % ${opts.shard.total} = ${opts.shard.index}`
+    );
+  }
+  const where = and(...conds);
   const pending = await db
     .select({
       matchId: flightMatches.ustaMatchId,
@@ -142,7 +148,7 @@ export async function backfillScorecardsFromDb(opts: {
   console.error(
     `${pending.length} unfetched flight_matches${
       opts.year ? ` (year ${opts.year})` : ""
-    }.`
+    }${opts.shard ? ` (shard ${opts.shard.index}/${opts.shard.total})` : ""}.`
   );
 
   // Match ids already present in raw_scorecards: skip the fetch but still mark
