@@ -1,0 +1,134 @@
+/* MatchMetric — design tokens & primitives
+   Three moods share ONE layout. Each profile/screen root carries a theme
+   class (.mm-light / .mm-dark / .mm-court) that re-binds the CSS variables.
+   Type: Saira Condensed (scoreboard numerals + display), Archivo (UI/body),
+   IBM Plex Mono (tabular data). */
+
+:root {
+  --font-display: "Saira Condensed", "Arial Narrow", sans-serif;
+  --font-body: "Archivo", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+/* ---- COURT LIGHT (leading mood) -------------------------------------- */
+.mm-light {
+  --bg: #f1ede3;
+  --paper: #f7f4ec;
+  --card: #ffffff;
+  --ink: #18201b;
+  --ink-2: #45514a;
+  --muted: #7c857d;
+  --hair: #e4ded0;
+  --hair-2: #efeae0;
+
+  --court: #1f6f54;      /* primary hard-court green */
+  --court-deep: #16513d;
+  --hero-bg: #1f6f54;    /* graphic green header band */
+  --court-bright: #2c9670;
+  --court-tint: #e8f1ec;
+  --court-tint-2: #d6e8df;
+
+  --ball: #d7e84d;       /* optic-yellow accent, used sparingly */
+  --ball-ink: #5d6a0e;
+  --win: #1f6f54;
+  --loss: #c0593c;       /* clay terracotta */
+
+  --shadow: 0 1px 2px rgba(24,40,30,.05), 0 10px 30px rgba(24,40,30,.06);
+  color-scheme: light;
+}
+
+/* ---- SCOREBOARD DARK ------------------------------------------------- */
+.mm-dark {
+  --bg: #0d1411;
+  --paper: #101a15;
+  --card: #14201a;
+  --ink: #eef3ee;
+  --ink-2: #b3c0b8;
+  --muted: #7d8c82;
+  --hair: #23332b;
+  --hair-2: #1b2922;
+
+  --court: #36b083;
+  --court-deep: #1f6f54;
+  --hero-bg: #154e3a;    /* deep green band — white text stays legible on dark */
+  --court-bright: #57d3a3;
+  --court-tint: #16271f;
+  --court-tint-2: #1c3329;
+
+  --ball: #d7e84d;
+  --ball-ink: #d7e84d;
+  --win: #57d3a3;
+  --loss: #e07a59;
+
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 18px 44px rgba(0,0,0,.5);
+  color-scheme: dark;
+}
+
+/* ---- CENTER COURT (light, graphic, painted lines) -------------------- */
+.mm-court {
+  --bg: #ece6d8;
+  --paper: #f3eee2;
+  --card: #ffffff;
+  --ink: #16201a;
+  --ink-2: #44514a;
+  --muted: #79827a;
+  --hair: #e0d9c8;
+  --hair-2: #ebe5d6;
+
+  --court: #1f6f54;
+  --court-deep: #133f2f;
+  --hero-bg: #1f6f54;
+  --court-bright: #2c9670;
+  --court-tint: #e8f1ec;
+  --court-tint-2: #d3e6dc;
+
+  --ball: #d7e84d;
+  --ball-ink: #56640d;
+  --win: #1f6f54;
+  --loss: #c0593c;
+
+  --shadow: 0 1px 2px rgba(24,40,30,.05), 0 12px 34px rgba(20,50,36,.08);
+  color-scheme: light;
+}
+
+/* ---- primitives ------------------------------------------------------- */
+.mm {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  box-sizing: border-box;
+}
+.mm *, .mm *::before, .mm *::after { box-sizing: border-box; }
+.mm-mono { font-family: var(--font-mono); font-feature-settings: "tnum" 1; }
+.mm-disp {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 0.92;
+}
+.mm-num { font-family: var(--font-display); font-weight: 600; font-variant-numeric: tabular-nums; }
+.mm-kicker {
+  font-family: var(--font-body);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--muted);
+}
+.mm-card {
+  background: var(--card);
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+/* net / court-line motif used in graphic moods */
+.mm-net {
+  background-image:
+    repeating-linear-gradient(0deg, transparent 0 13px, rgba(255,255,255,.07) 13px 14px),
+    repeating-linear-gradient(90deg, transparent 0 13px, rgba(255,255,255,.07) 13px 14px);
+}
+
+/* scrollbars hidden inside artboards anyway; keep tidy */
+.mm ::-webkit-scrollbar { display: none; }
