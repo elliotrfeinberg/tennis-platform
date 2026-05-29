@@ -45,7 +45,16 @@ export interface PlayerRow {
   memberId: string | null;
   latestNtrp: number | null;
   perf: number | null; // computed display perf rating, null if unrated
+  matches: number; // rating-affecting + shadow matches (drives confidence)
   bands: PlayerYearBand[]; // ascending by year
+}
+
+// Confidence label from career match count (proxy for rating deviation until
+// we surface RD directly). Few matches ⇒ Low; established ⇒ High.
+export function confidenceFromMatches(n: number): "High" | "Med" | "Low" {
+  if (n >= 10) return "High";
+  if (n >= 4) return "Med";
+  return "Low";
 }
 
 export interface PlayerListResult {
@@ -53,6 +62,15 @@ export interface PlayerListResult {
   total: number;
   shown: number;
   bandCounts: { band: number; count: number }[];
+}
+
+// Count of players that have a computed perf rating (the rated universe).
+export async function perfRatedCount(): Promise<number> {
+  const d = db();
+  const r = await d
+    .select({ n: sql<number>`count(*)::int` })
+    .from(playerPerfRatings);
+  return r[0]?.n ?? 0;
 }
 
 export async function listPlayers(opts: {
@@ -90,6 +108,9 @@ export async function listPlayers(opts: {
       memberId: players.ustaMemberId,
       latestNtrp: players.publishedNtrp,
       perf: playerPerfRatings.display,
+      adultMatches: playerPerfRatings.adultMatches,
+      mixedMatches: playerPerfRatings.mixedMatches,
+      otherMatches: playerPerfRatings.otherMatches,
     })
     .from(players)
     .leftJoin(playerPerfRatings, eq(playerPerfRatings.playerId, players.id))
@@ -121,8 +142,9 @@ export async function listPlayers(opts: {
     });
     bandsByPlayer.set(r.playerId, arr);
   }
-  const rows: PlayerRow[] = ps.map((p) => ({
+  const rows: PlayerRow[] = ps.map(({ adultMatches, mixedMatches, otherMatches, ...p }) => ({
     ...p,
+    matches: (adultMatches ?? 0) + (mixedMatches ?? 0) + (otherMatches ?? 0),
     bands: (bandsByPlayer.get(p.id) ?? []).sort((a, b) => a.year - b.year),
   }));
 
@@ -341,6 +363,8 @@ export async function findPlayer(id: string): Promise<PlayerDetail | null> {
   return {
     ...p,
     perf: pr?.display ?? null,
+    matches:
+      (pr?.adultMatches ?? 0) + (pr?.mixedMatches ?? 0) + (pr?.otherMatches ?? 0),
     bands: yearRows,
     perfFull: pr ?? null,
     matchLog,
