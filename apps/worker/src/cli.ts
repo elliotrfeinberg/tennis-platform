@@ -34,6 +34,7 @@ import {
   listAccounts,
   initAccountsTemplate,
   loginAndCaptureSession,
+  ensureSession,
   parsePlayerProfile,
   parsePlayerSearch,
   parseRatingSearch,
@@ -232,6 +233,32 @@ async function sessionLogin(account: string, headed: boolean) {
   console.error(
     `Run workflows for this account with TENNIS_ACCOUNT=${account}.`
   );
+}
+
+// Probe the account's session; re-login automatically if missing/expired.
+async function sessionEnsure(account: string, headed: boolean, force: boolean) {
+  const { refreshed } = await ensureSession({
+    account,
+    headless: !headed,
+    forceRefresh: force,
+  });
+  console.error(
+    refreshed
+      ? `✓ Session for "${account}" was refreshed via login.`
+      : `✓ Session for "${account}" is still valid.`
+  );
+}
+
+// Used by long-running crawl commands: when TENNIS_ACCOUNT is set, make sure
+// its session is fresh before starting (so a soon-to-expire cookie renews up
+// front). No-op when no account is configured.
+async function ensureAccountSession(): Promise<void> {
+  const account = process.env.TENNIS_ACCOUNT;
+  if (!account) return;
+  const { refreshed } = await ensureSession({ account, headless: true });
+  if (refreshed) {
+    console.error(`(auto-login: refreshed session for "${account}")`);
+  }
 }
 
 async function sessionAccountsInit() {
@@ -1388,6 +1415,8 @@ function usage(): never {
   tennis-scrape session list                             (list configured bot accounts)
   tennis-scrape session login <account> [--headed]       (Auth0 auto-login → sessions/{account}.json; --headed to solve CAPTCHA/2FA by hand)
                        (then run any command with TENNIS_ACCOUNT=<account> to use that session)
+  tennis-scrape session ensure <account> [--headed] [--force]  (probe the session; auto-login only if missing/expired, or --force)
+                       (long crawls auto-run this at start when TENNIS_ACCOUNT is set)
   tennis-scrape crawl team <par1> <year> [--out <dir>]   (default --out: ./captures)
   tennis-scrape crawl subflight <par1> <year> [--out <dir>] [--include-players]
   tennis-scrape crawl norcal [--years 2025,2026] [--out <dir>] [--section LABEL] [--district LABEL]
@@ -1514,6 +1543,7 @@ async function main() {
             console.error("Missing DATABASE_URL (env or --database-url).");
             process.exit(2);
           }
+          await ensureAccountSession();
           console.error(
             `Backfilling scorecards from ${positional[0]} (year ${year}, limit ${limit})`
           );
@@ -1593,6 +1623,12 @@ async function main() {
           const headed = rest.includes("--headed");
           if (!account) usage();
           await sessionLogin(account!, headed);
+        } else if (sub === "ensure") {
+          const account = rest.find((a) => !a.startsWith("--"));
+          const headed = rest.includes("--headed");
+          const force = rest.includes("--force");
+          if (!account) usage();
+          await sessionEnsure(account!, headed, force);
         } else usage();
         break;
       case "search": {
@@ -1764,6 +1800,7 @@ async function main() {
             else usage();
           }
           if (years.length === 0) usage();
+          await ensureAccountSession();
           await ratingsCrawlCmd({
             years,
             rootDir: outDir,

@@ -31,6 +31,12 @@ export {
 } from "./login.js";
 
 export {
+  ensureSession,
+  sessionIsValid,
+  type EnsureSessionResult,
+} from "./ensureSession.js";
+
+export {
   extractAspNetState,
   buildPostbackBody,
   type AspNetState,
