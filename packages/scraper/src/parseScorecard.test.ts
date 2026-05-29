@@ -13,6 +13,13 @@ const RETIRED_FIXTURE = readFileSync(
   join(here, "__fixtures__", "scorecard-retired.html"),
   "utf8"
 );
+// A 9-column scorecard variant (adds per-side set-win-count cells, which
+// shifts the visitor/score/mark columns). Regression guard for the
+// content/anchor-based cell detection.
+const NINE_COL_FIXTURE = readFileSync(
+  join(here, "__fixtures__", "scorecard-9col.html"),
+  "utf8"
+);
 
 // This fixture is a 2S+3D Adult 18+ Women's 3.5 match. Other league
 // formats (Combo 3D, Tri-Level 1S+2D, Mixed 5D) would have different
@@ -163,5 +170,55 @@ describe("parseScorecard (4/12/2026 fixture with court 4 retirement)", () => {
       expect(c.retired).toBeUndefined();
       expect(c.defaulted).toBeUndefined();
     }
+  });
+});
+
+describe("parseScorecard (9-column layout variant)", () => {
+  const parsed = parseScorecard(NINE_COL_FIXTURE);
+
+  it("reads the header", () => {
+    expect(parsed.header.homeTeamName).toBe(
+      "WALNUT CREEK RC/Walnut Creek TC 40AW3.5C"
+    );
+    expect(parsed.header.visitorTeamName).toBe("MORAGA CC 40AW3.5A");
+    expect(parsed.header.league).toBe("2026 ADULT 40&Over");
+    expect(parsed.header.datePlayed).toContain("3/1/2026");
+  });
+
+  it("parses the 1S+3D courts", () => {
+    expect(parsed.courts.filter((c) => c.kind === "S")).toHaveLength(1);
+    expect(parsed.courts.filter((c) => c.kind === "D")).toHaveLength(3);
+  });
+
+  // The whole point of the fix: the shifted score column must still yield
+  // set scores and a winner for every played court (this layout previously
+  // returned empty sets / undefined homeWon).
+  it("extracts sets and a winner for every court", () => {
+    for (const c of parsed.courts) {
+      expect(c.sets.length).toBeGreaterThan(0);
+      expect(typeof c.homeWon).toBe("boolean");
+    }
+  });
+
+  it("orients D1 (visitor won) home-vs-visitor", () => {
+    const d1 = parsed.courts.find((c) => c.kind === "D" && c.line === 1)!;
+    expect(d1.homePlayers).toEqual(["Erin Brindley", "Brigitte Shaw"]);
+    expect(d1.visitorPlayers).toEqual(["Grace Kan", "Vy Spoto"]);
+    expect(d1.homeWon).toBe(false);
+    expect(d1.sets).toEqual([
+      { home: 6, visitor: 3 },
+      { home: 4, visitor: 6 },
+      { home: 0, visitor: 1 },
+    ]);
+  });
+
+  it("orients S1 (home won) home-vs-visitor", () => {
+    const s1 = parsed.courts.find((c) => c.kind === "S" && c.line === 1)!;
+    expect(s1.homePlayers).toEqual(["Melissa Bach"]);
+    expect(s1.homeWon).toBe(true);
+    expect(s1.sets).toEqual([
+      { home: 6, visitor: 4 },
+      { home: 6, visitor: 4 },
+    ]);
   });
 });
