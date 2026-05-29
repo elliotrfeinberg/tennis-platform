@@ -28,6 +28,12 @@ import {
   harvestPlayerPar1s,
   initSessionTemplate,
   loadSession,
+  writeSession,
+  sessionPathForAccount,
+  loadAccount,
+  listAccounts,
+  initAccountsTemplate,
+  loginAndCaptureSession,
   parsePlayerProfile,
   parsePlayerSearch,
   parseRatingSearch,
@@ -195,6 +201,61 @@ async function robots(host: string) {
     console.log(result.body);
   } else {
     console.error(`Status ${result.status}, no body.`);
+  }
+}
+
+// Automated login for a stored bot account: drive Auth0, capture cookies,
+// write sessions/{account}.json. Use --headed to solve a CAPTCHA/2FA by hand.
+async function sessionLogin(account: string, headed: boolean) {
+  const creds = await loadAccount(account);
+  const contactEmail = creds.contactEmail ?? ENV_CONTACT;
+  if (!contactEmail) {
+    console.error(
+      "No contactEmail for this account and TENNIS_CONTACT_EMAIL is unset."
+    );
+    process.exit(2);
+  }
+  console.error(
+    `Logging in account "${account}" as ${creds.username} (headless=${!headed})…`
+  );
+  const session = await loginAndCaptureSession({
+    username: creds.username,
+    password: creds.password,
+    contactEmail,
+    headless: !headed,
+  });
+  const path = sessionPathForAccount(account);
+  await writeSession(session, path);
+  console.error(
+    `✓ Logged in. Wrote ${path} (${session.cookieHeader.length} cookie bytes).`
+  );
+  console.error(
+    `Run workflows for this account with TENNIS_ACCOUNT=${account}.`
+  );
+}
+
+async function sessionAccountsInit() {
+  const { path, created } = await initAccountsTemplate();
+  if (created) {
+    console.error(`Wrote accounts template to ${path} (mode 0600).`);
+    console.error(
+      "Fill in each account's username/password, then run\n" +
+        "  tennis-scrape session login <account>"
+    );
+  } else {
+    console.error(`Accounts file already exists at ${path}; not overwritten.`);
+  }
+}
+
+async function sessionList() {
+  const accounts = await listAccounts();
+  if (accounts.length === 0) {
+    console.error("No accounts. Run 'tennis-scrape session accounts-init'.");
+    return;
+  }
+  console.error("Accounts:");
+  for (const a of accounts) {
+    console.error(`  ${a}  → session ${sessionPathForAccount(a)}`);
   }
 }
 
@@ -1323,6 +1384,10 @@ function usage(): never {
   tennis-scrape robots <host>
   tennis-scrape session init
   tennis-scrape session check [probe-url]
+  tennis-scrape session accounts-init                    (write ~/.tennis-platform/accounts.json template, mode 0600)
+  tennis-scrape session list                             (list configured bot accounts)
+  tennis-scrape session login <account> [--headed]       (Auth0 auto-login → sessions/{account}.json; --headed to solve CAPTCHA/2FA by hand)
+                       (then run any command with TENNIS_ACCOUNT=<account> to use that session)
   tennis-scrape crawl team <par1> <year> [--out <dir>]   (default --out: ./captures)
   tennis-scrape crawl subflight <par1> <year> [--out <dir>] [--include-players]
   tennis-scrape crawl norcal [--years 2025,2026] [--out <dir>] [--section LABEL] [--district LABEL]
@@ -1521,7 +1586,14 @@ async function main() {
       case "session":
         if (sub === "init") await sessionInit();
         else if (sub === "check") await sessionCheck(rest[0]);
-        else usage();
+        else if (sub === "accounts-init") await sessionAccountsInit();
+        else if (sub === "list") await sessionList();
+        else if (sub === "login") {
+          const account = rest.find((a) => !a.startsWith("--"));
+          const headed = rest.includes("--headed");
+          if (!account) usage();
+          await sessionLogin(account!, headed);
+        } else usage();
         break;
       case "search": {
         if (sub !== "teams") usage();

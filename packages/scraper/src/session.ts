@@ -58,10 +58,36 @@ export class SessionMissingError extends Error {
   }
 }
 
+// Per-account session file, e.g. ~/.tennis-platform/sessions/norcal.json.
+// Each section/district runs under its own account + session so workflows
+// can run in parallel without sharing (or burning) one login.
+export function sessionPathForAccount(account: string): string {
+  return join(homedir(), ".tennis-platform", "sessions", `${account}.json`);
+}
+
+// Resolution precedence:
+//   1. TENNIS_SESSION_FILE (explicit path override)
+//   2. TENNIS_ACCOUNT      (→ sessions/{account}.json)
+//   3. the legacy single-session path
+// This makes every command account-aware just by setting TENNIS_ACCOUNT.
 export function defaultSessionPath(): string {
   const envPath = process.env.TENNIS_SESSION_FILE;
   if (envPath) return envPath;
+  const account = process.env.TENNIS_ACCOUNT;
+  if (account) return sessionPathForAccount(account);
   return join(homedir(), ".tennis-platform", "usta-session.json");
+}
+
+// Persist a session file (mode 0600 — it holds auth cookies).
+export async function writeSession(
+  session: UstaSession,
+  path: string = defaultSessionPath()
+): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, JSON.stringify(session, null, 2) + "\n", {
+    encoding: "utf8",
+    mode: 0o600,
+  });
 }
 
 export async function loadSession(

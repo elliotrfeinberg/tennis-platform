@@ -9,11 +9,26 @@ export {
   loadSession,
   initSessionTemplate,
   defaultSessionPath,
+  sessionPathForAccount,
+  writeSession,
   isLoginRedirect,
   LoginRequiredError,
   SessionMissingError,
   type UstaSession,
 } from "./session.js";
+
+export {
+  loadAccount,
+  listAccounts,
+  initAccountsTemplate,
+  accountsPath,
+  type AccountCredentials,
+} from "./accounts.js";
+
+export {
+  loginAndCaptureSession,
+  type LoginOptions,
+} from "./login.js";
 
 export {
   extractAspNetState,
