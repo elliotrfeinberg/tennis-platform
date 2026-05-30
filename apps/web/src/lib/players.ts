@@ -15,7 +15,7 @@ import {
   teamMatches,
   teams,
 } from "@tennis/db";
-import { and, asc, eq, ilike, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 const SECTION = "USTA/NO. CALIFORNIA";
 const UUID_RE =
@@ -84,7 +84,20 @@ export async function listPlayers(opts: {
   const q = (opts.q ?? "").trim();
 
   const conds = [eq(players.sectionCode, SECTION)];
-  if (q) conds.push(ilike(players.displayName, `%${q}%`));
+  if (q) {
+    // Tokenize on whitespace and require EACH token to prefix-match a word in
+    // the name (start of string, or after a space). So "Ben F" matches
+    // "Benjamin Feinberg" by first-name + last-name initial — not just a
+    // contiguous substring of the full name. Wildcards in the input are
+    // escaped so they're treated literally.
+    const esc = (s: string) => s.replace(/[\\%_]/g, (m) => `\\${m}`);
+    for (const tok of q.split(/\s+/).filter(Boolean)) {
+      const t = esc(tok);
+      conds.push(
+        sql`(${players.displayName} ILIKE ${t + "%"} OR ${players.displayName} ILIKE ${"% " + t + "%"})`
+      );
+    }
+  }
   if (opts.band) conds.push(eq(players.publishedNtrp, Number(opts.band)));
   const where = and(...conds);
 
