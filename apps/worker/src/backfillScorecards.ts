@@ -138,7 +138,7 @@ export async function backfillScorecardsFromDb(opts: {
     );
   }
   const where = and(...conds);
-  const pending = await db
+  const baseQuery = db
     .select({
       matchId: flightMatches.ustaMatchId,
       year: flightMatches.year,
@@ -147,8 +147,11 @@ export async function backfillScorecardsFromDb(opts: {
       visitorTeam: flightMatches.visitorTeam,
     })
     .from(flightMatches)
-    .where(where)
-    .limit(opts.limit);
+    .where(where);
+  // Only apply a SQL LIMIT for a finite cap — Postgres rejects "LIMIT Infinity".
+  const pending = await (Number.isFinite(opts.limit)
+    ? baseQuery.limit(opts.limit)
+    : baseQuery);
   console.error(
     `${pending.length} unfetched flight_matches${
       opts.year ? ` (year ${opts.year})` : ""
