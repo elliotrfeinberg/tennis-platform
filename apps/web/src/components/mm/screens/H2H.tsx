@@ -14,6 +14,7 @@ function Picker({ self, other, side, align }: { self: H2HPlayer; other: H2HPlaye
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Array<{ id: string; name: string; perf: number | null; band: number | null }>>([]);
+  const [active, setActive] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,6 +33,7 @@ function Picker({ self, other, side, align }: { self: H2HPlayer; other: H2HPlaye
         const r = await fetch(`/api/players/search?q=${encodeURIComponent(term)}`, { signal: ctrl.signal });
         const j = await r.json();
         setResults((j.results ?? []).filter((x: { id: string }) => x.id !== other.id));
+        setActive(0); // reset highlight to the top result on each new query
       } catch { /* ignore */ }
     }, 180);
     return () => { clearTimeout(t); ctrl.abort(); };
@@ -46,7 +48,7 @@ function Picker({ self, other, side, align }: { self: H2HPlayer; other: H2HPlaye
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button onClick={() => setOpen((o) => !o)}
+      <button onClick={() => setOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={open}
         style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 11, border: "1px solid var(--hair)", background: "var(--card)", cursor: "pointer", fontFamily: "var(--font-body)", minWidth: 230, flexDirection: align === "right" ? "row-reverse" : "row" }}>
         <Avatar name={self.name} hi />
         <div style={{ flex: 1, textAlign: align === "right" ? "right" : "left" }}>
@@ -58,15 +60,26 @@ function Picker({ self, other, side, align }: { self: H2HPlayer; other: H2HPlaye
       {open && (
         <div style={{ position: "absolute", top: "100%", marginTop: 6, [align === "right" ? "right" : "left"]: 0, zIndex: 20, background: "var(--card)", border: "1px solid var(--hair)", borderRadius: 12, boxShadow: "var(--shadow)", padding: 8, minWidth: 280 }}>
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search players…"
+            role="combobox" aria-expanded={results.length > 0} aria-controls={`h2h-listbox-${side}`} aria-autocomplete="list"
+            aria-activedescendant={results.length > 0 ? `h2h-opt-${side}-${active}` : undefined}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") { e.preventDefault(); setOpen(false); return; }
+              if (results.length === 0) return;
+              if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => Math.min(a + 1, results.length - 1)); }
+              else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
+              else if (e.key === "Enter") { e.preventDefault(); const x = results[active]; if (x) pick(x.id); }
+            }}
             style={{ width: "100%", padding: "9px 11px", border: "1px solid var(--hair)", borderRadius: 8, background: "var(--paper)", fontSize: 13.5, color: "var(--ink)", fontFamily: "var(--font-body)", outline: "none", marginBottom: 6 }} />
-          {results.map((x) => (
-            <button key={x.id} onClick={() => pick(x.id)}
-              style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "8px 8px", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", fontFamily: "var(--font-body)", textAlign: "left" }}>
-              <Avatar name={x.name} />
-              <span style={{ flex: 1, fontWeight: 600, fontSize: 13.5, color: "var(--ink)" }}>{x.name}</span>
-              <span className="mm-num" style={{ fontSize: 16, color: "var(--court)" }}>{x.perf != null ? x.perf.toFixed(2) : "—"}</span>
-            </button>
-          ))}
+          <div role="listbox" id={`h2h-listbox-${side}`} aria-label="Player results">
+            {results.map((x, i) => (
+              <button key={x.id} id={`h2h-opt-${side}-${i}`} role="option" aria-selected={i === active} onClick={() => pick(x.id)} onMouseEnter={() => setActive(i)}
+                style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "8px 8px", borderRadius: 8, border: "none", background: i === active ? "var(--court-tint)" : "transparent", cursor: "pointer", fontFamily: "var(--font-body)", textAlign: "left" }}>
+                <Avatar name={x.name} />
+                <span style={{ flex: 1, fontWeight: 600, fontSize: 13.5, color: "var(--ink)" }}>{x.name}</span>
+                <span className="mm-num" style={{ fontSize: 16, color: "var(--court)" }}>{x.perf != null ? x.perf.toFixed(2) : "—"}</span>
+              </button>
+            ))}
+          </div>
           {q.trim() && results.length === 0 && <div style={{ padding: "10px", color: "var(--muted)", fontSize: 13 }}>No matches.</div>}
         </div>
       )}
