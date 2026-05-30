@@ -30,6 +30,7 @@
 
   --ball: #d7e84d;       /* optic-yellow accent, used sparingly */
   --ball-ink: #5d6a0e;
+  --cat-mixed: #a86a00;  /* mixed-category accent — amber, distinct from court green */
   --win: #1f6f54;
   --loss: #c0593c;       /* clay terracotta */
 
@@ -57,6 +58,7 @@
 
   --ball: #d7e84d;
   --ball-ink: #d7e84d;
+  --cat-mixed: #d7e84d;  /* mixed-category accent — bright optic-yellow reads on dark */
   --win: #57d3a3;
   --loss: #e07a59;
 
@@ -84,6 +86,7 @@
 
   --ball: #d7e84d;
   --ball-ink: #56640d;
+  --cat-mixed: #a86a00;  /* mixed-category accent — amber, distinct from court green */
   --win: #1f6f54;
   --loss: #c0593c;
 

@@ -61,7 +61,7 @@ export default async function Page({
   );
   const series: ChartSeries[] = [
     { key: "adult", label: "Adult", color: "var(--court)", points: rated.filter((m) => m.category !== "mixed").map(mkPoint) },
-    { key: "mixed", label: "Mixed", color: "var(--ball)", points: rated.filter((m) => m.category === "mixed").map(mkPoint) },
+    { key: "mixed", label: "Mixed", color: "var(--cat-mixed)", points: rated.filter((m) => m.category === "mixed").map(mkPoint) },
   ].filter((s) => s.points.length > 0);
 
   // Record (courts won) across the full match log.

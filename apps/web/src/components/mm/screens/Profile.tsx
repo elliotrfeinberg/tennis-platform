@@ -39,7 +39,7 @@ function demoData(): ProfileData {
       const rated = DEMO.log.filter((m) => m.post != null);
       return [
         { key: "adult", label: "Adult", color: "var(--court)", points: rated.filter((m) => m.cat !== "mixed").map(mk) },
-        { key: "mixed", label: "Mixed", color: "var(--ball)", points: rated.filter((m) => m.cat === "mixed").map(mk) },
+        { key: "mixed", label: "Mixed", color: "var(--cat-mixed)", points: rated.filter((m) => m.cat === "mixed").map(mk) },
       ].filter((s) => s.points.length > 0);
     })(),
     log: DEMO.log.map((m) => ({ date: m.date, cat: m.cat, kind: m.kind, line: m.line, opp: m.opp, oppTeam: m.oppTeam, partner: m.partner, won: m.won, sets: m.sets, perf: m.perf, post: m.post })),
@@ -193,7 +193,7 @@ function MatchLog({ d }: { d: ProfileData }) {
               <tr key={k} style={{ borderTop: "1px solid var(--hair-2)" }}>
                 <td className="mm-mono" style={{ ...cell, color: "var(--ink-2)", whiteSpace: "nowrap" }}>{fmtDate(m.date)}</td>
                 <td style={cell}>
-                  <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: m.cat === "mixed" ? "color-mix(in oklab, var(--ball) 32%, var(--card))" : "var(--court-tint)", color: m.cat === "mixed" ? "var(--ball-ink)" : "var(--court)" }}>{m.cat === "mixed" ? "MX" : "AD"}</span>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: m.cat === "mixed" ? "color-mix(in oklab, var(--cat-mixed) 16%, var(--card))" : "var(--court-tint)", color: m.cat === "mixed" ? "var(--cat-mixed)" : "var(--court)" }}>{m.cat === "mixed" ? "MX" : "AD"}</span>
                 </td>
                 <td className="mm-mono" style={{ ...cell, fontWeight: 600 }}>{m.kind}{m.line}</td>
                 <td style={cell}>
@@ -215,7 +215,7 @@ function MatchLog({ d }: { d: ProfileData }) {
                   <span style={{ color: "var(--ink-2)" }}>{score(m.sets)}</span>
                 </td>
                 <td className="mm-mono" style={{ ...cell, textAlign: "right", color: "var(--ink-2)" }}>{m.perf.toFixed(2)}</td>
-                <td className="mm-num" style={{ ...cell, textAlign: "right", fontSize: 15, color: m.cat === "mixed" ? "var(--ball-ink)" : "var(--court)" }}>{m.post != null ? m.post.toFixed(2) : "—"}</td>
+                <td className="mm-num" style={{ ...cell, textAlign: "right", fontSize: 15, color: m.cat === "mixed" ? "var(--cat-mixed)" : "var(--court)" }}>{m.post != null ? m.post.toFixed(2) : "—"}</td>
               </tr>
             ))}
           </tbody>
