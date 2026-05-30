@@ -101,7 +101,22 @@ tennisrecord has **no** match predictor, appeal calculator, or what-if tools
 - **Data:** perf ratings + the `optimizer` package.
 - **Build:** "set this lineup vs that opponent ⇒ court-by-court win odds +
   expected team result"; optimal-lineup suggestions for captains.
+- **Status:** Done (Captain workspace) — the optimizer is now **NTRP-native**:
+  court win % is a logistic on the rating difference
+  `P = 1/(1 + 10^(−Δ/SCALE))` (default `SCALE = 1.0`: equal → 50%, +0.5 → ~75%).
 - **Effort:** High (but high differentiation).
+
+### 8a. Empirically calibrate the win-probability scale
+The optimizer's `SCALE` (and the doubles stacking penalty) are currently set to
+sensible defaults, not fit to data.
+- **Data:** `perf_match_results` — each player carries their **pre-match**
+  rating per court, plus the court outcome. For singles courts, regress
+  `won` on `Δ = ownPre − oppPre`; for doubles use the team-average `Δ`.
+- **Build:** fit `SCALE` (and the stacking penalty) by logistic regression /
+  max-likelihood over the observed court outcomes; report fit quality
+  (Brier score / calibration curve). Thread the fitted `SCALE` into
+  `optimizeLineup({ scale })`. Re-fit as the backfill grows the sample.
+- **Effort:** Medium. Needs a decent match sample first (waiting on backfill).
 
 ### 9. Appeal / what-if rating calculator
 - "What would my rating be if X match were excluded / if I'd won?" — leverages

@@ -1,22 +1,40 @@
 "use client";
-// Standings — Center Court (demo data).
+// Standings — Center Court. Prop-driven from real flight/team data, with a
+// flight picker (GET ?flight=).
 import Link from "next/link";
 import { PageHero, Avatar, Chip } from "@/components/mm/ui";
-import * as MM from "@/lib/demo";
+import type { FlightRef, StandingRow } from "@/lib/teams";
 
-export function Standings() {
-  const maxDiff = Math.max(...MM.standings.map((s) => Math.abs(s.cw - s.cl)));
-  const right = (
+export interface StandingsView {
+  flight: FlightRef | null;
+  flights: FlightRef[];
+  selectedId: string;
+  rows: StandingRow[];
+}
+
+export function Standings({ view }: { view: StandingsView }) {
+  const v = view;
+  const maxDiff = Math.max(1, ...v.rows.map((s) => Math.abs(s.cw - s.cl)));
+  const right = v.flight && (
     <div>
-      <div style={{ fontSize: 12.5, color: "rgba(255,255,255,.8)", fontWeight: 600 }}>Summer 2025</div>
-      <div style={{ fontSize: 16, color: "#fff", fontWeight: 700, marginTop: 2 }}>8 teams · 7 weeks</div>
+      <div style={{ fontSize: 12.5, color: "rgba(255,255,255,.8)", fontWeight: 600 }}>{v.flight.year}</div>
+      <div style={{ fontSize: 16, color: "#fff", fontWeight: 700, marginTop: 2 }}>{v.flight.teams} teams · {v.flight.matches} matches</div>
     </div>
   );
   const head = ["#", "Team", "W", "L", "Courts W", "Courts L", "Court diff"];
   return (
     <div style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
-      <PageHero kicker="Adult 40 & Over · 4.0 Men" title="Standings" right={right}
-        sub="USTA NorCal · regular-season league table, ranked by team wins then court differential." />
+      <PageHero kicker={v.flight ? v.flight.league : "USTA NorCal"} title="Standings" right={right}
+        sub={v.flight ? `${v.flight.name} · ranked by team wins then court differential.` : "No ingested flights yet."} />
+      <form action="/teams" className="mm-card" style={{ padding: 14, display: "flex", alignItems: "center", gap: 12 }}>
+        <span className="mm-kicker">Flight</span>
+        <select name="flight" defaultValue={v.selectedId} style={{ flex: 1, maxWidth: 560, padding: "10px 12px", border: "1px solid var(--hair)", borderRadius: 9, background: "var(--paper)", fontSize: 14, fontWeight: 600, color: "var(--ink)", fontFamily: "var(--font-body)" }}>
+          {v.flights.map((f) => (
+            <option key={f.id} value={f.id}>{f.league} · {f.name} ({f.matches})</option>
+          ))}
+        </select>
+        <button type="submit" style={{ padding: "10px 18px", border: "none", borderRadius: 9, background: "var(--court)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>View</button>
+      </form>
       <div className="mm-card" style={{ overflow: "hidden" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
@@ -27,15 +45,17 @@ export function Standings() {
             </tr>
           </thead>
           <tbody>
-            {MM.standings.map((s, i) => {
+            {v.rows.length === 0 ? (
+              <tr><td colSpan={7} style={{ padding: "30px", textAlign: "center", color: "var(--muted)" }}>No standings for this flight yet.</td></tr>
+            ) : v.rows.map((s, i) => {
               const diff = s.cw - s.cl;
               return (
-                <tr key={i} style={{ borderTop: "1px solid var(--hair-2)", background: s.me ? "var(--court-tint)" : "transparent" }}>
+                <tr key={s.id} style={{ borderTop: "1px solid var(--hair-2)" }}>
                   <td className="mm-num" style={{ padding: "13px 18px", textAlign: "center", fontSize: 18, color: i < 4 ? "var(--court)" : "var(--ink-2)" }}>{i + 1}</td>
                   <td style={{ padding: "13px 18px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                      <Avatar name={s.team} hi={s.me} />
-                      <Link href="/teams/demo" style={{ fontWeight: 700, fontSize: 14.5, color: s.me ? "var(--court)" : "var(--ink)", textDecoration: "none" }}>{s.team}</Link>
+                      <Avatar name={s.name} />
+                      <Link href={`/teams/${s.id}` as never} style={{ fontWeight: 700, fontSize: 14.5, color: "var(--ink)", textDecoration: "none" }}>{s.name}</Link>
                       {i === 0 && <Chip tone="ball">1st</Chip>}
                     </div>
                   </td>
@@ -58,7 +78,7 @@ export function Standings() {
           </tbody>
         </table>
       </div>
-      <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Court differential breaks ties on equal team-match records.</div>
+      <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Court differential breaks ties on equal team-match records. Sub-flight grouping is approximate until area splits are ingested.</div>
     </div>
   );
 }

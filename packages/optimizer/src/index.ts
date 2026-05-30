@@ -7,6 +7,9 @@ export {
 } from "./format.js";
 
 export {
+  DEFAULT_NTRP_SCALE,
+  ntrpWinProb,
+  teamNtrp,
   doublesWinProb,
   singlesWinProb,
   type Doubles,

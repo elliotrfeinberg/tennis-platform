@@ -20,10 +20,11 @@
 // For larger rosters or unusual formats we fall back to a greedy heuristic
 // (assign weakest court first, etc).
 
-import { winProbability, type Rating } from "@tennis/ratings";
 import type { CourtSlot, MatchFormat } from "./format.js";
 import {
+  DEFAULT_NTRP_SCALE,
   doublesWinProb,
+  ntrpWinProb,
   singlesWinProb,
   type Doubles,
 } from "./winprob.js";
@@ -31,7 +32,7 @@ import {
 export interface RosterPlayer {
   id: string;
   name: string;
-  rating: Rating;
+  rating: number; // NTRP perf rating
   available: boolean;
 }
 
@@ -41,8 +42,8 @@ export interface OpponentLineup {
 }
 
 export type OpponentCourt =
-  | { kind: "S"; player: Rating }
-  | { kind: "D"; a: Rating; b: Rating };
+  | { kind: "S"; player: number }
+  | { kind: "D"; a: number; b: number };
 
 export interface CourtAssignment {
   slot: CourtSlot;
@@ -59,15 +60,16 @@ export interface Lineup {
 function courtWinProb(
   slot: CourtSlot,
   ours: RosterPlayer[],
-  theirs: OpponentCourt
+  theirs: OpponentCourt,
+  scale = DEFAULT_NTRP_SCALE
 ): number {
   if (slot.kind === "S" && theirs.kind === "S" && ours.length === 1) {
-    return singlesWinProb(ours[0]!.rating, theirs.player);
+    return singlesWinProb(ours[0]!.rating, theirs.player, scale);
   }
   if (slot.kind === "D" && theirs.kind === "D" && ours.length === 2) {
     const us: Doubles = { a: ours[0]!.rating, b: ours[1]!.rating };
     const them: Doubles = { a: theirs.a, b: theirs.b };
-    return doublesWinProb(us, them);
+    return doublesWinProb(us, them, scale);
   }
   throw new Error(
     `Court/lineup kind mismatch: slot=${slot.kind} ours=${ours.length} theirs=${theirs.kind}`
@@ -106,7 +108,8 @@ export function teamWinProbability(courtProbs: readonly number[]): number {
 function* enumerateLineups(
   available: RosterPlayer[],
   format: MatchFormat,
-  opponent: OpponentLineup
+  opponent: OpponentLineup,
+  scale = DEFAULT_NTRP_SCALE
 ): Generator<Lineup> {
   if (opponent.courts.length !== format.courts.length) {
     throw new Error(
@@ -135,7 +138,7 @@ function* enumerateLineups(
         if (used[i]) continue;
         used[i] = true;
         const us = [available[i]!];
-        const winProb = courtWinProb(slot, us, opp);
+        const winProb = courtWinProb(slot, us, opp, scale);
         assignments.push({
           slot,
           ourPlayerIds: [us[0]!.id],
@@ -154,7 +157,7 @@ function* enumerateLineups(
           used[i] = true;
           used[j] = true;
           const us = [available[i]!, available[j]!];
-          const winProb = courtWinProb(slot, us, opp);
+          const winProb = courtWinProb(slot, us, opp, scale);
           assignments.push({
             slot,
             ourPlayerIds: [us[0]!.id, us[1]!.id],
@@ -178,6 +181,8 @@ export interface OptimizeOptions {
   // captain wants a "play to your numbers" lineup vs. a "swing for majority"
   // lineup — they can differ).
   includeExpectedWinsRanking?: boolean;
+  // NTRP win-prob scale (see winprob.ts). Lower = rating edges more decisive.
+  scale?: number;
 }
 
 export interface OptimizeResult {
@@ -204,9 +209,10 @@ export function optimizeLineup(
   }
 
   const topN = options.topN ?? 5;
+  const scale = options.scale ?? DEFAULT_NTRP_SCALE;
   const all: Lineup[] = [];
   let count = 0;
-  for (const lineup of enumerateLineups(available, format, opponent)) {
+  for (const lineup of enumerateLineups(available, format, opponent, scale)) {
     all.push(lineup);
     count += 1;
   }
@@ -230,7 +236,8 @@ export function evaluateLineup(
   roster: readonly RosterPlayer[],
   format: MatchFormat,
   opponent: OpponentLineup,
-  picks: readonly (readonly string[])[] // one entry per court, [id] or [id,id]
+  picks: readonly (readonly string[])[], // one entry per court, [id] or [id,id]
+  scale = DEFAULT_NTRP_SCALE
 ): Lineup {
   if (picks.length !== format.courts.length) {
     throw new Error(`Expected ${format.courts.length} picks, got ${picks.length}`);
@@ -247,7 +254,7 @@ export function evaluateLineup(
     return {
       slot,
       ourPlayerIds: [...ids],
-      winProb: courtWinProb(slot, ours, opp),
+      winProb: courtWinProb(slot, ours, opp, scale),
     };
   });
   const probs = assignments.map((a) => a.winProb);
@@ -258,7 +265,7 @@ export function evaluateLineup(
   };
 }
 
-// Quick win-prob check between two singles ratings — for UI explorations.
-export function singlesProbExplain(us: Rating, them: Rating): number {
-  return winProbability(us, them);
+// Quick win-prob check between two singles NTRP ratings — for UI explorations.
+export function singlesProbExplain(us: number, them: number, scale = DEFAULT_NTRP_SCALE): number {
+  return ntrpWinProb(us, them, scale);
 }
