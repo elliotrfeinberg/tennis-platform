@@ -23,7 +23,7 @@ export function Standings({ view }: { view: StandingsView }) {
   );
   const head = ["#", "Team", "W", "L", "Courts W", "Courts L", "Court diff"];
   return (
-    <div style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
+    <div className="mm-screen" style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
       <PageHero kicker={v.flight ? v.flight.league : "USTA NorCal"} title="Standings" right={right}
         sub={v.flight ? `${v.flight.name} · ranked by team wins then court differential.` : "No ingested flights yet."} />
       <form action="/teams" className="mm-card" style={{ padding: 14, display: "flex", alignItems: "center", gap: 12 }}>
@@ -35,7 +35,7 @@ export function Standings({ view }: { view: StandingsView }) {
         </select>
         <button type="submit" style={{ padding: "10px 18px", border: "none", borderRadius: 9, background: "var(--court)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>View</button>
       </form>
-      <div className="mm-card" style={{ overflow: "hidden" }}>
+      <div className="mm-card mm-tablewrap">
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>

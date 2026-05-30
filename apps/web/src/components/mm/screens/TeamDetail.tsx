@@ -37,10 +37,10 @@ export function TeamDetail({ data }: { data: TeamDetailData }) {
     </div>
   );
   return (
-    <div style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
+    <div className="mm-screen" style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
       <Link href="/teams" style={{ fontSize: 12.5, color: "var(--muted)", fontWeight: 600, textDecoration: "none" }}>← Standings</Link>
       <PageHero kicker={`${t.league} · ${t.flightName}`} title={t.name} sub={`USTA NorCal · ${t.year} · ${roster.length} players`} right={right} />
-      <div style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr", gap: 18, alignItems: "start" }}>
+      <div className="mm-stack" style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr", gap: 18, alignItems: "start" }}>
         <div className="mm-card" style={{ overflow: "hidden" }}>
           <div style={{ padding: "13px 20px", borderBottom: "1px solid var(--hair)", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ink-2)" }}>Roster · {roster.length}</div>
           {roster.length === 0 ? (

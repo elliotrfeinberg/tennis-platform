@@ -119,11 +119,11 @@ export function Directory({ view }: { view: DirView }) {
     </div>
   );
   return (
-    <div style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
+    <div className="mm-screen" style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
       <PageHero kicker="USTA NorCal · Player directory" title="Players" right={legend}
         sub={<span><span className="mm-mono" style={{ fontWeight: 600 }}>{v.total.toLocaleString()}</span> players · per-season roster bands and live perf ratings, refreshed nightly.</span>} />
       <FilterBar v={v} />
-      <div className="mm-card" style={{ overflow: "hidden" }}>
+      <div className="mm-card mm-tablewrap">
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>

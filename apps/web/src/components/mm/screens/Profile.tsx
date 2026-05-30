@@ -69,12 +69,12 @@ function BandMeter({ d }: { d: ProfileData }) {
 
 function Hero({ d }: { d: ProfileData }) {
   return (
-    <div style={{ borderRadius: 16, padding: "34px 38px", display: "grid", gridTemplateColumns: "1fr auto", gap: 40, alignItems: "center", position: "relative", overflow: "hidden", background: "var(--hero-bg)", color: "#fff", boxShadow: "var(--shadow)" }}>
+    <div className="mm-hero mm-hero-row" style={{ borderRadius: 16, padding: "34px 38px", display: "grid", gridTemplateColumns: "1fr auto", gap: 40, alignItems: "center", position: "relative", overflow: "hidden", background: "var(--hero-bg)", color: "#fff", boxShadow: "var(--shadow)" }}>
       <div className="mm-net" style={{ position: "absolute", inset: 0, opacity: 0.5, pointerEvents: "none" }} />
       <div style={{ position: "absolute", right: -40, top: -40, width: 220, height: 220, borderRadius: 999, border: "2px solid rgba(255,255,255,.12)", pointerEvents: "none" }} />
       <div style={{ position: "relative" }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase", color: "rgba(255,255,255,.6)" }}>Performance NTRP · {d.section}</div>
-        <h1 className="mm-disp" style={{ fontSize: 68, margin: "8px 0 0", textTransform: "uppercase", color: "#fff" }}>{d.name}</h1>
+        <h1 className="mm-disp" style={{ fontSize: "clamp(34px, 7.5vw, 68px)", margin: "8px 0 0", textTransform: "uppercase", color: "#fff" }}>{d.name}</h1>
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 16, flexWrap: "wrap" }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13.5, color: "rgba(255,255,255,.82)", fontWeight: 600, whiteSpace: "nowrap" }}>
             <svg width={14} height={14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6}><path d="M8 1v14M1 8h14" /></svg>
@@ -87,7 +87,7 @@ function Hero({ d }: { d: ProfileData }) {
       </div>
       <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "flex-end", minWidth: 380 }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "flex-end", gap: 12 }}>
-          <div className="mm-num" style={{ fontSize: 116, lineHeight: 0.8, color: "#fff" }}>{n2(d.perf)}</div>
+          <div className="mm-num" style={{ fontSize: "clamp(64px, 17vw, 116px)", lineHeight: 0.8, color: "#fff" }}>{n2(d.perf)}</div>
           {d.trend30 != null && (
             <div style={{ textAlign: "left", paddingBottom: 8 }}>
               <span style={{ display: "inline-flex", alignItems: "center", padding: "4px 8px", borderRadius: 8, background: "rgba(255,255,255,.16)" }}>
@@ -111,7 +111,7 @@ function Hero({ d }: { d: ProfileData }) {
 
 function Stat({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: boolean }) {
   return (
-    <div className="mm-card" style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+    <div className="mm-card" style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 132 }}>
       <div className="mm-kicker">{label}</div>
       <div className="mm-num" style={{ fontSize: 34, marginTop: 4, color: accent ? "var(--court)" : "var(--ink)" }}>{value}</div>
       {sub && <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>{sub}</div>}
@@ -122,7 +122,7 @@ function Stat({ label, value, sub, accent }: { label: string; value: string; sub
 function StatRow({ d }: { d: ProfileData }) {
   const total = d.record.w + d.record.l;
   return (
-    <div style={{ display: "flex", gap: 14 }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
       <Stat label="Roster band" value={n1(d.band)} sub={d.bands.length ? `${d.bands[d.bands.length - 1]!.year} · Computer` : ""} />
       <Stat label="Adult" value={n2(d.adult)} sub={d.adultMatches + " matches"} accent />
       <Stat label="Mixed" value={n2(d.mixed)} sub={d.mixedMatches + " matches"} accent />
@@ -180,6 +180,7 @@ function MatchLog({ d }: { d: ProfileData }) {
       {d.log.length === 0 ? (
         <div style={{ padding: "30px 20px", textAlign: "center", color: "var(--muted)", fontSize: 14 }}>No matches ingested for this player yet.</div>
       ) : (
+        <div className="mm-tablewrap">
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ textAlign: "left" }}>
@@ -220,6 +221,7 @@ function MatchLog({ d }: { d: ProfileData }) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );
@@ -269,12 +271,12 @@ function SideColumn({ d }: { d: ProfileData }) {
 export function Profile({ data }: { data?: ProfileData }) {
   const d = data ?? demoData();
   return (
-    <div style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
+    <div className="mm-screen" style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
       <Link href="/players" style={{ fontSize: 12.5, color: "var(--muted)", fontWeight: 600, textDecoration: "none" }}>← Players directory</Link>
       <Hero d={d} />
       <StatRow d={d} />
       <ChartCard d={d} />
-      <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
+      <div className="mm-stack" style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
         <MatchLog d={d} />
         <SideColumn d={d} />
       </div>

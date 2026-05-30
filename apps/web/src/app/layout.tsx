@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./mm.css";
 import { ThemeProvider } from "@/components/mm/ThemeProvider";
@@ -8,6 +8,12 @@ export const metadata: Metadata = {
   title: "MatchMetric — estimated NTRP ratings",
   description:
     "Daily-updated estimated NTRP ratings, captain lineup tools, and match win probabilities. Not affiliated with USTA.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -30,6 +36,7 @@ export default function RootLayout({
           <Nav />
           <main>{children}</main>
           <footer
+            className="mm-footer"
             style={{
               borderTop: "1px solid var(--hair)",
               padding: "26px 44px",

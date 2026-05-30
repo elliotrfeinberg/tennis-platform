@@ -62,7 +62,7 @@ function LineupCard({ rank, lu }: { rank: number; lu: CaptainView["lineups"][num
   const best = rank === 1;
   return (
     <div className="mm-card" style={{ overflow: "hidden", border: best ? "1.5px solid var(--court)" : "1px solid var(--hair)" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 22px", background: best ? "var(--court-tint)" : "var(--paper)", borderBottom: "1px solid var(--hair)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, padding: "16px 22px", background: best ? "var(--court-tint)" : "var(--paper)", borderBottom: "1px solid var(--hair)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span className="mm-disp" style={{ fontSize: 30, color: best ? "var(--court)" : "var(--ink-2)" }}>#{rank}</span>
           {best && <Chip tone="court">Recommended</Chip>}
@@ -104,11 +104,11 @@ export function Captain({ view }: { view: CaptainView }) {
     </div>
   );
   return (
-    <div style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
+    <div className="mm-screen" style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
       <PageHero kicker="Lineup optimizer" title="Captain workspace" right={right}
         sub="Pick your team and opponent — we rank lineups by team win probability, not just the sum of court odds." />
       <Controls v={v} />
-      <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
+      <div className="mm-stack" style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
         <RosterPanel title={`${v.myName} — your roster`} sub={`${v.myRoster.length} players`} players={v.myRoster} />
         <RosterPanel title={`${v.oppName} — projected`} sub={`${v.oppRoster.length} players · strongest-first`} players={v.oppRoster} opponent />
       </div>

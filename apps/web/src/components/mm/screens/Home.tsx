@@ -15,13 +15,13 @@ export interface HomeView {
 function Hero({ v }: { v: HomeView }) {
   const t = v.top;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr", gap: 36, alignItems: "stretch" }}>
+    <div className="mm-stack" style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr", gap: 36, alignItems: "stretch" }}>
       <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", padding: "8px 0" }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
           <span style={{ width: 7, height: 7, borderRadius: 7, background: "var(--court)" }} />
           <span className="mm-kicker">Updated nightly from TennisLink</span>
         </div>
-        <h1 className="mm-disp" style={{ fontSize: 82, textTransform: "uppercase", color: "var(--ink)", margin: 0 }}>
+        <h1 className="mm-disp" style={{ fontSize: "clamp(38px, 8.5vw, 82px)", textTransform: "uppercase", color: "var(--ink)", margin: 0 }}>
           Your rating,<br /><span style={{ color: "var(--court)" }}>recomputed</span> every night.
         </h1>
         <p style={{ fontSize: 18, lineHeight: 1.55, color: "var(--ink-2)", maxWidth: 540, marginTop: 22 }}>
@@ -63,7 +63,7 @@ function Hero({ v }: { v: HomeView }) {
         <div style={{ position: "relative" }}>
           <div style={{ fontSize: 13, color: "rgba(255,255,255,.8)", fontWeight: 600 }}>{t ? t.name : "—"} · USTA NorCal</div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
-            <div className="mm-num" style={{ fontSize: 132, lineHeight: 0.82, color: "#fff" }}>{t?.perf != null ? t.perf.toFixed(2) : "—"}</div>
+            <div className="mm-num" style={{ fontSize: "clamp(72px, 20vw, 132px)", lineHeight: 0.82, color: "#fff" }}>{t?.perf != null ? t.perf.toFixed(2) : "—"}</div>
           </div>
           {t && (
             <Link href={`/players/${t.id}` as never} style={{ fontSize: 13, color: "var(--ball)", fontWeight: 700, textDecoration: "none" }}>View profile →</Link>
@@ -87,7 +87,7 @@ function Feature({ title, body, icon }: { title: string; body: string; icon: Rea
 function DistViz({ v }: { v: HomeView }) {
   const max = Math.max(1, ...v.dist.map((d) => d.count));
   return (
-    <div className="mm-card" style={{ padding: "24px 28px", display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: 36, alignItems: "center" }}>
+    <div className="mm-card mm-stack" style={{ padding: "24px 28px", display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: 36, alignItems: "center" }}>
       <div>
         <div className="mm-kicker">Section snapshot</div>
         <h3 style={{ fontSize: 26, fontWeight: 700, margin: "8px 0 10px", color: "var(--ink)" }}>Where NorCal sits</h3>
@@ -113,9 +113,9 @@ const ic = (d: ReactNode) => (
 
 export function Home({ view }: { view: HomeView }) {
   return (
-    <div style={{ maxWidth: 1320, margin: "0 auto", padding: "44px 44px 52px", display: "flex", flexDirection: "column", gap: 40 }}>
+    <div className="mm-screen" style={{ maxWidth: 1320, margin: "0 auto", padding: "44px 44px 52px", display: "flex", flexDirection: "column", gap: 40 }}>
       <Hero v={view} />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 18 }}>
+      <div className="mm-stack" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 18 }}>
         <Feature title="Daily updates" body="Scores hit TennisLink within hours; ratings recompute every night — not once a month. See exactly how today's match moved your number." icon={ic(<path d="M10 5v5l3 2M10 2a8 8 0 100 16 8 8 0 000-16z" />)} />
         <Feature title="Score-aware model" body="A symmetric perf model reads the scoreline, not just the W. Per-court doubles attribution preserves partner spread across the lineup." icon={ic(<path d="M3 14l4-5 3 3 5-7M3 17h14" />)} />
         <Feature title="Confidence intervals" body="Match-count confidence flags new and inactive players as low-confidence. No more single-number lies about who's really a sandbagger." icon={ic(<path d="M10 2l7 4v5c0 4-3 6-7 7-4-1-7-3-7-7V6z" />)} />

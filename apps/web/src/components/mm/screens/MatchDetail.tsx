@@ -12,23 +12,23 @@ const fmtDate = (s: string | null) => {
 function Hero({ d }: { d: MatchDetailData }) {
   const homeWon = d.homeCourts > d.awayCourts;
   return (
-    <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, background: "var(--hero-bg)", color: "#fff", padding: "26px 36px", boxShadow: "var(--shadow)" }}>
+    <div className="mm-hero" style={{ position: "relative", overflow: "hidden", borderRadius: 16, background: "var(--hero-bg)", color: "#fff", padding: "26px 36px", boxShadow: "var(--shadow)" }}>
       <div className="mm-net" style={{ position: "absolute", inset: 0, opacity: 0.5, pointerEvents: "none" }} />
       <CourtLines opacity={0.16} />
       <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase", color: "rgba(255,255,255,.72)" }}>{fmtDate(d.date)} · {d.flight}</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 36, width: "100%", maxWidth: 820, marginTop: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase", color: "rgba(255,255,255,.72)", textAlign: "center" }}>{fmtDate(d.date)} · {d.flight}</div>
+        <div className="mm-score" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 36, width: "100%", maxWidth: 820, marginTop: 8 }}>
           <div style={{ textAlign: "right" }}>
-            <div className="mm-disp" style={{ fontSize: 36, textTransform: "uppercase", color: "#fff", lineHeight: 1 }}>{d.home}</div>
+            <div className="mm-disp" style={{ fontSize: "clamp(20px, 5.5vw, 36px)", textTransform: "uppercase", color: "#fff", lineHeight: 1 }}>{d.home}</div>
             <div style={{ fontSize: 12.5, color: "rgba(255,255,255,.75)", fontWeight: 600, marginTop: 4 }}>{homeWon ? "Winner · home" : "Home"}</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <span className="mm-num" style={{ fontSize: 76, lineHeight: 0.8, color: homeWon ? "var(--ball)" : "#fff" }}>{d.homeCourts}</span>
+            <span className="mm-num" style={{ fontSize: "clamp(46px, 12vw, 76px)", lineHeight: 0.8, color: homeWon ? "var(--ball)" : "#fff" }}>{d.homeCourts}</span>
             <span style={{ fontSize: 30, color: "rgba(255,255,255,.5)" }}>–</span>
-            <span className="mm-num" style={{ fontSize: 76, lineHeight: 0.8, color: !homeWon ? "var(--ball)" : "#fff" }}>{d.awayCourts}</span>
+            <span className="mm-num" style={{ fontSize: "clamp(46px, 12vw, 76px)", lineHeight: 0.8, color: !homeWon ? "var(--ball)" : "#fff" }}>{d.awayCourts}</span>
           </div>
           <div style={{ textAlign: "left" }}>
-            <div className="mm-disp" style={{ fontSize: 36, textTransform: "uppercase", color: "#fff", lineHeight: 1 }}>{d.away}</div>
+            <div className="mm-disp" style={{ fontSize: "clamp(20px, 5.5vw, 36px)", textTransform: "uppercase", color: "#fff", lineHeight: 1 }}>{d.away}</div>
             <div style={{ fontSize: 12.5, color: "rgba(255,255,255,.75)", fontWeight: 600, marginTop: 4 }}>{!homeWon ? "Winner · visitor" : "Visitor"}</div>
           </div>
         </div>
@@ -93,7 +93,7 @@ function CourtCard({ ct, d }: { ct: MatchDetailData["courts"][number]; d: MatchD
 
 export function MatchDetail({ data }: { data: MatchDetailData }) {
   return (
-    <div style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
+    <div className="mm-screen" style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
       <Hero d={data} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
         <div style={{ fontSize: 16, fontWeight: 700 }}>Court by court</div>

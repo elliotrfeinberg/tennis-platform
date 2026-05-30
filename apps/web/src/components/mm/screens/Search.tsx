@@ -73,9 +73,9 @@ export function Search() {
 
   const has = results.length > 0;
   return (
-    <div style={{ maxWidth: 820, margin: "0 auto", padding: "64px 44px 80px" }}>
+    <div className="mm-search" style={{ maxWidth: 820, margin: "0 auto", padding: "64px 44px 80px" }}>
       <div className="mm-kicker" style={{ textAlign: "center" }}>Player search</div>
-      <h1 className="mm-disp" style={{ fontSize: 64, textTransform: "uppercase", textAlign: "center", margin: "10px 0 0", color: "var(--ink)" }}>
+      <h1 className="mm-disp" style={{ fontSize: "clamp(38px, 10vw, 64px)", textTransform: "uppercase", textAlign: "center", margin: "10px 0 0", color: "var(--ink)" }}>
         Find a <span style={{ color: "var(--court)" }}>player</span>
       </h1>
       <p style={{ textAlign: "center", fontSize: 15, color: "var(--ink-2)", margin: "12px 0 30px" }}>

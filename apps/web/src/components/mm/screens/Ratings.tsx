@@ -120,11 +120,11 @@ export function Ratings({ view }: { view: RatingsView }) {
     </div>
   );
   return (
-    <div style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
+    <div className="mm-screen" style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
       <PageHero kicker="USTA NorCal · Performance NTRP" title="Ratings" right={right}
         sub="Score-aware dynamic ratings with year-over-year carry-over and confidence weighting — recomputed every night." />
-      <div style={{ display: "flex", gap: 18, alignItems: "stretch" }}><Distribution v={v} /><CoverageCard v={v} /></div>
-      <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
+      <div className="mm-stack" style={{ display: "flex", gap: 18, alignItems: "stretch" }}><Distribution v={v} /><CoverageCard v={v} /></div>
+      <div className="mm-stack" style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
         <div style={{ flex: "1 1 0" }}><TopRated v={v} /></div>
         <div style={{ flex: "1.2 1 0" }}><BandTable v={v} /></div>
       </div>

@@ -91,9 +91,9 @@ function HeroSide({ p, align }: { p: H2HPlayer; align: "left" | "right" }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: align === "right" ? "flex-end" : "flex-start", gap: 10 }}>
       <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(255,255,255,.16)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 19, fontFamily: "var(--font-display)" }}>{p.init}</div>
-      <div className="mm-disp" style={{ fontSize: 30, lineHeight: 1, textTransform: "uppercase", color: "#fff", textAlign: align, whiteSpace: "nowrap" }}>{p.name}</div>
+      <div className="mm-disp" style={{ fontSize: "clamp(22px, 6vw, 30px)", lineHeight: 1, textTransform: "uppercase", color: "#fff", textAlign: align, whiteSpace: "nowrap" }}>{p.name}</div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexDirection: align === "right" ? "row" : "row-reverse" }}>
-        <span className="mm-num" style={{ fontSize: 52, lineHeight: 1, color: "#fff" }}>{p.perf != null ? p.perf.toFixed(2) : "—"}</span>
+        <span className="mm-num" style={{ fontSize: "clamp(40px, 12vw, 52px)", lineHeight: 1, color: "#fff" }}>{p.perf != null ? p.perf.toFixed(2) : "—"}</span>
         {p.band != null && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ball-ink)", background: "var(--ball)", padding: "3px 8px", borderRadius: 100 }}>{p.band.toFixed(1)} BAND</span>}
       </div>
     </div>
@@ -108,12 +108,12 @@ function CompareRow({ label, aT, bT, aN, bN, lower }: { label: string; aT: strin
   const bLead = lower ? bN < aN : bN > aN;
   const val = (t: string, lead: boolean) => <span className="mm-num" style={{ fontSize: 22, color: lead ? "var(--court)" : "var(--ink-2)" }}>{t}</span>;
   const bar = (frac: number, lead: boolean, sideA: boolean) => (
-    <div style={{ flex: 1, display: "flex", justifyContent: sideA ? "flex-end" : "flex-start" }}>
+    <div className="mm-compare-bar" style={{ flex: 1, display: "flex", justifyContent: sideA ? "flex-end" : "flex-start" }}>
       <div style={{ height: 8, width: Math.max(0, Math.min(1, frac)) * 100 + "%", borderRadius: 4, background: lead ? "var(--court)" : "var(--hair)" }} />
     </div>
   );
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "62px 1fr 150px 1fr 62px", alignItems: "center", gap: 14, padding: "13px 0", borderTop: "1px solid var(--hair-2)" }}>
+    <div className="mm-compare" style={{ display: "grid", gridTemplateColumns: "62px 1fr 150px 1fr 62px", alignItems: "center", gap: 14, padding: "13px 0", borderTop: "1px solid var(--hair-2)" }}>
       <div style={{ textAlign: "right" }}>{val(aT, aLead)}</div>
       {bar(aFrac, aLead, true)}
       <div style={{ textAlign: "center", fontSize: 11.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--muted)" }}>{label}</div>
@@ -132,17 +132,17 @@ export function H2H({ data }: { data: H2HData }) {
   const aW = meetings.filter((m) => m.aWon).length;
   const bW = meetings.length - aW;
   return (
-    <div style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
+    <div className="mm-screen" style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
       <Link href="/players" style={{ fontSize: 12.5, color: "var(--muted)", fontWeight: 600, textDecoration: "none" }}>← Players directory</Link>
-      <div className="mm-card" style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "center", gap: 16 }}>
+      <div className="mm-card" style={{ padding: "12px 16px", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 16 }}>
         <Picker self={a} other={b} side="a" align="right" />
         <button onClick={() => router.push(`/h2h?a=${b.id}&b=${a.id}` as never)} title="Swap players" style={{ width: 38, height: 38, borderRadius: 10, border: "1px solid var(--hair)", background: "var(--paper)", color: "var(--court)", cursor: "pointer", flexShrink: 0, fontSize: 16 }}>⇄</button>
         <Picker self={b} other={a} side="b" align="left" />
       </div>
-      <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, background: "var(--hero-bg)", color: "#fff", padding: "30px 44px", boxShadow: "var(--shadow)" }}>
+      <div className="mm-hero" style={{ position: "relative", overflow: "hidden", borderRadius: 16, background: "var(--hero-bg)", color: "#fff", padding: "30px 44px", boxShadow: "var(--shadow)" }}>
         <div className="mm-net" style={{ position: "absolute", inset: 0, opacity: 0.5, pointerEvents: "none" }} />
         <CourtLines opacity={0.16} />
-        <div style={{ position: "relative", display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 40 }}>
+        <div className="mm-hero-row" style={{ position: "relative", display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 40 }}>
           <HeroSide p={a} align="right" />
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase", color: "rgba(255,255,255,.7)" }}>Head to head</div>
@@ -153,7 +153,7 @@ export function H2H({ data }: { data: H2HData }) {
         </div>
       </div>
       <div className="mm-card" style={{ padding: "8px 26px 18px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 150px 1fr", alignItems: "center", padding: "14px 0 6px" }}>
+        <div className="mm-compare" style={{ display: "grid", gridTemplateColumns: "1fr 150px 1fr", alignItems: "center", padding: "14px 0 6px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}><Avatar name={a.name} hi /><span style={{ fontWeight: 700, fontSize: 14 }}>{a.name}</span></div>
           <div style={{ textAlign: "center", fontSize: 11, fontWeight: 700, letterSpacing: ".1em", color: "var(--muted)" }}>COMPARE</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-end" }}><span style={{ fontWeight: 700, fontSize: 14 }}>{b.name}</span><Avatar name={b.name} /></div>
@@ -164,7 +164,7 @@ export function H2H({ data }: { data: H2HData }) {
         <CompareRow label="Adult NTRP" aT={n2(a.adult)} bT={n2(b.adult)} aN={num(a.adult)} bN={num(b.adult)} />
         <CompareRow label="Mixed NTRP" aT={n2(a.mixed)} bT={n2(b.mixed)} aN={num(a.mixed)} bN={num(b.mixed)} />
       </div>
-      <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
+      <div className="mm-stack" style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
         <div className="mm-card" style={{ overflow: "hidden", flex: "1 1 0" }}>
           <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--hair)", fontSize: 14, fontWeight: 700 }}>Their meetings</div>
           {meetings.length === 0 ? (

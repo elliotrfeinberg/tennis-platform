@@ -94,6 +94,69 @@
   color-scheme: light;
 }
 
+/* ---- responsive / mobile --------------------------------------------- */
+/* Desktop layout is inline-styled; mobile rules below override the few
+   structural properties via classes. !important is required because media
+   queries cannot otherwise beat inline styles. Oversized display fonts are
+   handled with clamp() inline (CSS can't override those). */
+.mm-tablewrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 720px) {
+  /* page container: tighter gutters + spacing */
+  .mm-screen { padding: 16px 14px 40px !important; gap: 14px !important; }
+  .mm-search { padding: 28px 16px 56px !important; }
+
+  /* hero bands */
+  .mm-hero { padding: 20px 18px !important; border-radius: 14px !important; }
+  .mm-hero-row {
+    grid-template-columns: 1fr !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 16px !important;
+  }
+  .mm-hero-row > * {
+    text-align: left !important;
+    align-items: flex-start !important;
+    min-width: 0 !important;
+  }
+  .mm-score { gap: 10px !important; }
+
+  /* multi-column blocks collapse to a single column */
+  .mm-stack {
+    grid-template-columns: 1fr !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 16px !important;
+  }
+
+  /* dense data tables scroll horizontally instead of crushing */
+  .mm-tablewrap > table { min-width: 640px; }
+
+  /* H2H compare rows: drop the bars, keep value · label · value */
+  .mm-compare { grid-template-columns: 1fr auto 1fr !important; gap: 10px !important; }
+  .mm-compare-bar { display: none !important; }
+
+  /* nav: wrap to two rows, links scroll, search collapses to an icon */
+  .mm-nav {
+    height: auto !important;
+    flex-wrap: wrap !important;
+    padding: 10px 14px !important;
+    row-gap: 10px !important;
+    column-gap: 12px !important;
+  }
+  .mm-nav-links {
+    order: 3 !important;
+    width: 100% !important;
+    gap: 22px !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .mm-nav-search { width: auto !important; }
+  .mm-nav-search-label { display: none !important; }
+
+  .mm-footer { padding: 22px 16px !important; }
+}
+
 /* ---- primitives ------------------------------------------------------- */
 .mm {
   font-family: var(--font-body);

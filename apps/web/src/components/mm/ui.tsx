@@ -46,6 +46,7 @@ export function Nav() {
     )[0]?.href ?? null;
   return (
     <header
+      className="mm-nav"
       style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 44px", height: 68, borderBottom: "1px solid var(--hair)",
@@ -53,7 +54,7 @@ export function Nav() {
       }}
     >
       <Logo />
-      <nav style={{ display: "flex", alignItems: "center", gap: 30 }}>
+      <nav className="mm-nav-links" style={{ display: "flex", alignItems: "center", gap: 30 }}>
         {NAV_ITEMS.map((it) => {
           const active = it.href === activeHref;
           return (
@@ -75,6 +76,7 @@ export function Nav() {
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <Link
           href="/search"
+          className="mm-nav-search"
           style={{
             display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", width: 196,
             border: "1px solid var(--hair)", borderRadius: 9, color: "var(--muted)", fontSize: 13,
@@ -85,7 +87,7 @@ export function Nav() {
             <circle cx={7} cy={7} r={5} stroke="currentColor" strokeWidth={1.6} />
             <path d="M11 11l3 3" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
           </svg>
-          Search players…
+          <span className="mm-nav-search-label">Search players…</span>
         </Link>
         <button
           title={dark ? "Switch to light" : "Switch to dark"}
@@ -168,15 +170,15 @@ export function PageHero({
   kicker?: ReactNode; title: ReactNode; sub?: ReactNode; right?: ReactNode;
 }) {
   return (
-    <div style={{ position: "relative", overflow: "hidden", borderRadius: 16, background: "var(--hero-bg)", color: "#fff", padding: "30px 36px", boxShadow: "var(--shadow)" }}>
+    <div className="mm-hero" style={{ position: "relative", overflow: "hidden", borderRadius: 16, background: "var(--hero-bg)", color: "#fff", padding: "30px 36px", boxShadow: "var(--shadow)" }}>
       <div className="mm-net" style={{ position: "absolute", inset: 0, opacity: 0.5, pointerEvents: "none" }} />
       <CourtLines opacity={0.18} />
-      <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 30 }}>
+      <div className="mm-hero-row" style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 30 }}>
         <div>
           {kicker && (
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase", color: "rgba(255,255,255,.72)" }}>{kicker}</div>
           )}
-          <h1 className="mm-disp" style={{ fontSize: 60, textTransform: "uppercase", margin: "8px 0 0", color: "#fff" }}>{title}</h1>
+          <h1 className="mm-disp" style={{ fontSize: "clamp(32px, 6vw, 60px)", textTransform: "uppercase", margin: "8px 0 0", color: "#fff" }}>{title}</h1>
           {sub && <div style={{ fontSize: 14.5, color: "rgba(255,255,255,.85)", fontWeight: 500, marginTop: 10 }}>{sub}</div>}
         </div>
         {right && <div style={{ textAlign: "right", flexShrink: 0 }}>{right}</div>}
@@ -196,7 +198,7 @@ export function Avatar({ name, hi }: { name: string; hi?: boolean }) {
 // Shared content-column wrapper: matches the design's padded, centered layout.
 export function Screen({ children }: { children: ReactNode }) {
   return (
-    <div style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
+    <div className="mm-screen" style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
       {children}
     </div>
   );
