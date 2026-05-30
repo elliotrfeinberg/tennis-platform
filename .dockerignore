@@ -1,0 +1,22 @@
+# Keep the Docker build context small + reproducible. node_modules is
+# reinstalled inside the image from the lockfile; never ship the host's copy.
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+
+.git
+captures
+*.log
+
+# Local secrets + env — never bake into an image. Creds are mounted at runtime
+# via the /data volume (see apps/worker/Dockerfile).
+.env
+.env.*
+**/.env
+**/.env.local
+
+# Editor / OS noise
+.DS_Store
+.vscode
+.idea

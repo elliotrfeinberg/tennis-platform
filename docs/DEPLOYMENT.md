@@ -166,9 +166,30 @@ risk.
     Xvfb + noVNC if the session turns out to be strictly IP-bound.
   - Add an **hourly keep-alive** so Oracle's idle-reclamation (CPU <20% p95 over
     7 days) never triggers — a long-running crawl already clears this.
-- **Build:** needs a `Dockerfile` with Playwright's Chromium system deps. Use
-  the `mcr.microsoft.com/playwright` base image. (Not yet in the repo — add when
-  you take this step.)
+- **Build:** `apps/worker/Dockerfile` is ready — it uses the
+  `mcr.microsoft.com/playwright:v1.60.0-noble` base (Chromium + OS deps + Node,
+  multi-arch so it runs on Ampere ARM), installs the pnpm workspace, and runs
+  the worker via `tsx`. Build from the **repo root**:
+  ```bash
+  docker build -f apps/worker/Dockerfile -t matchmetric-worker .
+  ```
+  Seed the bot account into a named volume once, then run the daily crawl:
+  ```bash
+  # one-time: copy your local ~/.tennis-platform creds+session into the volume
+  docker run --rm -v matchmetric-data:/data -v "$HOME/.tennis-platform:/seed:ro" \
+    --entrypoint sh matchmetric-worker \
+    -c 'mkdir -p /data/.tennis-platform && cp -a /seed/. /data/.tennis-platform/'
+
+  # daily incremental (schedule via host cron / a Fly scheduled machine)
+  docker run --rm \
+    -e DATABASE_URL='<neon-DIRECT-url>' \
+    -e TENNIS_CONTACT_EMAIL='you@example.com' \
+    -e TENNIS_ACCOUNT='norcal' \
+    -v matchmetric-data:/data \
+    matchmetric-worker
+  ```
+  Override the default `CMD` for one-offs, e.g. a sharded backfill:
+  `docker run ... matchmetric-worker db backfill-scorecards-db --year 2026 --shard 0/4`.
 
 ### Option B — Fly.io machine (cleanest paid DX)
 
