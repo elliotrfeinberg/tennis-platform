@@ -120,7 +120,7 @@ export function Captain({ view }: { view: CaptainView }) {
         <>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 4 }}>
             <div style={{ fontSize: 16, fontWeight: 700 }}>Top {v.lineups.length} lineups by team win probability</div>
-            <span className="mm-mono" style={{ fontSize: 12.5, color: "var(--muted)" }}>Evaluated {v.evaluated.toLocaleString()} possible lineups</span>
+            <span className="mm-mono" style={{ fontSize: 12.5, color: "var(--muted)" }}>Evaluated {v.evaluated.toLocaleString("en-US")} possible lineups</span>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {v.lineups.map((lu, i) => <LineupCard key={i} rank={i + 1} lu={lu} />)}

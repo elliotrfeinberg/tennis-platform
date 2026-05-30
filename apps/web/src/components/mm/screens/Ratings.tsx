@@ -19,7 +19,7 @@ function Distribution({ v }: { v: RatingsView }) {
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, height: 180 }}>
         {v.dist.map((d) => (
           <div key={d.band} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, height: "100%", justifyContent: "flex-end" }}>
-            <div className="mm-mono" style={{ fontSize: 12, color: "var(--muted)" }}>{d.count.toLocaleString()}</div>
+            <div className="mm-mono" style={{ fontSize: 12, color: "var(--muted)" }}>{d.count.toLocaleString("en-US")}</div>
             <div style={{ width: "100%", height: (d.count / max) * 128, borderRadius: "6px 6px 0 0", background: "var(--court-tint-2)" }} />
             <div className="mm-num" style={{ fontSize: 18, color: "var(--ink-2)" }}>{d.band.toFixed(1)}</div>
           </div>
@@ -45,7 +45,7 @@ function CoverageCard({ v }: { v: RatingsView }) {
       </p>
       <div style={{ display: "flex", gap: 10, marginTop: "auto" }}>
         <div style={{ flex: 1, padding: "10px 12px", borderRadius: 10, background: "var(--court-tint)" }}>
-          <div className="mm-num" style={{ fontSize: 22, color: "var(--court)" }}>{v.rated.toLocaleString()}</div>
+          <div className="mm-num" style={{ fontSize: 22, color: "var(--court)" }}>{v.rated.toLocaleString("en-US")}</div>
           <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600 }}>Players rated</div>
         </div>
         <div style={{ flex: 1, padding: "10px 12px", borderRadius: 10, background: "var(--paper)", border: "1px solid var(--hair)" }}>
@@ -94,7 +94,7 @@ function BandTable({ v }: { v: RatingsView }) {
           {[...v.dist].reverse().map((d, i) => (
             <tr key={i} style={{ borderTop: "1px solid var(--hair-2)" }}>
               <td className="mm-num" style={{ padding: "12px 20px", fontSize: 18, color: "var(--ink)" }}>{d.band.toFixed(1)}</td>
-              <td className="mm-mono" style={{ padding: "12px 20px", textAlign: "right", color: "var(--ink-2)" }}>{d.count.toLocaleString()}</td>
+              <td className="mm-mono" style={{ padding: "12px 20px", textAlign: "right", color: "var(--ink-2)" }}>{d.count.toLocaleString("en-US")}</td>
               <td style={{ padding: "12px 20px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ flex: 1, maxWidth: 360, height: 8, borderRadius: 5, background: "var(--hair-2)", overflow: "hidden" }}>
@@ -115,7 +115,7 @@ export function Ratings({ view }: { view: RatingsView }) {
   const v = view;
   const right = (
     <div>
-      <div className="mm-num" style={{ fontSize: 46, color: "#fff", lineHeight: 1 }}>{v.total.toLocaleString()}</div>
+      <div className="mm-num" style={{ fontSize: 46, color: "#fff", lineHeight: 1 }}>{v.total.toLocaleString("en-US")}</div>
       <div style={{ fontSize: 12.5, color: "rgba(255,255,255,.8)", fontWeight: 600, marginTop: 2 }}>players in section</div>
     </div>
   );

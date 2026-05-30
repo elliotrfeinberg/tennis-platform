@@ -33,8 +33,8 @@ function Hero({ v }: { v: HomeView }) {
         </div>
         <div style={{ display: "flex", gap: 28, marginTop: 34 }}>
           {[
-            [v.total.toLocaleString(), "NorCal players"],
-            [v.rated.toLocaleString(), "players rated"],
+            [v.total.toLocaleString("en-US"), "NorCal players"],
+            [v.rated.toLocaleString("en-US"), "players rated"],
             ["Nightly", "rating refresh"],
           ].map((s, i) => (
             <div key={i}>
@@ -92,12 +92,12 @@ function DistViz({ v }: { v: HomeView }) {
         <div className="mm-kicker">Section snapshot</div>
         <h3 style={{ fontSize: 26, fontWeight: 700, margin: "8px 0 10px", color: "var(--ink)" }}>Where NorCal sits</h3>
         <p style={{ fontSize: 14, lineHeight: 1.55, color: "var(--ink-2)", margin: 0 }}>Published NTRP across the section — league play is thickest in the middle of the curve.</p>
-        <div style={{ marginTop: 16 }}><Chip tone="court">{v.total.toLocaleString()} players rated</Chip></div>
+        <div style={{ marginTop: 16 }}><Chip tone="court">{v.total.toLocaleString("en-US")} players rated</Chip></div>
       </div>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 14, height: 180 }}>
         {v.dist.map((d) => (
           <div key={d.band} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, height: "100%", justifyContent: "flex-end" }}>
-            <div className="mm-mono" style={{ fontSize: 12, color: "var(--muted)" }}>{d.count.toLocaleString()}</div>
+            <div className="mm-mono" style={{ fontSize: 12, color: "var(--muted)" }}>{d.count.toLocaleString("en-US")}</div>
             <div style={{ width: "100%", height: (d.count / max) * 130, borderRadius: "6px 6px 0 0", background: "var(--court-tint-2)" }} />
             <div className="mm-num" style={{ fontSize: 18, color: "var(--ink-2)" }}>{d.band.toFixed(1)}</div>
           </div>

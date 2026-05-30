@@ -66,7 +66,7 @@ function FilterBar({ v }: { v: DirView }) {
             const active = v.band === c.value;
             return (
               <Link key={c.label} href={chipHref(c.value)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 100, textDecoration: "none", border: active ? "none" : "1px solid var(--hair)", fontWeight: 700, fontSize: 13, background: active ? "var(--court)" : "var(--card)", color: active ? "#fff" : "var(--ink-2)" }}>
-                {c.label}{c.count != null && <span className="mm-mono" style={{ fontSize: 11, fontWeight: 600, opacity: 0.7 }}>{c.count.toLocaleString()}</span>}
+                {c.label}{c.count != null && <span className="mm-mono" style={{ fontSize: 11, fontWeight: 600, opacity: 0.7 }}>{c.count.toLocaleString("en-US")}</span>}
               </Link>
             );
           })}
@@ -121,7 +121,7 @@ export function Directory({ view }: { view: DirView }) {
   return (
     <div className="mm-screen" style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
       <PageHero kicker="USTA NorCal · Player directory" title="Players" right={legend}
-        sub={<span><span className="mm-mono" style={{ fontWeight: 600 }}>{v.total.toLocaleString()}</span> players · per-season roster bands and live perf ratings, refreshed nightly.</span>} />
+        sub={<span><span className="mm-mono" style={{ fontWeight: 600 }}>{v.total.toLocaleString("en-US")}</span> players · per-season roster bands and live perf ratings, refreshed nightly.</span>} />
       <FilterBar v={v} />
       <div className="mm-card mm-tablewrap">
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -144,7 +144,7 @@ export function Directory({ view }: { view: DirView }) {
         </table>
       </div>
       <div style={{ textAlign: "center", fontSize: 13, color: "var(--muted)" }}>
-        Showing {v.shown.toLocaleString()} of {v.total.toLocaleString()}{v.total > v.shown ? " — refine with search" : ""}
+        Showing {v.shown.toLocaleString("en-US")} of {v.total.toLocaleString("en-US")}{v.total > v.shown ? " — refine with search" : ""}
       </div>
     </div>
   );

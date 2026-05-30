@@ -110,7 +110,7 @@ export function Search() {
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px 4px", borderTop: "1px solid var(--hair-2)", marginTop: 4 }}>
               <span style={{ fontSize: 12, color: "var(--muted)" }}>
-                <span className="mm-mono" style={{ fontWeight: 600, color: "var(--ink-2)" }}>{results.length}</span>{total > results.length ? ` of ${total.toLocaleString()}` : ""} matches
+                <span className="mm-mono" style={{ fontWeight: 600, color: "var(--ink-2)" }}>{results.length}</span>{total > results.length ? ` of ${total.toLocaleString("en-US")}` : ""} matches
               </span>
               <span style={{ fontSize: 11.5, color: "var(--muted)", display: "inline-flex", alignItems: "center", gap: 6 }}>
                 <kbd style={{ fontFamily: "var(--font-mono)", fontSize: 11, background: "var(--hair-2)", borderRadius: 5, padding: "2px 6px", color: "var(--ink-2)" }}>↵</kbd>open profile
