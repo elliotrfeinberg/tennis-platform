@@ -88,17 +88,20 @@ export function MobileProfile({ data }: { data: ProfileData }) {
           </div>
           <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)", marginTop: 8 }}>
             {m.opp.length === 0 ? "—" : m.opp.map((o, j) => (
-              <span key={j}>{j > 0 && <span style={{ color: "var(--muted)" }}> / </span>}{o[0]}<span className="mm-mono" style={{ fontSize: 11, color: "var(--muted)", marginLeft: 3 }}>{o[1] ? o[1].toFixed(2) : ""}</span></span>
+              <span key={j}>{j > 0 && <span style={{ color: "var(--muted)" }}> / </span>}{o[0]}<span className="mm-mono" style={{ fontSize: 11, color: "var(--muted)", marginLeft: 3 }}>{o[1] != null ? o[1].toFixed(2) : "—"}</span></span>
             ))}
           </div>
           {(m.oppTeam || m.partner) && (
             <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>
-              {m.oppTeam}{m.partner && <span>{"  ·  w/ "}{m.partner[0]} <span className="mm-mono">{m.partner[1] ? m.partner[1].toFixed(2) : ""}</span></span>}
+              {m.oppTeam}{m.partner && <span>{"  ·  w/ "}{m.partner[0]} <span className="mm-mono">{m.partner[1] != null ? m.partner[1].toFixed(2) : "—"}</span></span>}
             </div>
           )}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 7 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 7, gap: 10 }}>
             <span className="mm-mono" style={{ fontSize: 13, color: "var(--ink-2)", whiteSpace: "nowrap" }}>{score(m.sets)}</span>
-            <span style={{ fontSize: 12, color: "var(--muted)" }}>Rating after <span className="mm-num" style={{ fontSize: 16, color: m.cat === "mixed" ? "var(--cat-mixed)" : "var(--court)", marginLeft: 3 }}>{m.post != null ? m.post.toFixed(2) : "—"}</span></span>
+            <span style={{ display: "flex", alignItems: "baseline", gap: 12, whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: 11.5, color: "var(--muted)" }}>Perf <span className="mm-mono" style={{ fontSize: 12.5, color: "var(--ink-2)", marginLeft: 1 }}>{m.perf != null ? m.perf.toFixed(2) : "—"}</span></span>
+              <span style={{ fontSize: 11.5, color: "var(--muted)" }}>After <span className="mm-num" style={{ fontSize: 16, color: m.cat === "mixed" ? "var(--cat-mixed)" : "var(--court)", marginLeft: 2 }}>{m.post != null ? m.post.toFixed(2) : "—"}</span></span>
+            </span>
           </div>
         </div>
       ))}

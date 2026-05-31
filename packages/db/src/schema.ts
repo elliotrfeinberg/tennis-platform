@@ -430,7 +430,9 @@ export const perfMatchResults = pgTable(
     playedOn: timestamp("played_on", { withTimezone: true }),
     // adult | mixed | combo | other (MatchCategory from @tennis/calibrate)
     category: varchar("category", { length: 8 }).notNull(),
-    perf: doublePrecision("perf").notNull(),
+    // null when the match produced no rating for this player (combo/other, or
+    // a rated player facing a fully-unrated opponent — no anchor).
+    perf: doublePrecision("perf"),
     teamPerf: doublePrecision("team_perf"),
     preRating: doublePrecision("pre_rating"),
     postRating: doublePrecision("post_rating"),

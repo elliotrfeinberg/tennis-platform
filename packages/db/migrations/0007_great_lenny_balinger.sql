@@ -1,0 +1,1 @@
+ALTER TABLE "perf_match_results" ALTER COLUMN "perf" DROP NOT NULL;

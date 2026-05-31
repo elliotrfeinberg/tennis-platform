@@ -31,10 +31,10 @@ export default async function Page({
     cat: m.category,
     kind: m.kind,
     line: m.line,
-    opp: m.opponents.map((o) => [o.name, o.rating ?? 0] as Named),
+    opp: m.opponents.map((o) => [o.name, o.rating] as Named),
     oppTeam: m.opponentTeam,
     partner: m.partners[0]
-      ? ([m.partners[0].name, m.partners[0].rating ?? 0] as Named)
+      ? ([m.partners[0].name, m.partners[0].rating] as Named)
       : undefined,
     won: m.won,
     sets: m.sets.map((s) => [s.player, s.opponent] as [number, number]),
@@ -51,9 +51,9 @@ export default async function Page({
     won: m.won,
     kind: m.kind,
     line: m.line,
-    opp: m.opponents.map((o) => [o.name, o.rating ?? 0] as Named),
+    opp: m.opponents.map((o) => [o.name, o.rating] as Named),
     partner: m.partners[0]
-      ? ([m.partners[0].name, m.partners[0].rating ?? 0] as Named)
+      ? ([m.partners[0].name, m.partners[0].rating] as Named)
       : undefined,
     sets: m.sets.map((s) => [s.player, s.opponent] as [number, number]),
   });

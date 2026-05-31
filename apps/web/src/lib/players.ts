@@ -200,7 +200,9 @@ export interface MatchLogEntry {
   category: string;
   kind: "S" | "D";
   line: number;
-  perf: number;
+  // null when the match produced no rating for this player (combo/other, or a
+  // rated player facing a fully-unrated opponent).
+  perf: number | null;
   postRating: number | null;
   opponentRating: number | null;
   won: boolean;

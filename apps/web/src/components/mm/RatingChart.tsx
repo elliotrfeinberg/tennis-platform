@@ -221,14 +221,14 @@ function Tooltip({ m, catLabel, color, x }: { m: ChartPoint; catLabel?: string; 
           <span key={j}>
             {j > 0 && <span style={{ color: "var(--muted)", fontWeight: 500 }}> / </span>}
             {o[0]}
-            <span className="mm-mono" style={{ fontSize: 11, fontWeight: 500, color: "var(--muted)", marginLeft: 4 }}>{o[1].toFixed(2)}</span>
+            <span className="mm-mono" style={{ fontSize: 11, fontWeight: 500, color: "var(--muted)", marginLeft: 4 }}>{o[1] != null ? o[1].toFixed(2) : "—"}</span>
           </span>
         ))}
       </div>
       {m.partner && (
         <div style={{ fontSize: 12, color: "var(--ink-2)", marginTop: 2, whiteSpace: "nowrap" }}>
           with {m.partner[0]}
-          <span className="mm-mono" style={{ fontSize: 11, color: "var(--muted)", marginLeft: 4 }}>{m.partner[1].toFixed(2)}</span>
+          <span className="mm-mono" style={{ fontSize: 11, color: "var(--muted)", marginLeft: 4 }}>{m.partner[1] != null ? m.partner[1].toFixed(2) : "—"}</span>
         </div>
       )}
       <div className="mm-mono" style={{ fontSize: 13, marginTop: 3, color: "var(--ink-2)" }}>{score(m.sets)}</div>

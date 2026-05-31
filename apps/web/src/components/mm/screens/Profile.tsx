@@ -10,7 +10,7 @@ import * as DEMO from "@/lib/demo";
 export interface ProfileLogRow {
   date: string; cat: "adult" | "mixed" | string; kind: "S" | "D"; line: number;
   opp: Named[]; oppTeam: string | null; partner?: Named;
-  won: boolean; sets: Array<[number, number]>; perf: number; post: number | null;
+  won: boolean; sets: Array<[number, number]>; perf: number | null; post: number | null;
 }
 
 export interface ProfileData {
@@ -202,20 +202,20 @@ function MatchLog({ d }: { d: ProfileData }) {
                     {m.opp.length === 0 ? "—" : m.opp.map((o, j) => (
                       <span key={j}>
                         {j > 0 && <span style={{ color: "var(--muted)", fontWeight: 500 }}> / </span>}
-                        {o[0]}<span className="mm-mono" style={{ fontSize: 11.5, color: "var(--muted)", marginLeft: 4 }}>{o[1] ? o[1].toFixed(2) : ""}</span>
+                        {o[0]}<span className="mm-mono" style={{ fontSize: 11.5, color: "var(--muted)", marginLeft: 4 }}>{o[1] != null ? o[1].toFixed(2) : "—"}</span>
                       </span>
                     ))}
                   </div>
                   <div style={{ fontSize: 11.5, color: "var(--muted)" }}>
                     {m.oppTeam}
-                    {m.partner && <span>{"  ·  w/ "}{m.partner[0]} <span className="mm-mono">{m.partner[1] ? m.partner[1].toFixed(2) : ""}</span></span>}
+                    {m.partner && <span>{"  ·  w/ "}{m.partner[0]} <span className="mm-mono">{m.partner[1] != null ? m.partner[1].toFixed(2) : "—"}</span></span>}
                   </div>
                 </td>
                 <td className="mm-mono" style={cell}>
                   <span style={{ fontWeight: 700, color: m.won ? "var(--win)" : "var(--loss)", marginRight: 7 }}>{m.won ? "W" : "L"}</span>
                   <span style={{ color: "var(--ink-2)" }}>{score(m.sets)}</span>
                 </td>
-                <td className="mm-mono" style={{ ...cell, textAlign: "right", color: "var(--ink-2)" }}>{m.perf.toFixed(2)}</td>
+                <td className="mm-mono" style={{ ...cell, textAlign: "right", color: "var(--ink-2)" }}>{m.perf != null ? m.perf.toFixed(2) : "—"}</td>
                 <td className="mm-num" style={{ ...cell, textAlign: "right", fontSize: 15, color: m.cat === "mixed" ? "var(--cat-mixed)" : "var(--court)" }}>{m.post != null ? m.post.toFixed(2) : "—"}</td>
               </tr>
             ))}
