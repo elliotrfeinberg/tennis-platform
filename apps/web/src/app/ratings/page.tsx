@@ -1,4 +1,5 @@
 import { Ratings, type RatingsView } from "@/components/mm/screens/Ratings";
+import { MobileRatings } from "@/components/mm/mobile/Ratings";
 import { listPlayers, perfRatedCount } from "@/lib/players";
 import { getScopeFromCookies } from "@/lib/scope";
 
@@ -23,5 +24,10 @@ export default async function Page() {
     rated,
     topRated,
   };
-  return <Ratings view={view} />;
+  return (
+    <>
+      <div className="mm-desktop-only"><Ratings view={view} /></div>
+      <div className="mm-mobile-only"><MobileRatings view={view} /></div>
+    </>
+  );
 }

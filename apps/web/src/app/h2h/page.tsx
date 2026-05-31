@@ -1,4 +1,5 @@
 import { H2H } from "@/components/mm/screens/H2H";
+import { MobileH2H } from "@/components/mm/mobile/H2H";
 import { headToHead } from "@/lib/h2h";
 import { listPlayers } from "@/lib/players";
 
@@ -25,5 +26,10 @@ export default async function Page({
       </div>
     );
   }
-  return <H2H data={data} />;
+  return (
+    <>
+      <div className="mm-desktop-only"><H2H data={data} /></div>
+      <div className="mm-mobile-only"><MobileH2H data={data} /></div>
+    </>
+  );
 }

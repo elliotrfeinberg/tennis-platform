@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { Profile, type ProfileData, type ProfileLogRow } from "@/components/mm/screens/Profile";
+import { MobileProfile } from "@/components/mm/mobile/Profile";
 import { findPlayer, confidenceFromMatches } from "@/lib/players";
 import type { Named } from "@/lib/demo";
 import type { ChartPoint, ChartSeries } from "@/components/mm/RatingChart";
@@ -109,5 +110,10 @@ export default async function Page({
     bands: p.bands.map((b) => ({ year: b.year, ntrp: b.ntrp, type: b.ratingType })),
   };
 
-  return <Profile data={data} />;
+  return (
+    <>
+      <div className="mm-desktop-only"><Profile data={data} /></div>
+      <div className="mm-mobile-only"><MobileProfile data={data} /></div>
+    </>
+  );
 }

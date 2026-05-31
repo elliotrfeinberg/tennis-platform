@@ -4,6 +4,8 @@ import "./mm.css";
 import { ThemeProvider } from "@/components/mm/ThemeProvider";
 import { Nav } from "@/components/mm/ui";
 import { ScopeBar } from "@/components/mm/ScopeBar";
+import { MobileTopBar, MobileTabBar } from "@/components/mm/mobile/MobileChrome";
+import { PullToRefresh } from "@/components/mm/mobile/PullToRefresh";
 import { getScopeTree, getScopeFromCookies } from "@/lib/scope";
 
 export const metadata: Metadata = {
@@ -36,11 +38,16 @@ export default async function RootLayout({
       </head>
       <body>
         <ThemeProvider>
-          <Nav />
-          <ScopeBar tree={scopeTree} current={scope} />
+          <div className="mm-desktop-only">
+            <Nav />
+            <ScopeBar tree={scopeTree} current={scope} />
+          </div>
+          <MobileTopBar tree={scopeTree} scope={scope} />
+          <PullToRefresh />
           <main>{children}</main>
+          <MobileTabBar />
           <footer
-            className="mm-footer"
+            className="mm-footer mm-desktop-only"
             style={{
               borderTop: "1px solid var(--hair)",
               padding: "26px 44px",

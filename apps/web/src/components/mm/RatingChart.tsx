@@ -9,7 +9,7 @@
 // isn't real. The x-axis is time-based so multiple series with different match
 // dates align on the same scale. Colors come from theme CSS vars.
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fmtDate, score, type Named } from "@/lib/demo";
 
 export interface ChartPoint {
@@ -30,8 +30,7 @@ export interface ChartSeries {
   points: ChartPoint[];
 }
 
-const W = 1000, H = 300;
-const PADT = 18, PADB = 34, PADL = 6, PADR = 92;
+const PADT = 18, PADB = 34, PADL = 6;
 const ts = (d: string) => new Date(d).getTime();
 
 export function RatingChart({
@@ -47,8 +46,25 @@ export function RatingChart({
   midpoint: number;
   height?: number;
 }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
   const ref = useRef<SVGSVGElement>(null);
+  const [w, setW] = useState(640); // measured below; safe pre-measure default
   const [hover, setHover] = useState<number | null>(null);
+
+  // Render at the container's REAL pixel size (no non-uniform SVG stretch), so
+  // markers stay round and spacing is true at any width. The old fixed
+  // 1000×300 viewBox + preserveAspectRatio="none" squished the chart on the
+  // narrow mobile frame; measuring the container fixes that.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const cw = entries[0]?.contentRect.width;
+      if (cw && cw > 0) setW(Math.round(cw));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Clean + sort each series by date; drop empties.
   const lines = series
@@ -73,6 +89,11 @@ export function RatingChart({
     );
   }
 
+  const W = w;
+  const H = height;
+  const narrow = W < 480;
+  const PADR = narrow ? 46 : 92;
+
   const times = flat.map((f) => ts(f.m.date));
   const tMin = Math.min(...times);
   const tMax = Math.max(...times);
@@ -95,8 +116,9 @@ export function RatingChart({
   for (let t = Math.ceil(yMin * 10) / 10; t <= yMax; t += 0.1) ticks.push(Math.round(t * 10) / 10);
 
   // ~5 evenly spaced date labels across the time range
+  const nx = narrow ? 3 : 5;
   const xTicks: number[] =
-    tMax === tMin ? [tMin] : Array.from({ length: 5 }, (_, i) => tMin + ((tMax - tMin) * i) / 4);
+    tMax === tMin ? [tMin] : Array.from({ length: nx }, (_, i) => tMin + ((tMax - tMin) * i) / (nx - 1));
 
   const onMove = (e: React.MouseEvent) => {
     if (!ref.current) return;
@@ -117,7 +139,7 @@ export function RatingChart({
   const single = lines.length === 1;
 
   return (
-    <div style={{ position: "relative", width: "100%" }}>
+    <div ref={wrapRef} style={{ position: "relative", width: "100%" }}>
       {lines.length > 1 && (
         <div style={{ position: "absolute", top: 0, right: PADR / W * 100 + "%", display: "flex", gap: 16, zIndex: 4, fontSize: 12, fontFamily: "var(--font-body)", fontWeight: 600 }}>
           {lines.map((s) => (
@@ -129,8 +151,8 @@ export function RatingChart({
         </div>
       )}
       <svg
-        ref={ref} viewBox={`0 0 ${W} ${H}`} width="100%" height={height}
-        preserveAspectRatio="none" onMouseMove={onMove} onMouseLeave={() => setHover(null)}
+        ref={ref} viewBox={`0 0 ${W} ${H}`} width="100%" height={H}
+        onMouseMove={onMove} onMouseLeave={() => setHover(null)}
         style={{ display: "block", overflow: "visible", cursor: "crosshair" }}
       >
         <rect x={PADL} y={bandTop} width={plotW} height={bandBot - bandTop} style={{ fill: "var(--court)", opacity: 0.08 }} />
@@ -139,11 +161,11 @@ export function RatingChart({
           <line key={g} x1={PADL} x2={PADL + plotW} y1={yAt(g)} y2={yAt(g)} style={{ stroke: "var(--ink)", opacity: 0.06 }} strokeWidth={1} />
         ))}
         {ticks.map((g) => (
-          <text key={"t" + g} x={PADL + plotW + 10} y={yAt(g) + 4} style={{ fill: "var(--muted)", fontFamily: "var(--font-mono)", fontSize: 13 }}>{g.toFixed(1)}</text>
+          <text key={"t" + g} x={PADL + plotW + (narrow ? 6 : 10)} y={yAt(g) + 4} style={{ fill: "var(--muted)", fontFamily: "var(--font-mono)", fontSize: narrow ? 11 : 13 }}>{g.toFixed(1)}</text>
         ))}
         <line x1={PADL} x2={PADL + plotW} y1={mid} y2={mid} style={{ stroke: "var(--court)", opacity: 0.55 }} strokeWidth={1.5} strokeDasharray="6 5" />
         <text x={PADL + 6} y={mid - 7} style={{ fill: "var(--court)", fontFamily: "var(--font-body)", fontWeight: 600, fontSize: 12, letterSpacing: ".08em", opacity: 0.85 }}>
-          {`BAND MIDPOINT ${midpoint.toFixed(2)}`}
+          {narrow ? `MID ${midpoint.toFixed(2)}` : `BAND MIDPOINT ${midpoint.toFixed(2)}`}
         </text>
 
         {/* per-series area (single series only — keeps the polish without clutter) + line */}
@@ -171,7 +193,7 @@ export function RatingChart({
         ))}
 
         {xTicks.map((t, i) => (
-          <text key={"x" + i} x={Math.min(Math.max(xAt(t), PADL + 24), PADL + plotW - 24)} y={H - 10} textAnchor="middle" style={{ fill: "var(--muted)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
+          <text key={"x" + i} x={Math.min(Math.max(xAt(t), PADL + 24), PADL + plotW - 24)} y={H - 10} textAnchor="middle" style={{ fill: "var(--muted)", fontFamily: "var(--font-mono)", fontSize: narrow ? 11 : 12 }}>
             {fmtDate(new Date(t).toISOString().slice(0, 10))}
           </text>
         ))}

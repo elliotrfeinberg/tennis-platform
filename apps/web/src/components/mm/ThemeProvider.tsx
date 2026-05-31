@@ -36,6 +36,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setDark(true);
   }, []);
 
+  // Paint the document root in the theme's surface colour. With viewport-fit
+  // cover, the browser can expose thin strips outside our layout (landscape
+  // notch insets, dynamic-viewport rounding); tinting <html> makes any such
+  // strip blend with the app instead of flashing the default white.
+  useEffect(() => {
+    document.documentElement.style.backgroundColor = dark ? "#0d1411" : "#ece6d8";
+  }, [dark]);
+
   const toggle = () => {
     setDark((d) => {
       const next = !d;
@@ -50,9 +58,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider value={{ dark, toggle }}>
-      <div className={`mm ${dark ? "mm-dark" : "mm-court"}`} style={{ minHeight: "100vh" }}>
-        {children}
-      </div>
+      <div className={`mm ${dark ? "mm-dark" : "mm-court"}`}>{children}</div>
     </Ctx.Provider>
   );
 }

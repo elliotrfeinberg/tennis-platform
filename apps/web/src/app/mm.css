@@ -95,85 +95,95 @@
 }
 
 /* ---- responsive / mobile --------------------------------------------- */
-/* Desktop layout is inline-styled; mobile rules below override the few
-   structural properties via classes. !important is required because media
-   queries cannot otherwise beat inline styles. Oversized display fonts are
-   handled with clamp() inline (CSS can't override those). */
+/* The app ships TWO layouts that share one server data fetch: a desktop one
+   (top nav + dense tables) and a purpose-built mobile one (top bar + bottom
+   tab bar + stacked cards). Both render; we switch by CSS at the breakpoint,
+   never by JS — no device sniffing, no hydration mismatch, no layout flash.
+   Anything tagged .mm-desktop-only hides on phones; .mm-mobile-only hides on
+   wider screens. Mobile screen components live in components/mm/mobile/. */
 .mm-tablewrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-@media (max-width: 720px) {
-  /* page container: tighter gutters + spacing */
-  .mm-screen { padding: 16px 14px 40px !important; gap: 14px !important; }
-  .mm-search { padding: 28px 16px 56px !important; }
+.mm-mobile-bp { /* documentation anchor: the single mobile breakpoint = 760px */ }
 
-  /* hero bands */
-  .mm-hero { padding: 20px 18px !important; border-radius: 14px !important; }
-  .mm-hero-row {
-    grid-template-columns: 1fr !important;
-    flex-direction: column !important;
-    align-items: flex-start !important;
-    gap: 16px !important;
+/* default (desktop / tablet ≥ 760px): show desktop, hide mobile */
+.mm-mobile-only { display: none; }
+
+@media (max-width: 760px) {
+  .mm-desktop-only { display: none !important; }
+  .mm-mobile-only { display: block; }
+
+  /* App-shell layout. `position:fixed` bottom bars drift on iOS as the browser
+     toolbars resize, leaving a gap. Instead the themed wrapper becomes a
+     full-height flex column that owns the scroll: the top bar and tab bar are
+     ordinary flex children (never fixed, so they can't drift), and only the
+     content region scrolls. Because the *document* no longer scrolls, the
+     browser chrome also stops collapsing — so the dynamic-viewport churn that
+     caused the gap goes away. 100dvh tracks the live viewport; 100vh is the
+     fallback for engines without dvh. */
+  html, body { overflow: hidden; }
+  .mm {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
-  .mm-hero-row > * {
-    text-align: left !important;
-    align-items: flex-start !important;
-    min-width: 0 !important;
-  }
-  .mm-score { gap: 10px !important; }
-
-  /* multi-column blocks collapse to a single column */
-  .mm-stack {
-    grid-template-columns: 1fr !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 16px !important;
-  }
-
-  /* dense data tables scroll horizontally instead of crushing */
-  .mm-tablewrap > table { min-width: 640px; }
-
-  /* H2H compare rows: drop the bars, keep value · label · value */
-  .mm-compare { grid-template-columns: 1fr auto 1fr !important; gap: 10px !important; }
-  .mm-compare-bar { display: none !important; }
-
-  /* form controls: <select>/<input> are flex items whose default
-     min-width:auto refuses to shrink below their longest <option>, so long
-     flight names overflowed the screen. Stack fields full-width and cap every
-     control at the container so nothing exceeds the viewport. */
-  .mm-screen form, .mm-search form { flex-wrap: wrap !important; }
-  .mm-screen form label, .mm-search form label { flex: 1 1 100% !important; min-width: 0 !important; }
-  .mm-screen form select, .mm-search form select { width: 100% !important; }
-  .mm-screen form select, .mm-screen form input, .mm-screen form label > div,
-  .mm-search form select, .mm-search form input, .mm-search form label > div {
-    max-width: 100% !important; min-width: 0 !important; box-sizing: border-box;
-  }
-
-  /* nav: wrap to two rows, links scroll, search collapses to an icon */
-  .mm-nav {
-    height: auto !important;
-    flex-wrap: wrap !important;
-    padding: 10px 14px !important;
-    row-gap: 10px !important;
-    column-gap: 12px !important;
-  }
-  .mm-nav-links {
-    order: 3 !important;
-    width: 100% !important;
-    gap: 22px !important;
-    overflow-x: auto;
+  main {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
-  .mm-nav-search { width: auto !important; }
-  .mm-nav-search-label { display: none !important; }
-
-  .mm-footer { padding: 22px 16px !important; }
-
-  /* scope bar: tag + count on top row, the cascading menus scroll on a second */
-  .mm-scopebar { flex-wrap: wrap !important; padding: 8px 14px !important; row-gap: 10px !important; min-height: 0 !important; }
-  .mm-scope-spacer { display: none !important; }
-  .mm-scope-right { margin-left: auto !important; }
-  .mm-scope-menus { order: 5 !important; width: 100% !important; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
 }
+
+/* Mobile content scroller: single column, tight gutters, room to breathe. */
+.mm-mscreen {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* keep content clear of the landscape notch (left/right safe-area insets),
+     while the bars and background still bleed edge-to-edge */
+  padding: 14px max(14px, env(safe-area-inset-right)) 24px max(14px, env(safe-area-inset-left));
+}
+
+/* Compact green hero card — the Center Court identity element, phone size. */
+.mm-mhero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--hero-bg);
+  color: #fff;
+  padding: 20px 20px;
+  box-shadow: var(--shadow);
+}
+
+/* horizontally scrollable chip/filter strips (bands, etc.) */
+.mm-hscroll {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+.mm-hscroll > * { flex-shrink: 0; }
+
+/* Tab bar clears the home indicator with the bottom safe-area inset. In
+   portrait that's the full ~34px; in landscape the indicator is a thin centred
+   bar, so the full inset reads as dead space — trim it back there. (Scoped to
+   phone-width landscape; the bar is hidden on desktop anyway.) */
+.mm-tabbar { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.mm-tabrow { padding-top: 7px; padding-bottom: 6px; }
+@media (orientation: landscape) and (max-width: 960px) {
+  /* drop the home-indicator inset and compact the row — the indicator is thin
+     and unobtrusive in landscape, and vertical space is scarce */
+  .mm-tabbar { padding-bottom: 2px; }
+  .mm-tabrow { padding-top: 3px; padding-bottom: 2px; }
+}
+
+/* spinner for the custom mobile pull-to-refresh indicator */
+@keyframes mm-spin { to { transform: rotate(360deg); } }
 
 /* ---- primitives ------------------------------------------------------- */
 .mm {
@@ -182,6 +192,12 @@
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   box-sizing: border-box;
+}
+/* Full-height background on desktop (document scroll). Gated to desktop so it
+   can't fight the mobile app-shell's `height:100dvh` further down the cascade
+   (media queries add no specificity, and this rule comes later in source). */
+@media (min-width: 761px) {
+  .mm { min-height: 100vh; }
 }
 .mm *, .mm *::before, .mm *::after { box-sizing: border-box; }
 .mm-mono { font-family: var(--font-mono); font-feature-settings: "tnum" 1; }

@@ -1,4 +1,5 @@
 import { Captain } from "@/components/mm/screens/Captain";
+import { MobileCaptain } from "@/components/mm/mobile/Captain";
 import { buildCaptain } from "@/lib/captain";
 import { getScopeFromCookies } from "@/lib/scope";
 
@@ -19,5 +20,10 @@ export default async function Page({
       </div>
     );
   }
-  return <Captain view={view} />;
+  return (
+    <>
+      <div className="mm-desktop-only"><Captain view={view} /></div>
+      <div className="mm-mobile-only"><MobileCaptain view={view} /></div>
+    </>
+  );
 }

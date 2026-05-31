@@ -1,4 +1,5 @@
 import { Directory, type DirView, type DirViewRow } from "@/components/mm/screens/Directory";
+import { MobileDirectory } from "@/components/mm/mobile/Directory";
 import { listPlayers, confidenceFromMatches } from "@/lib/players";
 import { getScopeFromCookies } from "@/lib/scope";
 
@@ -48,5 +49,10 @@ export default async function Page({
     sort,
     band,
   };
-  return <Directory view={view} />;
+  return (
+    <>
+      <div className="mm-desktop-only"><Directory view={view} /></div>
+      <div className="mm-mobile-only"><MobileDirectory view={view} /></div>
+    </>
+  );
 }

@@ -1,4 +1,5 @@
 import { Home, type HomeView } from "@/components/mm/screens/Home";
+import { MobileHome } from "@/components/mm/mobile/Home";
 import { listPlayers, perfRatedCount } from "@/lib/players";
 import { getScopeFromCookies } from "@/lib/scope";
 
@@ -16,5 +17,10 @@ export default async function Page() {
     dist: agg.bandCounts,
     top: t ? { id: t.id, name: t.name, perf: t.perf, band: t.latestNtrp } : null,
   };
-  return <Home view={view} />;
+  return (
+    <>
+      <div className="mm-desktop-only"><Home view={view} /></div>
+      <div className="mm-mobile-only"><MobileHome view={view} /></div>
+    </>
+  );
 }

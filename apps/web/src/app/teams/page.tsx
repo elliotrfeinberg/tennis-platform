@@ -1,4 +1,5 @@
 import { Standings, type StandingsView } from "@/components/mm/screens/Standings";
+import { MobileStandings } from "@/components/mm/mobile/Standings";
 import { listFlights, flightStandings } from "@/lib/teams";
 
 export const dynamic = "force-dynamic";
@@ -15,5 +16,10 @@ export default async function Page({
     ? await flightStandings(selectedId)
     : { flight: null, rows: [] };
   const view: StandingsView = { flight, flights, selectedId, rows };
-  return <Standings view={view} />;
+  return (
+    <>
+      <div className="mm-desktop-only"><Standings view={view} /></div>
+      <div className="mm-mobile-only"><MobileStandings view={view} /></div>
+    </>
+  );
 }
