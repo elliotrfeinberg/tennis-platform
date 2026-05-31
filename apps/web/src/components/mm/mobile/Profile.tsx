@@ -2,14 +2,26 @@
 // Mobile Player Profile — compact green hero with band meter, stat grid, the
 // full interactive rating chart, and stacked match-log cards. Same ProfileData
 // the desktop profile consumes.
+import Link from "next/link";
 import type { ProfileData } from "@/components/mm/screens/Profile";
 import { TrendArrow } from "@/components/mm/ui";
 import { RatingChart } from "@/components/mm/RatingChart";
-import { fmtDate, score } from "@/lib/demo";
+import { fmtDate, score, type Named } from "@/lib/demo";
 import { MHero, MSectionTitle } from "./shell";
 
 const n2 = (v: number | null) => (v == null ? "—" : v.toFixed(2));
 const n1 = (v: number | null) => (v == null ? "—" : v.toFixed(1));
+
+// A match-log player name, linked to their profile when an id is present.
+function PName({ p }: { p: Named }) {
+  const id = p[2];
+  if (!id) return <>{p[0]}</>;
+  return (
+    <Link href={`/players/${id}` as never} style={{ color: "inherit", textDecoration: "none" }}>
+      {p[0]}
+    </Link>
+  );
+}
 
 export function MobileProfile({ data }: { data: ProfileData }) {
   const d = data;
@@ -88,12 +100,12 @@ export function MobileProfile({ data }: { data: ProfileData }) {
           </div>
           <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)", marginTop: 8 }}>
             {m.opp.length === 0 ? "—" : m.opp.map((o, j) => (
-              <span key={j}>{j > 0 && <span style={{ color: "var(--muted)" }}> / </span>}{o[0]}<span className="mm-mono" style={{ fontSize: 11, color: "var(--muted)", marginLeft: 3 }}>{o[1] != null ? o[1].toFixed(2) : "—"}</span></span>
+              <span key={j}>{j > 0 && <span style={{ color: "var(--muted)" }}> / </span>}<PName p={o} /><span className="mm-mono" style={{ fontSize: 11, color: "var(--muted)", marginLeft: 3 }}>{o[1] != null ? o[1].toFixed(2) : "—"}</span></span>
             ))}
           </div>
           {(m.oppTeam || m.partner) && (
             <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>
-              {m.oppTeam}{m.partner && <span>{"  ·  w/ "}{m.partner[0]} <span className="mm-mono">{m.partner[1] != null ? m.partner[1].toFixed(2) : "—"}</span></span>}
+              {m.oppTeam}{m.partner && <span>{"  ·  w/ "}<PName p={m.partner} /> <span className="mm-mono">{m.partner[1] != null ? m.partner[1].toFixed(2) : "—"}</span></span>}
             </div>
           )}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 7, gap: 10 }}>

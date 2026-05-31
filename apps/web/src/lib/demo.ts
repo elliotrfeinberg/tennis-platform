@@ -6,7 +6,8 @@
 export type Cat = "adult" | "mixed";
 export type Kind = "S" | "D";
 // rating is null when that player was unrated at match time (UI shows a dash).
-export type Named = [name: string, rating: number | null];
+// Optional 3rd element is the player id, used to link names to their profile.
+export type Named = [name: string, rating: number | null, id?: string];
 
 export interface LogEntry {
   date: string;

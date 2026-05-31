@@ -208,13 +208,13 @@ export interface MatchLogEntry {
   won: boolean;
   affectsRating: boolean;
   sets: Array<{ player: number; opponent: number }>;
-  // Each opponent on the court, with their snapshotted (pre-match) perf
-  // rating at the time this match was played. rating is null if the opponent
-  // had no rating computed for this court.
-  opponents: Array<{ name: string; rating: number | null }>;
-  // Doubles partner(s) on the player's own side, with the same snapshotted
+  // Each opponent on the court, with their player id (for profile links) and
+  // snapshotted (pre-match) perf rating. rating is null if the opponent had no
+  // rating computed for this court.
+  opponents: Array<{ id: string; name: string; rating: number | null }>;
+  // Doubles partner(s) on the player's own side, with id + the same snapshotted
   // pre-match rating. Empty for singles.
-  partners: Array<{ name: string; rating: number | null }>;
+  partners: Array<{ id: string; name: string; rating: number | null }>;
   opponentTeam: string | null;
 }
 
@@ -373,10 +373,12 @@ export async function findPlayer(id: string): Promise<PlayerDetail | null> {
       affectsRating: r.affectsRating,
       sets,
       opponents: oppIds.map((o) => ({
+        id: o,
         name: nameById.get(o) ?? "(unknown)",
         rating: snapByCourtPlayer.get(`${r.courtId}:${o}`) ?? null,
       })),
       partners: partnerIds.map((p) => ({
+        id: p,
         name: nameById.get(p) ?? "(unknown)",
         rating: snapByCourtPlayer.get(`${r.courtId}:${p}`) ?? null,
       })),

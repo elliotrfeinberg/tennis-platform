@@ -50,6 +50,17 @@ function demoData(): ProfileData {
 const n2 = (v: number | null, d = "—") => (v == null ? d : v.toFixed(2));
 const n1 = (v: number | null, d = "—") => (v == null ? d : v.toFixed(1));
 
+// A match-log player name, linked to their profile when an id is present.
+function PName({ p }: { p: Named }) {
+  const id = p[2];
+  if (!id) return <>{p[0]}</>;
+  return (
+    <Link href={`/players/${id}` as never} style={{ color: "inherit", textDecoration: "none" }}>
+      {p[0]}
+    </Link>
+  );
+}
+
 function BandMeter({ d }: { d: ProfileData }) {
   const { bandLow, bandHigh, midpoint, perf } = d;
   const pct = (v: number) => Math.max(0, Math.min(100, ((v - bandLow) / (bandHigh - bandLow)) * 100));
@@ -202,13 +213,13 @@ function MatchLog({ d }: { d: ProfileData }) {
                     {m.opp.length === 0 ? "—" : m.opp.map((o, j) => (
                       <span key={j}>
                         {j > 0 && <span style={{ color: "var(--muted)", fontWeight: 500 }}> / </span>}
-                        {o[0]}<span className="mm-mono" style={{ fontSize: 11.5, color: "var(--muted)", marginLeft: 4 }}>{o[1] != null ? o[1].toFixed(2) : "—"}</span>
+                        <PName p={o} /><span className="mm-mono" style={{ fontSize: 11.5, color: "var(--muted)", marginLeft: 4 }}>{o[1] != null ? o[1].toFixed(2) : "—"}</span>
                       </span>
                     ))}
                   </div>
                   <div style={{ fontSize: 11.5, color: "var(--muted)" }}>
                     {m.oppTeam}
-                    {m.partner && <span>{"  ·  w/ "}{m.partner[0]} <span className="mm-mono">{m.partner[1] != null ? m.partner[1].toFixed(2) : "—"}</span></span>}
+                    {m.partner && <span>{"  ·  w/ "}<PName p={m.partner} /> <span className="mm-mono">{m.partner[1] != null ? m.partner[1].toFixed(2) : "—"}</span></span>}
                   </div>
                 </td>
                 <td className="mm-mono" style={cell}>
