@@ -8,10 +8,11 @@
 
 import "server-only";
 import { unstable_cache } from "next/cache";
+import { cookies } from "next/headers";
 import { createClient } from "@tennis/db";
 import { sql, type SQL } from "drizzle-orm";
 import { players } from "@tennis/db";
-import type { Scope, ScopeTree, ScopeNode } from "./scopeShared";
+import { EMPTY_SCOPE, SCOPE_COOKIE, type Scope, type ScopeTree, type ScopeNode } from "./scopeShared";
 
 let _db: ReturnType<typeof createClient> | undefined;
 function db() {
@@ -93,8 +94,10 @@ async function buildScopeTree(): Promise<ScopeTree> {
     lg.flights.push({ id: r.flight_id, name: r.flight_name ?? r.flight_id, n: r.players });
   }
 
-  // Assemble + sort: seasons newest-first, leagues + flights by population.
-  const byPop = (a: ScopeNode, b: ScopeNode) => b.n - a.n || a.name.localeCompare(b.name);
+  // Assemble + sort every level alphabetically ascending (numeric-aware, so
+  // "3.5" < "10.0" and 2025 < 2026).
+  const byName = (a: ScopeNode, b: ScopeNode) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
   const sectionNodes: ScopeNode[] = [...sections.values()]
     .map((sec) => ({
       id: sec.id, name: sec.name, n: sec.n,
@@ -102,14 +105,31 @@ async function buildScopeTree(): Promise<ScopeTree> {
         .map((ssn) => ({
           id: ssn.id, name: ssn.name, n: ssn.n,
           children: [...ssn.leagues.values()]
-            .map((lg) => ({ id: lg.id, name: lg.name, n: lg.n, children: lg.flights.sort(byPop) }))
-            .sort(byPop),
+            .map((lg) => ({ id: lg.id, name: lg.name, n: lg.n, children: lg.flights.sort(byName) }))
+            .sort(byName),
         }))
-        .sort((a, b) => Number(b.id) - Number(a.id)),
+        .sort(byName),
     }))
-    .sort(byPop);
+    .sort(byName);
 
   return { total, sections: sectionNodes };
+}
+
+// Read the current scope from the cookie (server-side). Survives all navigation.
+export async function getScopeFromCookies(): Promise<Scope> {
+  try {
+    const raw = (await cookies()).get(SCOPE_COOKIE)?.value;
+    if (!raw) return { ...EMPTY_SCOPE };
+    const o = JSON.parse(decodeURIComponent(raw)) as Partial<Scope>;
+    return {
+      section: o.section ?? null,
+      season: o.season ?? null,
+      league: o.league ?? null,
+      flight: o.flight ?? null,
+    };
+  } catch {
+    return { ...EMPTY_SCOPE };
+  }
 }
 
 // Cached so the layout doesn't re-aggregate on every navigation. Counts shift
@@ -118,20 +138,6 @@ export const getScopeTree = unstable_cache(buildScopeTree, ["mm-scope-tree-v1"],
   revalidate: 600,
   tags: ["scope-tree"],
 });
-
-export function parseScope(sp: {
-  section?: string;
-  season?: string;
-  league?: string;
-  flight?: string;
-}): Scope {
-  return {
-    section: sp.section || null,
-    season: sp.season || null,
-    league: sp.league || null,
-    flight: sp.flight || null,
-  };
-}
 
 // Player-participation predicate, as a NON-correlated `id IN (...)` semi-join:
 // the in-scope player set is computed once (filtered by the scope) and hashed,

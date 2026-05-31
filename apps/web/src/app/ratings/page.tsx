@@ -1,16 +1,12 @@
 import { Ratings, type RatingsView } from "@/components/mm/screens/Ratings";
 import { listPlayers, perfRatedCount } from "@/lib/players";
-import { parseScope } from "@/lib/scope";
+import { getScopeFromCookies } from "@/lib/scope";
 
 // Always reflect the latest nightly recompute rather than build-time data.
 export const dynamic = "force-dynamic";
 
-export default async function Page({
-  searchParams,
-}: {
-  searchParams: Promise<{ section?: string; season?: string; league?: string; flight?: string }>;
-}) {
-  const scope = parseScope(await searchParams);
+export default async function Page() {
+  const scope = await getScopeFromCookies();
   // Aggregates (limit 1 — we only need total + bandCounts), the rated count,
   // and the top perf list.
   const agg = await listPlayers({ limit: 1, scope });

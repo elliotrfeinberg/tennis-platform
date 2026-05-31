@@ -25,6 +25,10 @@ export interface Scope {
 
 export const EMPTY_SCOPE: Scope = { section: null, season: null, league: null, flight: null };
 
+// Cookie that persists the scope across navigation (read server-side, written
+// client-side). Defined here so both the client bar and server lib can use it.
+export const SCOPE_COOKIE = "mm-scope";
+
 export function scopeFromParams(p: {
   section?: string | null;
   season?: string | null;

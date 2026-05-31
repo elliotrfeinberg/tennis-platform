@@ -1,11 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Suspense } from "react";
 import "./globals.css";
 import "./mm.css";
 import { ThemeProvider } from "@/components/mm/ThemeProvider";
 import { Nav } from "@/components/mm/ui";
 import { ScopeBar } from "@/components/mm/ScopeBar";
-import { getScopeTree } from "@/lib/scope";
+import { getScopeTree, getScopeFromCookies } from "@/lib/scope";
 
 export const metadata: Metadata = {
   title: "MatchMetric — estimated NTRP ratings",
@@ -24,7 +23,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const scopeTree = await getScopeTree();
+  const [scopeTree, scope] = await Promise.all([getScopeTree(), getScopeFromCookies()]);
   return (
     <html lang="en">
       <head>
@@ -38,9 +37,7 @@ export default async function RootLayout({
       <body>
         <ThemeProvider>
           <Nav />
-          <Suspense fallback={<div style={{ minHeight: 52, borderBottom: "1px solid var(--hair)", background: "var(--paper)" }} />}>
-            <ScopeBar tree={scopeTree} />
-          </Suspense>
+          <ScopeBar tree={scopeTree} current={scope} />
           <main>{children}</main>
           <footer
             className="mm-footer"

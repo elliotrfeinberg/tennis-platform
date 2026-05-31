@@ -1,19 +1,22 @@
 "use client";
 
 // Global scope filter bar — Section › Season › League › Flight. Rendered under
-// the Nav on every page (from the layout). Reads the current scope from the URL
-// (?section&season&league&flight) and navigates on change; cascading, so
+// the Nav on every page (from the layout). The current scope is persisted in a
+// cookie (read server-side), so it survives navigation between every page.
+// Changing a level rewrites the cookie and refreshes the route; cascading, so
 // choosing a level clears the narrower ones. Counts come from the precomputed
-// tree passed by the server, so no fetch happens on render.
+// tree, so no fetch happens on render.
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { SCOPE_COOKIE } from "@/lib/scopeShared";
 import {
-  scopeFromParams,
   scopeOptions,
   scopeNodes,
   scopeCount,
   scopeDepth,
+  EMPTY_SCOPE,
+  type Scope,
   type ScopeTree,
   type ScopeNode,
 } from "@/lib/scopeShared";
@@ -21,35 +24,30 @@ import {
 const SCOPE_KEYS = ["section", "season", "league", "flight"] as const;
 type ScopeKey = (typeof SCOPE_KEYS)[number];
 
-export function ScopeBar({ tree }: { tree: ScopeTree }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
+function writeCookie(scope: Scope) {
+  const v = encodeURIComponent(JSON.stringify(scope));
+  document.cookie = `${SCOPE_COOKIE}=${v}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+}
 
-  const scope = scopeFromParams({
-    section: params.get("section"),
-    season: params.get("season"),
-    league: params.get("league"),
-    flight: params.get("flight"),
-  });
+export function ScopeBar({ tree, current }: { tree: ScopeTree; current: Scope }) {
+  const router = useRouter();
+  const scope = current;
   const opts = scopeOptions(tree, scope);
   const sel = scopeNodes(tree, scope);
 
-  // Set one scope level (or clear it with null) and drop everything narrower,
-  // preserving non-scope params (q/sort/band/team/opp).
+  // Set one scope level (or clear it with null), dropping everything narrower,
+  // then persist + refresh so the server re-renders with the new scope.
   function pick(level: ScopeKey, id: string | null) {
-    const next = new URLSearchParams(params.toString());
+    const next: Scope = { ...scope };
     const idx = SCOPE_KEYS.indexOf(level);
-    for (let i = idx; i < SCOPE_KEYS.length; i++) next.delete(SCOPE_KEYS[i]!);
-    if (id) next.set(level, id);
-    const qs = next.toString();
-    router.push((qs ? `${pathname}?${qs}` : pathname) as never, { scroll: false });
+    for (let i = idx; i < SCOPE_KEYS.length; i++) next[SCOPE_KEYS[i]!] = null;
+    if (id) next[level] = id;
+    writeCookie(next);
+    router.refresh();
   }
   function clearAll() {
-    const next = new URLSearchParams(params.toString());
-    for (const k of SCOPE_KEYS) next.delete(k);
-    const qs = next.toString();
-    router.push((qs ? `${pathname}?${qs}` : pathname) as never, { scroll: false });
+    writeCookie({ ...EMPTY_SCOPE });
+    router.refresh();
   }
 
   const count = scopeCount(tree, scope);
