@@ -43,6 +43,13 @@
       "when": 1780036030649,
       "tag": "0005_fluffy_talon",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1780200966199,
+      "tag": "0006_sloppy_tombstone",
+      "breakpoints": true
     }
   ]
 }

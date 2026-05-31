@@ -83,6 +83,20 @@ describe("parseTeamCode", () => {
   it("forces gender X for the mixed category", () => {
     expect(parseTeamCode("CLUB 40XW3.5A")?.gender).toBe("X");
   });
+  it("parses a mixed (MX) team code", () => {
+    expect(parseTeamCode("ALMADEN SR 18MX7.0A")).toEqual({
+      division: 18,
+      gender: "X",
+      ntrp: 7.0,
+    });
+  });
+  it("parses a 2-digit mixed rating (10.0)", () => {
+    expect(parseTeamCode("BAY CLUB COURTSIDE 18MX10.0")).toEqual({
+      division: 18,
+      gender: "X",
+      ntrp: 10.0,
+    });
+  });
   it("returns null when there is no flight code (e.g. combo)", () => {
     expect(parseTeamCode("WALNUT CREEK RC Combo Team")).toBeNull();
     expect(parseTeamCode("MORAGA CC")).toBeNull();

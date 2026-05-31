@@ -24,7 +24,7 @@ import {
   players,
   rawScorecards,
 } from "@tennis/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   genderWord,
   parseTeamCode,
@@ -333,7 +333,102 @@ export async function normalizeMatches(opts: {
     `Normalized ${processed} scorecards → ${teamMatchCount} team_matches, ` +
       `${courtCount} court_matches (${skippedCourts} courts skipped: no winner/players).`
   );
+
+  const splitFlights = await splitSubflightsByConnectivity(db);
+  console.error(
+    `Subflights: split ${splitFlights} flight(s) into real pods by match connectivity.`
+  );
+
   await (
     db as unknown as { $client: { end: () => Promise<void> } }
   ).$client.end();
+}
+
+// Post-pass: a USTA subflight is the round-robin pod teams actually play in, so
+// derive it from connectivity — teams linked (directly or transitively) by a
+// team_match are one subflight. Flights that are a single connected pod keep
+// their lone (flight-named) subflight; multi-pod flights split into
+// "<flight> · N" subflights (provisional names until the subflight crawl
+// supplies the real "… - DN 1"). Idempotent: deterministic numbering by each
+// pod's alphabetically-first team, reused via the (flightId,name) unique index.
+async function splitSubflightsByConnectivity(
+  db: ReturnType<typeof createClient>
+): Promise<number> {
+  const flightRows = (await db.execute(sql`SELECT id, name FROM flights`)) as unknown as Array<{ id: string; name: string }>;
+  const flightName = new Map(flightRows.map((f) => [f.id, f.name]));
+
+  const teamRows = (await db.execute(sql`
+    SELECT t.id, t.name, sf.flight_id AS "flightId"
+    FROM teams t JOIN subflights sf ON sf.id = t.subflight_id
+  `)) as unknown as Array<{ id: string; name: string; flightId: string }>;
+
+  const edgeRows = (await db.execute(sql`
+    SELECT home_team_id AS a, visitor_team_id AS b FROM team_matches
+  `)) as unknown as Array<{ a: string; b: string }>;
+
+  // Union-find over all team ids.
+  const parent = new Map<string, string>();
+  for (const t of teamRows) parent.set(t.id, t.id);
+  const find = (x: string): string => {
+    let r = x;
+    while (parent.get(r) !== r) r = parent.get(r)!;
+    while (parent.get(x) !== r) { const n = parent.get(x)!; parent.set(x, r); x = n; }
+    return r;
+  };
+  const union = (a: string, b: string) => {
+    const ra = find(a), rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  };
+  for (const e of edgeRows) if (parent.has(e.a) && parent.has(e.b)) union(e.a, e.b);
+
+  // Group teams by flight, then by component root.
+  const byFlight = new Map<string, Array<{ id: string; name: string }>>();
+  for (const t of teamRows) {
+    const arr = byFlight.get(t.flightId) ?? [];
+    arr.push({ id: t.id, name: t.name });
+    byFlight.set(t.flightId, arr);
+  }
+
+  let splitCount = 0;
+  for (const [flightId, ts] of byFlight) {
+    const comps = new Map<string, string[]>();
+    const compName = new Map<string, string>(); // root -> alphabetically-first team name
+    for (const t of ts) {
+      const r = find(t.id);
+      (comps.get(r) ?? comps.set(r, []).get(r)!).push(t.id);
+      const cur = compName.get(r);
+      if (cur === undefined || t.name < cur) compName.set(r, t.name);
+    }
+    if (comps.size <= 1) continue; // single pod — leave the synthetic subflight
+
+    const groups = [...comps.entries()]
+      .map(([root, ids]) => ({ ids, key: compName.get(root)! }))
+      .sort((x, y) => x.key.localeCompare(y.key));
+
+    let n = 1;
+    for (const g of groups) {
+      const name = `${flightName.get(flightId)} · ${n++}`;
+      const ins = await db
+        .insert(subflights)
+        .values({ flightId, name })
+        .onConflictDoNothing()
+        .returning({ id: subflights.id });
+      let sfId = ins[0]?.id;
+      if (!sfId) {
+        const sel = await db
+          .select({ id: subflights.id })
+          .from(subflights)
+          .where(and(eq(subflights.flightId, flightId), eq(subflights.name, name)));
+        sfId = sel[0]!.id;
+      }
+      await db.update(teams).set({ subflightId: sfId }).where(inArray(teams.id, g.ids));
+    }
+    splitCount += 1;
+  }
+
+  // Drop subflights left with no teams (the old synthetic ones we split out of).
+  await db.execute(sql`
+    DELETE FROM subflights WHERE id NOT IN (SELECT DISTINCT subflight_id FROM teams)
+  `);
+  return splitCount;
 }

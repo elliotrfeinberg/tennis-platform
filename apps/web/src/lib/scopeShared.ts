@@ -21,9 +21,10 @@ export interface Scope {
   season: string | null;
   league: string | null;
   flight: string | null;
+  subflight: string | null;
 }
 
-export const EMPTY_SCOPE: Scope = { section: null, season: null, league: null, flight: null };
+export const EMPTY_SCOPE: Scope = { section: null, season: null, league: null, flight: null, subflight: null };
 
 // Cookie that persists the scope across navigation (read server-side, written
 // client-side). Defined here so both the client bar and server lib can use it.
@@ -34,20 +35,23 @@ export function scopeFromParams(p: {
   season?: string | null;
   league?: string | null;
   flight?: string | null;
+  subflight?: string | null;
 }): Scope {
   return {
     section: p.section || null,
     season: p.season || null,
     league: p.league || null,
     flight: p.flight || null,
+    subflight: p.subflight || null,
   };
 }
 
 export function scopeIsEmpty(s: Scope): boolean {
-  return !s.section && !s.season && !s.league && !s.flight;
+  return !s.section && !s.season && !s.league && !s.flight && !s.subflight;
 }
 
 export function scopeDepth(s: Scope): number {
+  if (s.subflight) return 5;
   if (s.flight) return 4;
   if (s.league) return 3;
   if (s.season) return 2;
@@ -64,29 +68,31 @@ export function scopeNodes(tree: ScopeTree, s: Scope) {
   const season = find(section?.children, s.season);
   const league = find(season?.children, s.league);
   const flight = find(league?.children, s.flight);
-  return { section, season, league, flight };
+  const subflight = find(flight?.children, s.subflight);
+  return { section, season, league, flight, subflight };
 }
 
 // Cascading option lists: a level's options come from its parent's children.
 export function scopeOptions(tree: ScopeTree, s: Scope) {
-  const { section, season, league } = scopeNodes(tree, s);
+  const { section, season, league, flight } = scopeNodes(tree, s);
   return {
     sections: tree.sections,
     seasons: section?.children ?? [],
     leagues: season?.children ?? [],
     flights: league?.children ?? [],
+    subflights: flight?.children ?? [],
   };
 }
 
 // Players in the narrowest chosen level (or the grand total when unscoped).
 export function scopeCount(tree: ScopeTree, s: Scope): number {
-  const { section, season, league, flight } = scopeNodes(tree, s);
-  return flight?.n ?? league?.n ?? season?.n ?? section?.n ?? tree.total;
+  const { section, season, league, flight, subflight } = scopeNodes(tree, s);
+  return subflight?.n ?? flight?.n ?? league?.n ?? season?.n ?? section?.n ?? tree.total;
 }
 
-// Human-readable summary, e.g. "USTA NorCal · 2026 · Men 3.5".
+// Human-readable summary, e.g. "USTA NorCal · 2026 · Men's 3.5 · Men's 3.5 · 1".
 export function scopeSummary(tree: ScopeTree, s: Scope): string {
-  const { section, season, league, flight } = scopeNodes(tree, s);
-  const parts = [section?.name, season?.name, league?.name, flight?.name].filter(Boolean);
+  const { section, season, league, flight, subflight } = scopeNodes(tree, s);
+  const parts = [section?.name, season?.name, league?.name, flight?.name, subflight?.name].filter(Boolean);
   return parts.length ? (parts as string[]).join(" · ") : "All of USTA";
 }

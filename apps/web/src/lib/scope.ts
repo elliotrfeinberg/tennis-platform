@@ -36,16 +36,24 @@ interface GroupRow {
   league_name: string | null;
   flight_id: string | null;
   flight_name: string | null;
+  subflight_id: string | null;
+  subflight_name: string | null;
   players: number;
 }
 
+type SeasonAcc = ScopeNode & { leagues: Map<string, LeagueAcc> };
+type LeagueAcc = ScopeNode & { flights: Map<string, FlightAcc> };
+type FlightAcc = ScopeNode & { subflights: ScopeNode[] };
+type SectionAcc = ScopeNode & { seasons: Map<string, SeasonAcc> };
+
 // One GROUPING SETS query yields accurate distinct-player counts at each level
-// (summing flight counts would double-count players in multiple flights).
+// (summing child counts would double-count players who appear in several).
 async function buildScopeTree(): Promise<ScopeTree> {
   const rows = (await db().execute(sql`
     SELECT l.section_code AS section, l.year AS season,
            l.id AS league_id, l.name AS league_name,
            f.id AS flight_id, f.name AS flight_name,
+           sf.id AS subflight_id, sf.name AS subflight_name,
            count(DISTINCT v.pid)::int AS players
     FROM court_matches cm
     JOIN team_matches tm ON tm.id = cm.team_match_id
@@ -63,12 +71,13 @@ async function buildScopeTree(): Promise<ScopeTree> {
       (l.section_code),
       (l.section_code, l.year),
       (l.section_code, l.year, l.id, l.name),
-      (l.section_code, l.year, l.id, l.name, f.id, f.name)
+      (l.section_code, l.year, l.id, l.name, f.id, f.name),
+      (l.section_code, l.year, l.id, l.name, f.id, f.name, sf.id, sf.name)
     )
   `)) as unknown as GroupRow[];
 
   let total = 0;
-  const sections = new Map<string, ScopeNode & { seasons: Map<string, ScopeNode & { leagues: Map<string, ScopeNode & { flights: ScopeNode[] }> }> }>();
+  const sections = new Map<string, SectionAcc>();
 
   for (const r of rows) {
     if (r.section == null) { total = r.players; continue; }
@@ -87,11 +96,17 @@ async function buildScopeTree(): Promise<ScopeTree> {
     if (r.league_id == null) { ssn.n = r.players; continue; }
     let lg = ssn.leagues.get(r.league_id);
     if (!lg) {
-      lg = { id: r.league_id, name: r.league_name ?? r.league_id, n: 0, flights: [] };
+      lg = { id: r.league_id, name: r.league_name ?? r.league_id, n: 0, flights: new Map() };
       ssn.leagues.set(r.league_id, lg);
     }
     if (r.flight_id == null) { lg.n = r.players; continue; }
-    lg.flights.push({ id: r.flight_id, name: r.flight_name ?? r.flight_id, n: r.players });
+    let fl = lg.flights.get(r.flight_id);
+    if (!fl) {
+      fl = { id: r.flight_id, name: r.flight_name ?? r.flight_id, n: 0, subflights: [] };
+      lg.flights.set(r.flight_id, fl);
+    }
+    if (r.subflight_id == null) { fl.n = r.players; continue; }
+    fl.subflights.push({ id: r.subflight_id, name: r.subflight_name ?? r.subflight_id, n: r.players });
   }
 
   // Assemble + sort every level alphabetically ascending (numeric-aware, so
@@ -105,7 +120,12 @@ async function buildScopeTree(): Promise<ScopeTree> {
         .map((ssn) => ({
           id: ssn.id, name: ssn.name, n: ssn.n,
           children: [...ssn.leagues.values()]
-            .map((lg) => ({ id: lg.id, name: lg.name, n: lg.n, children: lg.flights.sort(byName) }))
+            .map((lg) => ({
+              id: lg.id, name: lg.name, n: lg.n,
+              children: [...lg.flights.values()]
+                .map((fl) => ({ id: fl.id, name: fl.name, n: fl.n, children: fl.subflights.sort(byName) }))
+                .sort(byName),
+            }))
             .sort(byName),
         }))
         .sort(byName),
@@ -126,6 +146,7 @@ export async function getScopeFromCookies(): Promise<Scope> {
       season: o.season ?? null,
       league: o.league ?? null,
       flight: o.flight ?? null,
+      subflight: o.subflight ?? null,
     };
   } catch {
     return { ...EMPTY_SCOPE };
@@ -134,7 +155,7 @@ export async function getScopeFromCookies(): Promise<Scope> {
 
 // Cached so the layout doesn't re-aggregate on every navigation. Counts shift
 // only when the nightly recompute runs, so a few minutes of staleness is fine.
-export const getScopeTree = unstable_cache(buildScopeTree, ["mm-scope-tree-v1"], {
+export const getScopeTree = unstable_cache(buildScopeTree, ["mm-scope-tree-v2"], {
   revalidate: 600,
   tags: ["scope-tree"],
 });
@@ -149,6 +170,7 @@ export function scopePlayerFilter(scope: Scope): SQL | null {
   if (scope.season) conds.push(sql`l.year = ${Number(scope.season)}`);
   if (scope.league) conds.push(sql`l.id = ${scope.league}`);
   if (scope.flight) conds.push(sql`f.id = ${scope.flight}`);
+  if (scope.subflight) conds.push(sql`sf.id = ${scope.subflight}`);
   if (conds.length === 0) return null;
   const extra = sql.join(conds, sql` AND `);
   return sql`${players.id} IN (

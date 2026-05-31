@@ -34,13 +34,21 @@ export function genderWord(g: Gender): string {
 
 // Parse the flight code embedded in a USTA team name, e.g.
 // "MORAGA CC 40AW3.5A" -> { division: 40, gender: "F", ntrp: 3.5 }.
-// Format: <2-digit division><category A|X><gender W|M|X><NTRP><team letter?>.
-// A category of "X" (mixed) forces gender "X". Returns null when the suffix
-// doesn't match (e.g. combo/tri-level team names).
+// Two code shapes:
+//   - Single-gender: <2-digit division><cat A|X><gender W|M|X><NTRP><letter?>,
+//     e.g. "40AW3.5A". A category of "X" forces gender "X".
+//   - Mixed: <2-digit division>MX<combined rating><letter?>, e.g. "18MX7.0",
+//     "18MX10.0B" -> { division: 18, gender: "X", ntrp: 7.0 | 10.0 }.
+// Ratings may be 1–2 digits before the decimal (3.5, 10.0). Returns null when
+// the suffix doesn't match (e.g. combo/tri-level team names).
 export function parseTeamCode(
   name: string
 ): { division: number; gender: Gender; ntrp: number } | null {
-  const m = name.match(/(\d{2})([AX])([WMX])(\d\.\d)[A-Z]?\s*$/i);
+  // Mixed first — "MX" is a 2-char marker, not cat+gender.
+  const mx = name.match(/(\d{2})MX(\d{1,2}\.\d)[A-Z]?\s*$/i);
+  if (mx) return { division: Number(mx[1]), gender: "X", ntrp: Number(mx[2]) };
+
+  const m = name.match(/(\d{2})([AX])([WMX])(\d{1,2}\.\d)[A-Z]?\s*$/i);
   if (!m) return null;
   const cat = m[2]!.toUpperCase();
   const gCode = m[3]!.toUpperCase();

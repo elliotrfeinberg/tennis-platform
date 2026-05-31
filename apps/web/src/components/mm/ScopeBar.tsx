@@ -21,7 +21,7 @@ import {
   type ScopeNode,
 } from "@/lib/scopeShared";
 
-const SCOPE_KEYS = ["section", "season", "league", "flight"] as const;
+const SCOPE_KEYS = ["section", "season", "league", "flight", "subflight"] as const;
 type ScopeKey = (typeof SCOPE_KEYS)[number];
 
 function writeCookie(scope: Scope) {
@@ -69,6 +69,8 @@ export function ScopeBar({ tree, current }: { tree: ScopeTree; current: Scope })
         <Menu label="League" value={sel.league} options={opts.leagues} disabled={!scope.season} onPick={(id) => pick("league", id)} />
         <Sep />
         <Menu label="Flight" value={sel.flight} options={opts.flights} disabled={!scope.league} onPick={(id) => pick("flight", id)} />
+        <Sep />
+        <Menu label="Subflight" value={sel.subflight} options={opts.subflights} disabled={!scope.flight} onPick={(id) => pick("subflight", id)} />
       </div>
       <div className="mm-scope-spacer" style={{ flex: 1 }} />
       <div className="mm-scope-right" style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>

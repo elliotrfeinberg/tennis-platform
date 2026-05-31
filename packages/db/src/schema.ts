@@ -130,6 +130,12 @@ export const subflights = pgTable(
       .references(() => flights.id, { onDelete: "cascade" }),
     name: text("name").notNull(), // "Women's 3.5 - DN - 1"
     ustaSubflightId: varchar("usta_subflight_id", { length: 32 }),
+    // How to re-reach this subflight's standings page (a member team's par1 +
+    // year). Populated by the subflight crawl; null for provisional subflights
+    // derived from the match graph before the crawl reaches them.
+    reachPar1: text("reach_par1"),
+    reachYear: integer("reach_year"),
+    reachTeamName: text("reach_team_name"),
   },
   (t) => [uniqueIndex("subflights_flight_name_uq").on(t.flightId, t.name)]
 );
@@ -585,5 +591,51 @@ export const flightEnumVisits = pgTable("flight_enum_visits", {
     .defaultNow(),
   teamsFound: integer("teams_found").notNull().default(0),
   newFlights: integer("new_flights").notNull().default(0),
+  error: text("error"),
+});
+
+// Subflight catalog: the real USTA subflights (named divisions like
+// "Men's 3.5 - DN 1") discovered by the subflight crawl, with how to re-reach
+// their standings page and the member-team names that define membership. The
+// importer (normalize) assigns teams to subflights by matching team name+year
+// against memberTeams here; flights not yet crawled fall back to match-graph
+// connected components. One row per subflight.
+export const subflightCatalog = pgTable(
+  "subflight_catalog",
+  {
+    // Stable key: "{year}|{league}|{flightName}|{subflightName}".
+    subflightKey: text("subflight_key").primaryKey(),
+    flightKey: text("flight_key").notNull(), // ties back to flight_catalog
+    year: integer("year").notNull(),
+    league: text("league").notNull(),
+    flightName: text("flight_name").notNull(), // "Men's 3.5"
+    subflightName: text("subflight_name").notNull(), // "Men's 3.5 - DN 1"
+    // How to re-reach this subflight's standings (a member team's par1 + anchor).
+    reachPar1: text("reach_par1"),
+    reachTeamAnchorId: text("reach_team_anchor_id"),
+    reachTeamName: text("reach_team_name"),
+    // Member team names (as they appear on the standings page).
+    memberTeams: text("member_teams")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    standingsAt: timestamp("standings_at", { withTimezone: true }),
+    discoveredAt: timestamp("discovered_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("subflight_catalog_flight_idx").on(t.flightKey)]
+);
+
+// Resumability log for the subflight crawl: which seed par1 tokens we've
+// processed and what each yielded.
+export const subflightEnumVisits = pgTable("subflight_enum_visits", {
+  par1: text("par1").primaryKey(),
+  year: integer("year").notNull(),
+  visitedAt: timestamp("visited_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  subflightName: text("subflight_name"),
+  teamsFound: integer("teams_found").notNull().default(0),
   error: text("error"),
 });
