@@ -66,6 +66,7 @@ import {
   backfillScorecardsFromDb,
 } from "./backfillScorecards.js";
 import { enumerateFlights, backfillFlightMatches } from "./enumerateFlights.js";
+import { enumerateSubflights } from "./enumerateSubflights.js";
 import { runIncremental } from "./incremental.js";
 import { normalizeMatches } from "./normalizeMatches.js";
 import { computeRatingsFromDb } from "./computeRatingsDb.js";
@@ -1449,6 +1450,7 @@ function usage(): never {
   tennis-scrape db load-players [--ratings-dir <dir>] [--years 2025,2026]
                        (loads crawl-norcal rating dumps into Postgres: players + player_year_ratings. players permanent, years additive)
   tennis-scrape db enumerate-flights [--years 2025,2026] [--limit-players N] [--stop-after-barren N] [--min-delay MS] [--max-delay MS]
+  tennis-scrape db enumerate-subflights [--year N] [--limit N] [--min-delay MS] [--max-delay MS]   (real subflight names + standings)
                        (walks players (rating-search par1 → t=T-0 record) to DISCOVER every flight, scraping each new flight's Match Summary into flight_catalog + flight_matches; resumable + self-terminating on saturation. --years restricts to those season years (a record page lists all years a member played). Defaults: 500 players, stop after 150 barren. Set TENNIS_ACCOUNT for auto-login.)
   tennis-scrape db backfill-flight-matches [--years 2026] [--limit N] [--refresh] [--min-delay MS] [--max-delay MS]
                        (retry/refresh the Match Summary scrape for catalogued flights with no matches yet; --refresh re-scrapes all; --years scopes to active seasons)
@@ -1625,6 +1627,38 @@ async function main() {
             maxDelayMs,
             years,
           });
+          break;
+        }
+        if (sub === "enumerate-subflights") {
+          // For each cataloged flight, render its Team Summary standings view,
+          // capture the real subflight name + member teams, and rename the
+          // matching connectivity pod. Resumable via subflight_enum_visits.
+          let year: number | undefined;
+          let limit: number | undefined;
+          let minDelayMs = 3000;
+          let maxDelayMs = 5000;
+          let databaseUrl = process.env.DATABASE_URL;
+          for (let i = 0; i < rest.length; i++) {
+            const arg = rest[i]!;
+            const next = () => {
+              const n = rest[i + 1];
+              if (!n) usage();
+              i += 1;
+              return n!;
+            };
+            if (arg === "--year") year = Number(next());
+            else if (arg === "--limit") limit = Number(next());
+            else if (arg === "--min-delay") minDelayMs = Number(next());
+            else if (arg === "--max-delay") maxDelayMs = Number(next());
+            else if (arg === "--database-url") databaseUrl = next();
+            else usage();
+          }
+          if (!databaseUrl) {
+            console.error("Missing DATABASE_URL (env or --database-url).");
+            process.exit(2);
+          }
+          await ensureAccountSession();
+          await enumerateSubflights({ databaseUrl, year, limit, minDelayMs, maxDelayMs });
           break;
         }
         if (sub === "backfill-flight-matches") {

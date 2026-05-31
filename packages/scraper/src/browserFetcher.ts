@@ -721,6 +721,48 @@ export class BrowserFetcher implements CrawlFetcher {
     });
   }
 
+  // Render a team's "Team Summary" standings view (the real subflight: its
+  // name like "Men's 3.5 - DN 1", its member-team standings, and schedule) by
+  // navigating the player record, clicking the team, then the Team Summary tab.
+  // The post-render DOM is what parseTeamProfile consumes. par1 + teamAnchorId
+  // are the same reach tokens stored in flight_catalog.
+  async fetchTeamSummary(
+    par1: string,
+    teamAnchorId: string
+  ): Promise<BrowserFetchResult> {
+    const base =
+      "https://tennislink.usta.com/Leagues/Main/StatsAndStandings.aspx";
+    const url = `${base}?t=T-0&par1=${encodeURIComponent(par1)}&e=1`;
+    const TEAM_SUMMARY_TAB = "ctl00_mainContent_lnkTeamSummaryforTeams";
+    return this.runOnHost(new URL(url).host, async () => {
+      const page = await this.openPage();
+      try {
+        const resp = await page.goto(url, { waitUntil: "domcontentloaded" });
+        await page
+          .waitForLoadState("networkidle", { timeout: 30000 })
+          .catch(() => undefined);
+
+        // 1) Click the player's team → team/subflight context.
+        await page.waitForSelector(`#${cssEscape(teamAnchorId)}`, { timeout: 30000 });
+        await page.click(`#${cssEscape(teamAnchorId)}`);
+        // 2) Click the Team Summary tab → the standings view (#TeamSummary).
+        await page.waitForSelector(`#${TEAM_SUMMARY_TAB}`, { timeout: 30000 });
+        await page.click(`#${TEAM_SUMMARY_TAB}`);
+        // The standings table renders after the UpdatePanel postback.
+        await page
+          .waitForFunction(
+            `!!document.querySelector("#TeamSummary") && /Won|Lost|Points/i.test(document.body ? document.body.innerText : "")`,
+            { timeout: 30000 }
+          )
+          .catch(() => undefined);
+        const body = await page.content();
+        return { status: resp?.status() ?? 0, body, finalUrl: page.url() };
+      } finally {
+        await page.close();
+      }
+    });
+  }
+
   async close(): Promise<void> {
     if (this.context) {
       await this.context.close();
