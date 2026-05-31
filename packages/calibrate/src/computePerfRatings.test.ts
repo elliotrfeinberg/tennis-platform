@@ -222,6 +222,29 @@ describe("computePerfRatings — opponent-anchored, unrated cold start", () => {
     expect(aDoubles.opponentRating).toBeCloseTo(3.54, 6);
   });
 
+  it("doubles: an unrated partner absorbs the residual; the rated partner is held at rating", () => {
+    // Rate Nancy and both opponents to 3.54 (band 3.5). Then [Nancy, Tim] vs
+    // [O1, O2], won 6-2,6-2 (δ 0.29). Opp anchor 3.54 → team_perf 3.83.
+    // Nancy is held at her 3.54; Tim (unrated) absorbs the rest:
+    //   Tim = 2·3.83 − 3.54 = 4.12.
+    const N = rateUpMatches("Nancy", 3.5, "n");
+    const O1 = rateUpMatches("O1", 3.5, "o1");
+    const O2 = rateUpMatches("O2", 3.5, "o2");
+    const captures = mkCaptures(
+      [p("Nancy", 3.5), p("Tim", 3.5), p("O1", 3.5), p("O2", 3.5),
+        ...N.players, ...O1.players, ...O2.players],
+      [...N.matches, ...O1.matches, ...O2.matches,
+        mkMatch(new Date(2026, 1, 1), ["Nancy", "Tim"], ["O1", "O2"], [6, 2], [6, 2])]
+    );
+    const r = computePerfRatings(captures);
+    const tim = r.history.get("Tim")![0]!;
+    const nancyLast = r.history.get("Nancy")!.at(-1)!;
+    expect(tim.teamPerf).toBeCloseTo(3.83, 6);
+    expect(nancyLast.perf).toBeCloseTo(3.54, 6); // rated partner held at rating
+    expect(tim.perf).toBeCloseTo(2 * 3.83 - 3.54, 6); // 4.12 — carried the team
+    expect(tim.affectsRating).toBe(true);
+  });
+
   it("history entries appear in chronological order with diagnostics", () => {
     const captures = mkCaptures(
       [p("A", 3.5), p("B", 3.5)],

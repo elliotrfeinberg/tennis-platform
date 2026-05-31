@@ -28,9 +28,14 @@
 // don't update either stream; they still appear in history (perf = null).
 //
 // Doubles: the team's match rating = opponentAnchor + score margin. Individual
-// attribution preserves the partner spread when BOTH partners are rated
-// (partner_perf = team_perf + (partner_rolling − rated_team_mean)); an unrated
-// partner just takes the team perf.
+// attribution depends on who's rated:
+//   - both rated → preserve their spread (perf = team_perf + (rolling − mean)).
+//   - one rated + one unrated → hold the rated partner at their established
+//     rating and let the unrated partner absorb the residual, so the team still
+//     averages team_perf. This credits a strong unrated player who carried a
+//     weaker rated partner (e.g. team played at 4.26, partner is 3.66 → the
+//     unrated player is attributed 2·4.26 − 3.66 = 4.86).
+//   - all unrated → everyone takes team_perf.
 //
 // Year boundaries: a rated player's stream rating is carried into the next
 // season, clamped into that season's band. Unrated players carry nothing.
@@ -376,9 +381,19 @@ export function computePerfRatings(
     ) => {
       const anc = sideAnchor(oppKeys);
       const teamPerf = anc.valid ? anc.anchor + delta : null;
-      // Spread baseline: mean of this side's RATED partners' rolling ratings.
-      const ratedPres = sideKeys.filter(preRated).map((k) => preRolling(k)!);
-      const teamMeanPre = ratedPres.length ? mean(ratedPres) : undefined;
+      // Doubles attribution baselines (see per-player perf below):
+      //  - all partners rated → preserve their pre-match spread around teamPerf
+      //  - mixed (some unrated) → hold each RATED partner at their established
+      //    rating and let the UNRATED partner(s) absorb the residual, so the
+      //    team still averages teamPerf. This credits a strong unrated player
+      //    who carried a weaker rated partner against tougher opponents.
+      const sideSize = sideKeys.length;
+      const ratedKeys = sideKeys.filter(preRated);
+      const unratedCount = sideSize - ratedKeys.length;
+      const ratedMeanPre = ratedKeys.length
+        ? mean(ratedKeys.map((k) => preRolling(k)!))
+        : undefined;
+      const ratedSumPre = ratedKeys.reduce((s, k) => s + preRolling(k)!, 0);
       const oppRefs = oppKeys.map((k) => ({
         key: k,
         name: nameFor(k),
@@ -393,11 +408,16 @@ export function computePerfRatings(
 
         let perf: number | null = null;
         if (anc.valid) {
-          const offset =
-            preRated(key) && teamMeanPre !== undefined
-              ? preRolling(key)! - teamMeanPre
-              : 0;
-          perf = teamPerf! + offset;
+          if (unratedCount === 0) {
+            // All partners rated: preserve their pre-match spread around teamPerf.
+            perf = teamPerf! + (preRolling(key)! - ratedMeanPre!);
+          } else if (preRated(key)) {
+            // Rated partner held at their established rating.
+            perf = preRolling(key)!;
+          } else {
+            // Unrated partner(s) absorb the residual so the team averages teamPerf.
+            perf = (sideSize * teamPerf! - ratedSumPre) / unratedCount;
+          }
         }
         const impact = anc.valid;
 
