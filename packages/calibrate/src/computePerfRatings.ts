@@ -253,15 +253,30 @@ export function computePerfRatings(
     return coldStart(key);
   };
 
+  // Closeness weight: a match between similar-level players is far more
+  // informative than a lopsided one, so it counts more in the rolling mean.
+  // Weight falls off as a Gaussian in the pre-match rating gap (σ = 0.6):
+  // gap 0 → 1.0, 0.5 → 0.71, 1.0 → 0.25, 1.5 → 0.04. This also damps
+  // "completely unexpected" results, which are by definition across a big gap.
+  // The synthetic year-boundary seed (no pre/opp fields) counts at full weight.
+  const CLOSENESS_SIGMA = 0.6;
+  const closenessWeight = (e: PerfMatchEntry): number => {
+    const pre = e.playerPreRating;
+    const opp = e.opponentRating;
+    if (typeof pre !== "number" || typeof opp !== "number") return 1;
+    const gap = pre - opp;
+    return Math.exp(-(gap * gap) / (2 * CLOSENESS_SIGMA * CLOSENESS_SIGMA));
+  };
+
   // Weighted-mean current rating from a chronological category history.
-  // The most-recent entry is k=0 from the end.
+  // The most-recent entry is k=0 from the end. Weight = recency × closeness.
   const computeCurrent = (entries: PerfMatchEntry[], fallback: number): number => {
     if (entries.length === 0) return fallback;
     let num = 0;
     let den = 0;
     for (let i = entries.length - 1; i >= 0; i--) {
       const kFromEnd = entries.length - 1 - i;
-      const w = weightFn(kFromEnd);
+      const w = weightFn(kFromEnd) * closenessWeight(entries[i]!);
       if (w <= 0) continue;
       num += w * entries[i]!.perf;
       den += w;
@@ -451,7 +466,14 @@ export function computePerfRatings(
       for (let i = 0; i < sideKeys.length; i++) {
         const key = sideKeys[i]!;
         const partnerPre = sidePre[i]!;
-        const individualPerf = sidePerf + (partnerPre - sideMean);
+        const rawPerf = sidePerf + (partnerPre - sideMean);
+        // You only move on a surprise: a WIN never drops your perf below your
+        // pre-match rating, and a LOSS never lifts it above. This binds only
+        // when you beat a weaker opponent (floored to no-change) or lose to a
+        // stronger one (capped to no-change); upsets still move you fully.
+        const individualPerf = sideWon
+          ? Math.max(rawPerf, partnerPre)
+          : Math.min(rawPerf, partnerPre);
         const partners = sideRefs.filter((_, j) => j !== i);
 
         const playerBasis = basisFor(key);
@@ -466,12 +488,16 @@ export function computePerfRatings(
         let newStreamRating: number;
         if (affectsRating) {
           // We'll push the entry into the stream list and recompute.
+          // Provisional carries pre/opp so its OWN closeness weight applies.
+          const provisional = {
+            perf: individualPerf,
+            playerPreRating: partnerPre,
+            opponentRating: oppMean,
+          } as PerfMatchEntry;
           if (category === "adult") {
-            const provisional = { perf: individualPerf } as PerfMatchEntry;
             const tempList = [...adultEntries, provisional];
             newStreamRating = computeCurrent(tempList, coldStart(key));
           } else {
-            const provisional = { perf: individualPerf } as PerfMatchEntry;
             const tempList = [...mixedEntries, provisional];
             newStreamRating = computeCurrent(tempList, coldStart(key));
           }

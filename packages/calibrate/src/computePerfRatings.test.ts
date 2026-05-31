@@ -79,10 +79,10 @@ function mkMatch(
 }
 
 describe("computePerfRatings", () => {
-  it("a single 6-0, 6-0 win splits the table gap (±0.24) around the shared midpoint", () => {
+  it("a single 6-0, 6-0 win splits the table gap (±0.25) around the shared midpoint", () => {
     // Both labeled 3.0 → initial rating = band midpoint 2.75 each. The table
-    // gap for 6-0,6-0 is 0.48; with equal pre-ratings the midpoint is 2.75,
-    // so winner = 2.75 + 0.24 = 2.99 and loser = 2.75 − 0.24 = 2.51 (gap 0.48).
+    // gap for 6-0,6-0 is 0.50; with equal pre-ratings the midpoint is 2.75,
+    // so winner = 2.75 + 0.25 = 3.00 and loser = 2.75 − 0.25 = 2.50 (gap 0.50).
     const captures = mkCaptures(
       [
         { key: "A", name: "A", memberId: undefined, ntrp: 3.0, teams: [] },
@@ -91,8 +91,8 @@ describe("computePerfRatings", () => {
       [mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [6, 0], [6, 0])]
     );
     const result = computePerfRatings(captures);
-    expect(result.ratings.get("A")!).toBeCloseTo(2.99, 6);
-    expect(result.ratings.get("B")!).toBeCloseTo(2.51, 6);
+    expect(result.ratings.get("A")!).toBeCloseTo(3.0, 6);
+    expect(result.ratings.get("B")!).toBeCloseTo(2.5, 6);
   });
 
   it("a 7-6, 7-6 sweep splits the ±0.05 table gap around the midpoint", () => {
@@ -284,21 +284,23 @@ describe("computePerfRatings", () => {
     const bPerf = result.history.get("B")![0]!.perf;
     // Spread preserved between partners.
     expect(bPerf - aPerf).toBeCloseTo(3.75 - 3.27, 6);
-    // Team perf = match midpoint + signed delta/2 (symmetric split).
+    // Team perf = match midpoint + signed delta/2 (symmetric split). (Both
+    // partners LOST, so neither hits the win-floor; the loss-cap doesn't bind
+    // since both perfs sit below their pre-match ratings.)
     const ownMean = (3.27 + 3.75) / 2; // 3.51
     const oppMean = (4.12 + 3.47) / 2; // 3.795
-    const winnerTableValue = 0.4; // 6-0, 6-2 → 0.40 in TWO_SET_SWEEP_TABLE
+    const winnerTableValue = 0.48; // 6-0, 6-2 → 0.48 in TWO_SET_SWEEP_TABLE
     const teamPerfExpected = (ownMean + oppMean) / 2 - winnerTableValue / 2;
     expect((aPerf + bPerf) / 2).toBeCloseTo(teamPerfExpected, 6);
   });
 
   it("symmetric split: doubles win moves each player from their own pre by ±surprise/2", () => {
-    // Project-owner worked model. A(3.10)/B(3.70) [mean 3.40] beat
-    // C(3.25)/D(3.35) [mean 3.30] — here 6-1,6-1 → table gap 0.40.
-    // midpoint 3.35 → winner team 3.55, loser team 3.15 (gap 0.40).
-    // Each player moves from THEIR OWN pre by the same ±(team−mean):
-    //   A 3.10→3.25, B 3.70→3.85  (home +0.15 each, spread 0.60 kept)
-    //   C 3.25→3.10, D 3.35→3.20  (visitor −0.15 each, spread 0.10 kept)
+    // A(3.10)/B(3.70) [mean 3.40] beat C(3.25)/D(3.35) [mean 3.30], 6-1,6-1 →
+    // table gap 0.49. Home midpoint (3.40+3.30)/2=3.35 → home team 3.595.
+    //   A = 3.595 + (3.10−3.40) = 3.295,  B = 3.595 + 0.30 = 3.895
+    // Visitor midpoint (3.30+3.40)/2=3.35 → visitor team 3.105.
+    //   C = 3.105 + (3.25−3.30) = 3.055, D = 3.105 + 0.05 = 3.155
+    // (Spread preserved each side; no floor/cap binds here.)
     const captures = mkCaptures(
       [
         { key: "A", name: "A", memberId: undefined, ntrp: 3.1, teams: [] },
@@ -311,10 +313,50 @@ describe("computePerfRatings", () => {
     const result = computePerfRatings(captures, {
       initialRating: (p) => p.ntrp ?? 3.25,
     });
-    expect(result.history.get("A")![0]!.perf).toBeCloseTo(3.25, 6);
-    expect(result.history.get("B")![0]!.perf).toBeCloseTo(3.85, 6);
-    expect(result.history.get("C")![0]!.perf).toBeCloseTo(3.1, 6);
-    expect(result.history.get("D")![0]!.perf).toBeCloseTo(3.2, 6);
+    expect(result.history.get("A")![0]!.perf).toBeCloseTo(3.295, 6);
+    expect(result.history.get("B")![0]!.perf).toBeCloseTo(3.895, 6);
+    expect(result.history.get("C")![0]!.perf).toBeCloseTo(3.055, 6);
+    expect(result.history.get("D")![0]!.perf).toBeCloseTo(3.155, 6);
+  });
+
+  it("a win never lowers you and a loss never raises you (playing up/down)", () => {
+    // A (band 4.0 → seed 3.75) beats B (band 3.0 → seed 2.75) 6-0,6-0. The
+    // symmetric formula would DROP A to (3.75+2.75)/2 + 0.25 = 3.50 and RAISE
+    // B to 3.00 — punishing A for playing down. The floor/cap pin them: a win
+    // can't fall below your pre (A stays 3.75), a loss can't rise above it
+    // (B stays 2.75).
+    const captures = mkCaptures(
+      [
+        { key: "A", name: "A", memberId: undefined, ntrp: 4.0, teams: [] },
+        { key: "B", name: "B", memberId: undefined, ntrp: 3.0, teams: [] },
+      ],
+      [mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [6, 0], [6, 0])]
+    );
+    const result = computePerfRatings(captures);
+    expect(result.history.get("A")![0]!.perf).toBeCloseTo(3.75, 6);
+    expect(result.history.get("B")![0]!.perf).toBeCloseTo(2.75, 6);
+  });
+
+  it("a wild upset across a big rating gap is heavily down-weighted", () => {
+    // A loses to an equal B (symmetric → 3.00), then pulls a huge upset over a
+    // 5.0 (a ~4.13 match perf). That win is across a ~1.75-point gap, so its
+    // closeness weight is ~0.014 — A's rating barely moves off 3.00, not the
+    // ~3.56 a naive average of the two perfs would give.
+    const captures = mkCaptures(
+      [
+        { key: "A", name: "A", memberId: undefined, ntrp: 3.5, teams: [] },
+        { key: "B", name: "B", memberId: undefined, ntrp: 3.5, teams: [] },
+        { key: "C", name: "C", memberId: undefined, ntrp: 5.0, teams: [] },
+      ],
+      [
+        mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [0, 6], [0, 6]),
+        mkMatch(new Date(2026, 0, 5), ["A"], ["C"], [6, 0], [6, 0]),
+      ]
+    );
+    const result = computePerfRatings(captures);
+    const a = result.ratings.get("A")!;
+    expect(a).toBeGreaterThan(3.0); // the upset registers a little
+    expect(a).toBeLessThan(3.1); // but is heavily discounted (not ~3.56)
   });
 
   it("mixed match updates mixed rating, not adult", () => {
@@ -668,8 +710,8 @@ describe("computePerfRatings", () => {
       );
       const result = computePerfRatings(captures);
       // Symmetric split: a 6-0,6-0 win from the 3.25 midpoint moves N by
-      // +0.48/2 = +0.24 → rolling 3.49 (not the old +0.48).
-      const nRolling = 3.25 + 0.24; // 3.49
+      // +0.50/2 = +0.25 → rolling 3.50.
+      const nRolling = 3.25 + 0.25; // 3.50
       const expectedAnchor = (1 / 3) * nRolling + (2 / 3) * 3.25; // 3.33
       // E's match-2 entry was computed against the DISCOUNTED N anchor.
       const eEntry = result.history.get("E")![0]!;

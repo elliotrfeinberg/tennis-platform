@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { matchPerformance, scoreToPerfDelta } from "./matchPerf.js";
 
 describe("scoreToPerfDelta — 2-set sweep table", () => {
-  // Calibration anchors from the project owner, refined to empirical
-  // medians from tennisrecord.com (3431 matches, year 2025).
-  it("6-0, 6-0 sweep returns +0.48 for winner (empirical, near the 0.50 anchor)", () => {
+  // A dominant blowout implies ~half a band (~0.5), tapering to ~0.05 for a
+  // 7-6,7-6 squeaker.
+  it("6-0, 6-0 sweep returns +0.50 for winner (half-band blowout)", () => {
     expect(
       scoreToPerfDelta(
         [
@@ -13,10 +13,10 @@ describe("scoreToPerfDelta — 2-set sweep table", () => {
         ],
         true
       )
-    ).toBe(0.48);
+    ).toBe(0.5);
   });
 
-  it("6-1, 6-1 sweep returns +0.40 for winner (in 0.40–0.45 anchor range)", () => {
+  it("6-1, 6-1 sweep returns +0.49 for winner (near half-band)", () => {
     expect(
       scoreToPerfDelta(
         [
@@ -25,10 +25,10 @@ describe("scoreToPerfDelta — 2-set sweep table", () => {
         ],
         true
       )
-    ).toBe(0.4);
+    ).toBe(0.49);
   });
 
-  it("6-3, 6-3 sweep returns +0.21 for winner (empirical, near the 0.25 anchor)", () => {
+  it("6-3, 6-3 sweep returns +0.27 for winner (clear but not dominant)", () => {
     expect(
       scoreToPerfDelta(
         [
@@ -37,7 +37,7 @@ describe("scoreToPerfDelta — 2-set sweep table", () => {
         ],
         true
       )
-    ).toBe(0.21);
+    ).toBe(0.27);
   });
 
   it("7-6, 7-6 sweep returns +0.05 — barely above opponent", () => {
@@ -52,7 +52,7 @@ describe("scoreToPerfDelta — 2-set sweep table", () => {
     ).toBe(0.05);
   });
 
-  it("0-6, 0-6 returns -0.48 for loser (symmetric)", () => {
+  it("0-6, 0-6 returns -0.50 for loser (symmetric)", () => {
     expect(
       scoreToPerfDelta(
         [
@@ -61,7 +61,7 @@ describe("scoreToPerfDelta — 2-set sweep table", () => {
         ],
         false
       )
-    ).toBe(-0.48);
+    ).toBe(-0.5);
   });
 
   it("set order doesn't matter: 6-0, 6-4 = 6-4, 6-0", () => {
@@ -185,7 +185,7 @@ describe("matchPerformance — wraps the delta around opponent rating", () => {
         { won: 6, lost: 0 },
       ],
     });
-    expect(perf).toBeCloseTo(3.48, 6);
+    expect(perf).toBeCloseTo(3.5, 6);
   });
 
   it("returns opponent - perfDelta for the loser (symmetric)", () => {
@@ -197,6 +197,6 @@ describe("matchPerformance — wraps the delta around opponent rating", () => {
         { won: 0, lost: 6 },
       ],
     });
-    expect(perf).toBeCloseTo(3.52, 6);
+    expect(perf).toBeCloseTo(3.5, 6);
   });
 });

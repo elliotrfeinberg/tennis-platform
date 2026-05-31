@@ -62,36 +62,39 @@ export function matchPerformance(input: MatchPerfInput): number {
 //   n=170 for 6-3,6-4 (most common 2-set sweep at the 3.0–4.0 levels)
 //   n=12  for 6-0,7-6 / 7-6,7-6 (rare extremes)
 // Cells with n<30 are noisier; refine with a larger crawl if needed.
+// Values are tuned so a dominant straight-set blowout implies roughly a
+// half-band (~0.5) gap, tapering smoothly down to ~0.05 for a 7-6,7-6 squeaker.
+// (Project-owner intuition; the original empirical tennisrecord medians ran
+// ~0.05 lower across the dominant region and are kept in git history.)
 const TWO_SET_SWEEP_TABLE: Record<string, number> = {
-  // Score      empirical median (sample size)
-  "6-0,6-0": 0.48, // n=46
-  "6-0,6-1": 0.44, // n=105
-  "6-0,6-2": 0.4, // n=87
-  "6-0,6-3": 0.34, // n=59
-  "6-0,6-4": 0.29, // n=46
-  "6-0,7-5": 0.32, // n=9   (low confidence; near table value)
-  "6-0,7-6": 0.25, // n=12  (low confidence)
-  "6-1,6-1": 0.4, // n=63
-  "6-1,6-2": 0.34, // n=141
-  "6-1,6-3": 0.29, // n=128
-  "6-1,6-4": 0.25, // n=99
-  "6-1,7-5": 0.22, // n=54
-  "6-1,7-6": 0.17, // n=26
-  "6-2,6-2": 0.29, // n=79
-  "6-2,6-3": 0.24, // n=146
-  "6-2,6-4": 0.2, // n=130
-  "6-2,7-5": 0.17, // n=59
-  "6-2,7-6": 0.13, // n=30
-  "6-3,6-3": 0.21, // n=71
-  "6-3,6-4": 0.15, // n=170
-  "6-3,7-5": 0.12, // n=58
-  "6-3,7-6": 0.1, // n=47
-  "6-4,6-4": 0.1, // n=62
-  "6-4,7-5": 0.09, // n=64
-  "6-4,7-6": 0.09, // n=44
-  "7-5,7-5": 0.09, // n=15  (low confidence)
-  "7-5,7-6": 0.05, // n=20
-  "7-6,7-6": 0.05, // n=12  (low confidence)
+  "6-0,6-0": 0.5,
+  "6-0,6-1": 0.5,
+  "6-0,6-2": 0.48,
+  "6-0,6-3": 0.42,
+  "6-0,6-4": 0.37,
+  "6-0,7-5": 0.38,
+  "6-0,7-6": 0.32,
+  "6-1,6-1": 0.49,
+  "6-1,6-2": 0.43,
+  "6-1,6-3": 0.38,
+  "6-1,6-4": 0.33,
+  "6-1,7-5": 0.3,
+  "6-1,7-6": 0.24,
+  "6-2,6-2": 0.38,
+  "6-2,6-3": 0.32,
+  "6-2,6-4": 0.27,
+  "6-2,7-5": 0.23,
+  "6-2,7-6": 0.18,
+  "6-3,6-3": 0.27,
+  "6-3,6-4": 0.2,
+  "6-3,7-5": 0.16,
+  "6-3,7-6": 0.13,
+  "6-4,6-4": 0.13,
+  "6-4,7-5": 0.12,
+  "6-4,7-6": 0.1,
+  "7-5,7-5": 0.1,
+  "7-5,7-6": 0.06,
+  "7-6,7-6": 0.05,
 };
 
 // 3-set wins (split sets): losing a set inherently signals the
