@@ -1,18 +1,22 @@
 import { Directory, type DirView, type DirViewRow } from "@/components/mm/screens/Directory";
 import { listPlayers, confidenceFromMatches } from "@/lib/players";
+import { parseScope } from "@/lib/scope";
+
+export const dynamic = "force-dynamic";
 
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; sort?: string; band?: string }>;
+  searchParams: Promise<{ q?: string; sort?: string; band?: string; section?: string; season?: string; league?: string; flight?: string }>;
 }) {
   const sp = await searchParams;
   const sort: "name" | "band" | "perf" =
     sp.sort === "name" ? "name" : sp.sort === "band" ? "band" : "perf";
   const q = (sp.q ?? "").trim();
   const band = sp.band?.trim() ?? "";
+  const scope = parseScope(sp);
 
-  const data = await listPlayers({ q, band, sort, limit: 200 });
+  const data = await listPlayers({ q, band, sort, limit: 200, scope });
 
   // Year columns: the two most recent years present across the rows.
   const yearSet = new Set<number>();

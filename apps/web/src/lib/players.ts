@@ -16,6 +16,8 @@ import {
   teams,
 } from "@tennis/db";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { scopePlayerFilter } from "./scope";
+import type { Scope } from "./scopeShared";
 
 const SECTION = "USTA/NO. CALIFORNIA";
 const UUID_RE =
@@ -64,12 +66,16 @@ export interface PlayerListResult {
   bandCounts: { band: number; count: number }[];
 }
 
-// Count of players that have a computed perf rating (the rated universe).
-export async function perfRatedCount(): Promise<number> {
+// Count of players that have a computed perf rating (the rated universe),
+// optionally restricted to the current scope.
+export async function perfRatedCount(scope?: Scope): Promise<number> {
   const d = db();
+  const scopeCond = scope ? scopePlayerFilter(scope) : null;
   const r = await d
     .select({ n: sql<number>`count(*)::int` })
-    .from(playerPerfRatings);
+    .from(players)
+    .innerJoin(playerPerfRatings, eq(playerPerfRatings.playerId, players.id))
+    .where(scopeCond ? and(eq(players.sectionCode, SECTION), scopeCond) : eq(players.sectionCode, SECTION));
   return r[0]?.n ?? 0;
 }
 
@@ -78,12 +84,15 @@ export async function listPlayers(opts: {
   band?: string;
   sort?: "name" | "band" | "perf";
   limit?: number;
+  scope?: Scope;
 }): Promise<PlayerListResult> {
   const d = db();
   const limit = opts.limit ?? 200;
   const q = (opts.q ?? "").trim();
 
   const conds = [eq(players.sectionCode, SECTION)];
+  const scopeCond = opts.scope ? scopePlayerFilter(opts.scope) : null;
+  if (scopeCond) conds.push(scopeCond);
   if (q) {
     // Tokenize on whitespace and require EACH token to prefix-match a word in
     // the name (start of string, or after a space). So "Ben F" matches
@@ -167,7 +176,7 @@ export async function listPlayers(opts: {
       count: sql<number>`count(*)::int`,
     })
     .from(players)
-    .where(eq(players.sectionCode, SECTION))
+    .where(scopeCond ? and(eq(players.sectionCode, SECTION), scopeCond) : eq(players.sectionCode, SECTION))
     .groupBy(players.publishedNtrp);
   const bandCounts = bc
     .filter((b) => b.band !== null)

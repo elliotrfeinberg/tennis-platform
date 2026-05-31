@@ -167,6 +167,12 @@
   .mm-nav-search-label { display: none !important; }
 
   .mm-footer { padding: 22px 16px !important; }
+
+  /* scope bar: tag + count on top row, the cascading menus scroll on a second */
+  .mm-scopebar { flex-wrap: wrap !important; padding: 8px 14px !important; row-gap: 10px !important; min-height: 0 !important; }
+  .mm-scope-spacer { display: none !important; }
+  .mm-scope-right { margin-left: auto !important; }
+  .mm-scope-menus { order: 5 !important; width: 100% !important; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
 }
 
 /* ---- primitives ------------------------------------------------------- */
