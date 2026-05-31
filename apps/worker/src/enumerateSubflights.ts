@@ -207,8 +207,10 @@ async function walkPlayers(
     (await db.select({ p: subflightEnumVisits.par1 }).from(subflightEnumVisits)).map((r) => r.p)
   );
   const candRows = (await db.execute(sql`
-    SELECT DISTINCT tennislink_par1 AS par1 FROM player_year_ratings
-    WHERE tennislink_par1 IS NOT NULL ${opts.year ? sql`AND year = ${opts.year}` : sql``}
+    SELECT par1 FROM (
+      SELECT DISTINCT tennislink_par1 AS par1 FROM player_year_ratings
+      WHERE tennislink_par1 IS NOT NULL ${opts.year ? sql`AND year = ${opts.year}` : sql``}
+    ) q
     ORDER BY random()
   `)) as unknown as Array<{ par1: string }>;
   const players = candRows.filter((c) => !walked.has(c.par1));
