@@ -64,6 +64,20 @@ node_modules/.bin/tsx src/cli.ts db normalize-matches
 node_modules/.bin/tsx src/cli.ts db compute-ratings --persist
 ```
 
+### Refresh subflight names (real "… - DN 1" labels)
+
+Normalize derives subflight *pods* from match connectivity (named `<flight> · N`
+provisionally). The crawl gives them their real USTA names + standings. Paced
+browser crawl; resumable (skips flights already in `subflight_catalog`):
+
+```bash
+cd apps/worker
+node_modules/.bin/tsx src/cli.ts db enumerate-subflights --year 2026   # [--limit N]
+```
+
+Runs as a step in `scripts/pipeline.sh` after `normalize`. Renaming subflights
+doesn't change ratings, so no recompute needed after.
+
 ### Scheduled daily delta (production)
 
 `scripts/incremental.sh` (wraps `db incremental`) + `scripts/crontab.example`

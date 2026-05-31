@@ -50,5 +50,7 @@ run_until_ok "enumerate-flights" $TSX src/cli.ts db enumerate-flights --years "$
 run_until_ok "backfill-2026"     $TSX src/cli.ts db backfill-scorecards-db --year 2026 "${DELAY[@]}"
 run_until_ok "backfill-2025"     $TSX src/cli.ts db backfill-scorecards-db --year 2025 "${DELAY[@]}"
 run_until_ok "normalize"         $TSX src/cli.ts db normalize-matches
+run_until_ok "subflights-2026"   $TSX src/cli.ts db enumerate-subflights --year 2026 "${DELAY[@]}"
+run_until_ok "subflights-2025"   $TSX src/cli.ts db enumerate-subflights --year 2025 "${DELAY[@]}"
 run_until_ok "compute-ratings"   $TSX src/cli.ts db compute-ratings --persist
 log "=== PIPELINE DONE ==="

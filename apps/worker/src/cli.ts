@@ -1450,7 +1450,7 @@ function usage(): never {
   tennis-scrape db load-players [--ratings-dir <dir>] [--years 2025,2026]
                        (loads crawl-norcal rating dumps into Postgres: players + player_year_ratings. players permanent, years additive)
   tennis-scrape db enumerate-flights [--years 2025,2026] [--limit-players N] [--stop-after-barren N] [--min-delay MS] [--max-delay MS]
-  tennis-scrape db enumerate-subflights [--year N] [--limit N] [--min-delay MS] [--max-delay MS]   (real subflight names + standings)
+  tennis-scrape db enumerate-subflights [--year N] [--walk] [--stop-after-barren N] [--limit N] [--min-delay MS] [--max-delay MS]   (real subflight names; --walk = full coverage via player walk)
                        (walks players (rating-search par1 → t=T-0 record) to DISCOVER every flight, scraping each new flight's Match Summary into flight_catalog + flight_matches; resumable + self-terminating on saturation. --years restricts to those season years (a record page lists all years a member played). Defaults: 500 players, stop after 150 barren. Set TENNIS_ACCOUNT for auto-login.)
   tennis-scrape db backfill-flight-matches [--years 2026] [--limit N] [--refresh] [--min-delay MS] [--max-delay MS]
                        (retry/refresh the Match Summary scrape for catalogued flights with no matches yet; --refresh re-scrapes all; --years scopes to active seasons)
@@ -1637,6 +1637,8 @@ async function main() {
           let limit: number | undefined;
           let minDelayMs = 3000;
           let maxDelayMs = 5000;
+          let walk = false;
+          let stopAfterBarren = 150;
           let databaseUrl = process.env.DATABASE_URL;
           for (let i = 0; i < rest.length; i++) {
             const arg = rest[i]!;
@@ -1648,6 +1650,8 @@ async function main() {
             };
             if (arg === "--year") year = Number(next());
             else if (arg === "--limit") limit = Number(next());
+            else if (arg === "--walk") walk = true;
+            else if (arg === "--stop-after-barren") stopAfterBarren = Number(next());
             else if (arg === "--min-delay") minDelayMs = Number(next());
             else if (arg === "--max-delay") maxDelayMs = Number(next());
             else if (arg === "--database-url") databaseUrl = next();
@@ -1658,7 +1662,7 @@ async function main() {
             process.exit(2);
           }
           await ensureAccountSession();
-          await enumerateSubflights({ databaseUrl, year, limit, minDelayMs, maxDelayMs });
+          await enumerateSubflights({ databaseUrl, year, limit, minDelayMs, maxDelayMs, walk, stopAfterBarren });
           break;
         }
         if (sub === "backfill-flight-matches") {
