@@ -381,6 +381,16 @@ async function splitSubflightsByConnectivity(
   };
   for (const e of edgeRows) if (parent.has(e.a) && parent.has(e.b)) union(e.a, e.b);
 
+  // Flights whose subflights the crawl has already given real names ("… - DN 1")
+  // are left untouched — re-splitting would clobber those crawled names.
+  const namedFlights = new Set(
+    (
+      (await db.execute(sql`
+        SELECT DISTINCT flight_id AS "flightId" FROM subflights WHERE reach_par1 IS NOT NULL
+      `)) as unknown as Array<{ flightId: string }>
+    ).map((r) => r.flightId)
+  );
+
   // Group teams by flight, then by component root.
   const byFlight = new Map<string, Array<{ id: string; name: string }>>();
   for (const t of teamRows) {
@@ -391,6 +401,7 @@ async function splitSubflightsByConnectivity(
 
   let splitCount = 0;
   for (const [flightId, ts] of byFlight) {
+    if (namedFlights.has(flightId)) continue; // preserve crawled subflight names
     const comps = new Map<string, string[]>();
     const compName = new Map<string, string>(); // root -> alphabetically-first team name
     for (const t of ts) {
@@ -426,9 +437,12 @@ async function splitSubflightsByConnectivity(
     splitCount += 1;
   }
 
-  // Drop subflights left with no teams (the old synthetic ones we split out of).
+  // Drop empty synthetic subflights we split out of — but never a named
+  // (crawled) one, even if momentarily teamless.
   await db.execute(sql`
-    DELETE FROM subflights WHERE id NOT IN (SELECT DISTINCT subflight_id FROM teams)
+    DELETE FROM subflights
+    WHERE reach_par1 IS NULL
+      AND id NOT IN (SELECT DISTINCT subflight_id FROM teams)
   `);
   return splitCount;
 }
