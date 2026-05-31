@@ -35,7 +35,7 @@ function demoData(): ProfileData {
     perf: p.perf, adult: p.adult, mixed: p.mixed, adultMatches: p.adultMatches, mixedMatches: p.mixedMatches,
     record: p.record, trend30: p.trend30, confidence: p.confidence, rankLabel: "#" + p.rank.pos,
     series: (() => {
-      const mk = (m: (typeof DEMO.log)[number]) => ({ date: m.date, post: m.post as number, won: m.won, kind: m.kind, line: m.line, opp: m.opp, partner: m.partner, sets: m.sets });
+      const mk = (m: (typeof DEMO.log)[number]) => ({ date: m.date, post: m.post as number, perf: m.perf, won: m.won, kind: m.kind, line: m.line, opp: m.opp, partner: m.partner, sets: m.sets });
       const rated = DEMO.log.filter((m) => m.post != null);
       return [
         { key: "adult", label: "Adult", color: "var(--court)", points: rated.filter((m) => m.cat !== "mixed").map(mk) },

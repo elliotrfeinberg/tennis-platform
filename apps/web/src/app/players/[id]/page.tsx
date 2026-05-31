@@ -48,6 +48,7 @@ export default async function Page({
   const mkPoint = (m: (typeof p.matchLog)[number]): ChartPoint => ({
     date: isoDate(m.playedOn),
     post: m.postRating!,
+    perf: m.perf,
     won: m.won,
     kind: m.kind,
     line: m.line,

@@ -15,6 +15,9 @@ import { fmtDate, score, type Named } from "@/lib/demo";
 export interface ChartPoint {
   date: string;
   post: number;
+  // The player's individual performance rating for this match (the point's
+  // contribution to the rolling rating). Null only for no-impact matches.
+  perf?: number | null;
   won: boolean;
   kind: "S" | "D";
   line: number;
@@ -232,9 +235,15 @@ function Tooltip({ m, catLabel, color, x }: { m: ChartPoint; catLabel?: string; 
         </div>
       )}
       <div className="mm-mono" style={{ fontSize: 13, marginTop: 3, color: "var(--ink-2)" }}>{score(m.sets)}</div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, borderTop: "1px solid var(--hair-2)", paddingTop: 7 }}>
-        <span style={{ fontSize: 11, color: "var(--muted)" }}>Rating after</span>
-        <span className="mm-num" style={{ fontSize: 17, color }}>{m.post.toFixed(2)}</span>
+      <div style={{ marginTop: 8, borderTop: "1px solid var(--hair-2)", paddingTop: 7, display: "flex", flexDirection: "column", gap: 3 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <span style={{ fontSize: 11, color: "var(--muted)" }}>Match perf</span>
+          <span className="mm-mono" style={{ fontSize: 13, color: "var(--ink-2)" }}>{m.perf != null ? m.perf.toFixed(2) : "—"}</span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <span style={{ fontSize: 11, color: "var(--muted)" }}>Rating after</span>
+          <span className="mm-num" style={{ fontSize: 17, color }}>{m.post.toFixed(2)}</span>
+        </div>
       </div>
     </div>
   );
