@@ -6,7 +6,8 @@ import {
   type OpponentLineup,
   type OpponentCourt,
 } from "@tennis/optimizer";
-import { listFlights, flightStandings, teamDetail } from "./teams";
+import { listFlights, flightStandings, subflightStandings, teamUpcomingMatches, teamDetail, type StandingRow } from "./teams";
+import type { Scope } from "./scopeShared";
 
 export interface CaptainView {
   flights: Array<{ id: string; label: string }>;
@@ -16,8 +17,12 @@ export interface CaptainView {
   oppTeamId: string;
   myName: string;
   oppName: string;
+  // True when the opponent was prefilled from my team's next scheduled match.
+  oppFromSchedule: boolean;
   myRoster: Array<{ id: string; name: string; perf: number | null; band: number | null }>;
   oppRoster: Array<{ id: string; name: string; perf: number | null; band: number | null }>;
+  // Standings of the scoped subflight/flight (the "teams you play") — ranked.
+  standings: Array<{ id: string; name: string; w: number; l: number; cw: number; cl: number }>;
   lineups: Array<{ teamWin: number; exp: number; courts: Array<{ c: string; players: string[]; wp: number }> }>;
   evaluated: number;
   error?: string;
@@ -27,20 +32,41 @@ export async function buildCaptain(opts: {
   flightId?: string;
   myTeamId?: string;
   oppTeamId?: string;
+  scope?: Scope;
 }): Promise<CaptainView | null> {
   const flights = await listFlights();
   if (flights.length === 0) return null;
-  const flightId = opts.flightId && flights.some((f) => f.id === opts.flightId) ? opts.flightId : flights[0]!.id;
-  const { rows: standings } = await flightStandings(flightId);
-  const teams = standings.map((s) => ({ id: s.id, name: s.name }));
+  // Scope drives defaults: a scoped flight pre-selects it; a scoped subflight
+  // narrows the team universe to that real round-robin pod.
+  const scope = opts.scope;
+  const flightId =
+    (opts.flightId && flights.some((f) => f.id === opts.flightId) && opts.flightId) ||
+    (scope?.flight && flights.some((f) => f.id === scope.flight) && scope.flight) ||
+    flights[0]!.id;
+  const standingsRows: StandingRow[] = scope?.subflight
+    ? await subflightStandings(scope.subflight)
+    : (await flightStandings(flightId)).rows;
+  const teams = standingsRows.map((s) => ({ id: s.id, name: s.name }));
   const myTeamId = opts.myTeamId && teams.some((t) => t.id === opts.myTeamId) ? opts.myTeamId : teams[0]?.id ?? "";
-  const oppTeamId = opts.oppTeamId && teams.some((t) => t.id === opts.oppTeamId) && opts.oppTeamId !== myTeamId
-    ? opts.oppTeamId
-    : teams.find((t) => t.id !== myTeamId)?.id ?? "";
+
+  // Opponent: explicit > my team's next scheduled opponent > first other team.
+  let oppTeamId = "";
+  let oppFromSchedule = false;
+  if (opts.oppTeamId && teams.some((t) => t.id === opts.oppTeamId) && opts.oppTeamId !== myTeamId) {
+    oppTeamId = opts.oppTeamId;
+  } else if (myTeamId) {
+    const next = await teamUpcomingMatches(myTeamId);
+    if (next && teams.some((t) => t.id === next.oppTeamId)) {
+      oppTeamId = next.oppTeamId;
+      oppFromSchedule = true;
+    }
+  }
+  if (!oppTeamId) oppTeamId = teams.find((t) => t.id !== myTeamId)?.id ?? "";
 
   const flightList = flights.map((f) => ({ id: f.id, label: `${f.league} · ${f.name}` }));
   const base = {
-    flights: flightList, flightId, teams, myTeamId, oppTeamId,
+    flights: flightList, flightId, teams, myTeamId, oppTeamId, oppFromSchedule,
+    standings: standingsRows,
     myName: teams.find((t) => t.id === myTeamId)?.name ?? "—",
     oppName: teams.find((t) => t.id === oppTeamId)?.name ?? "—",
   };

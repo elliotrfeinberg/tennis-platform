@@ -85,6 +85,61 @@ export async function flightStandings(flightId: string): Promise<FlightStandings
   return { flight, rows };
 }
 
+// Standings scoped to a single subflight (the real round-robin pod) — same
+// math as flightStandings but over the subflight's teams. This is the "teams
+// you actually play" table a captain cares about.
+export async function subflightStandings(subflightId: string): Promise<StandingRow[]> {
+  const rows = (await db().execute(sql`
+    WITH ft AS (
+      SELECT t.id, t.name FROM teams t WHERE t.subflight_id = ${subflightId}
+    ),
+    perteam AS (
+      SELECT ft.id, ft.name,
+        sum(CASE WHEN tm.home_team_id = ft.id THEN tm.home_courts_won ELSE tm.visitor_courts_won END)::int AS cw,
+        sum(CASE WHEN tm.home_team_id = ft.id THEN tm.visitor_courts_won ELSE tm.home_courts_won END)::int AS cl,
+        sum(CASE WHEN (tm.home_team_id = ft.id AND tm.home_courts_won > tm.visitor_courts_won)
+                   OR (tm.visitor_team_id = ft.id AND tm.visitor_courts_won > tm.home_courts_won) THEN 1 ELSE 0 END)::int AS w,
+        sum(CASE WHEN (tm.home_team_id = ft.id AND tm.home_courts_won < tm.visitor_courts_won)
+                   OR (tm.visitor_team_id = ft.id AND tm.visitor_courts_won < tm.home_courts_won) THEN 1 ELSE 0 END)::int AS l
+      FROM ft
+      LEFT JOIN team_matches tm ON tm.home_team_id = ft.id OR tm.visitor_team_id = ft.id
+      GROUP BY ft.id, ft.name
+    )
+    SELECT id, name, coalesce(w,0) w, coalesce(l,0) l, coalesce(cw,0) cw, coalesce(cl,0) cl
+    FROM perteam
+    ORDER BY coalesce(w,0) DESC, (coalesce(cw,0) - coalesce(cl,0)) DESC, name ASC
+  `)) as unknown as StandingRow[];
+  return rows;
+}
+
+export interface UpcomingMatch {
+  matchId: string;
+  oppTeamId: string;
+  oppName: string;
+  date: string | null;
+}
+
+// A team's next not-yet-played match (the natural opponent to plan a lineup
+// against). Falls back to null when the schedule has no scheduled match.
+export async function teamUpcomingMatches(teamId: string): Promise<UpcomingMatch | null> {
+  const rows = (await db().execute(sql`
+    SELECT tm.id AS "matchId",
+      CASE WHEN tm.home_team_id = ${teamId} THEN tm.visitor_team_id ELSE tm.home_team_id END AS "oppTeamId",
+      CASE WHEN tm.home_team_id = ${teamId} THEN vt.name ELSE ht.name END AS "oppName",
+      coalesce(tm.date_scheduled, tm.played_on) AS d
+    FROM team_matches tm
+    JOIN teams ht ON ht.id = tm.home_team_id
+    JOIN teams vt ON vt.id = tm.visitor_team_id
+    WHERE (tm.home_team_id = ${teamId} OR tm.visitor_team_id = ${teamId})
+      AND tm.status = 'scheduled'
+    ORDER BY coalesce(tm.date_scheduled, tm.played_on) ASC NULLS LAST
+    LIMIT 1
+  `)) as unknown as Array<{ matchId: string; oppTeamId: string; oppName: string; d: string | null }>;
+  const r = rows[0];
+  if (!r) return null;
+  return { matchId: r.matchId, oppTeamId: r.oppTeamId, oppName: r.oppName, date: r.d ? new Date(r.d).toISOString().slice(0, 10) : null };
+}
+
 export interface TeamDetailData {
   id: string;
   name: string;

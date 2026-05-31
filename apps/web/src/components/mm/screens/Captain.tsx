@@ -94,13 +94,51 @@ function LineupCard({ rank, lu }: { rank: number; lu: CaptainView["lineups"][num
   );
 }
 
+function StandingsPanel({ v }: { v: CaptainView }) {
+  return (
+    <div className="mm-card mm-tablewrap" style={{ overflow: "hidden" }}>
+      <div style={{ padding: "13px 20px", borderBottom: "1px solid var(--hair)", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ink-2)" }}>
+        Subflight standings · {v.standings.length} teams
+      </div>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            {["#", "Team", "W", "L", "Court diff"].map((h, i) => (
+              <th key={i} style={{ padding: "9px 18px", fontSize: 10.5, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)", textAlign: i === 1 ? "left" : i < 1 ? "center" : "right", background: "var(--paper)" }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {v.standings.map((s, i) => {
+            const mine = s.id === v.myTeamId, opp = s.id === v.oppTeamId;
+            const diff = s.cw - s.cl;
+            return (
+              <tr key={s.id} style={{ borderTop: "1px solid var(--hair-2)", background: mine ? "var(--court-tint)" : opp ? "color-mix(in oklab, var(--cat-mixed) 12%, var(--card))" : "transparent" }}>
+                <td className="mm-num" style={{ padding: "10px 18px", textAlign: "center", fontSize: 16, color: i < 4 ? "var(--court)" : "var(--ink-2)" }}>{i + 1}</td>
+                <td style={{ padding: "10px 18px", fontWeight: mine || opp ? 700 : 600, fontSize: 14, color: "var(--ink)" }}>
+                  {s.name}{mine ? " · you" : opp ? " · opponent" : ""}
+                </td>
+                <td className="mm-num" style={{ padding: "10px 18px", textAlign: "right", fontSize: 15 }}>{s.w}</td>
+                <td className="mm-mono" style={{ padding: "10px 18px", textAlign: "right", color: "var(--muted)" }}>{s.l}</td>
+                <td className="mm-num" style={{ padding: "10px 18px", textAlign: "right", color: diff > 0 ? "var(--win)" : diff < 0 ? "var(--loss)" : "var(--muted)" }}>{(diff > 0 ? "+" : "") + diff}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function Captain({ view }: { view: CaptainView }) {
   const v = view;
   const right = (
     <div style={{ background: "rgba(255,255,255,.14)", borderRadius: 12, padding: "12px 18px", textAlign: "left" }}>
       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,.7)" }}>Optimizing</div>
       <div style={{ fontSize: 19, fontWeight: 700, color: "#fff", marginTop: 4 }}>{v.myName} vs {v.oppName}</div>
-      <div className="mm-mono" style={{ fontSize: 12.5, color: "rgba(255,255,255,.8)", marginTop: 2 }}>USTA Adult · 2S + 3D</div>
+      <div className="mm-mono" style={{ fontSize: 12.5, color: "rgba(255,255,255,.8)", marginTop: 2 }}>
+        USTA Adult · 2S + 3D{v.oppFromSchedule ? " · next match" : ""}
+      </div>
     </div>
   );
   return (
@@ -112,6 +150,7 @@ export function Captain({ view }: { view: CaptainView }) {
         <RosterPanel title={`${v.myName} — your roster`} sub={`${v.myRoster.length} players`} players={v.myRoster} />
         <RosterPanel title={`${v.oppName} — projected`} sub={`${v.oppRoster.length} players · strongest-first`} players={v.oppRoster} opponent />
       </div>
+      {v.standings.length > 1 && <StandingsPanel v={v} />}
       {v.error ? (
         <div className="mm-card" style={{ padding: "22px 24px", color: "var(--ink-2)", fontSize: 14, lineHeight: 1.5 }}>
           <span style={{ fontWeight: 700, color: "var(--ink)" }}>Can't optimize yet.</span> {v.error}
