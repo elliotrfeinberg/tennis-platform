@@ -94,6 +94,12 @@
   color-scheme: light;
 }
 
+/* Dark text for SOLID optic-yellow badges (band / confidence). The themed
+   --ball-ink is repurposed as bright-yellow TEXT in dark mode, so it can't sit
+   on a solid --ball background (yellow-on-yellow → invisible). --ball is bright
+   in every theme, so its on-text is always this dark olive. */
+.mm-light, .mm-dark, .mm-court { --on-ball: #4a530f; }
+
 /* ---- responsive / mobile --------------------------------------------- */
 /* The app ships TWO layouts that share one server data fetch: a desktop one
    (top nav + dense tables) and a purpose-built mobile one (top bar + bottom

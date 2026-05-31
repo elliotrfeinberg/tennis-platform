@@ -23,7 +23,7 @@ export function MobileHome({ view }: { view: HomeView }) {
             <div className="mm-num" style={{ fontSize: 78, lineHeight: 0.85, color: "#fff", marginTop: 2 }}>{t?.perf != null ? t.perf.toFixed(2) : "—"}</div>
           </div>
           {t?.band != null && (
-            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ball-ink)", background: "var(--ball)", padding: "4px 9px", borderRadius: 100, whiteSpace: "nowrap" }}>{t.band.toFixed(1)} BAND</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--on-ball)", background: "var(--ball)", padding: "4px 9px", borderRadius: 100, whiteSpace: "nowrap" }}>{t.band.toFixed(1)} BAND</span>
           )}
         </div>
         {t && (

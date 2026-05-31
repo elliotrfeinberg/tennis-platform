@@ -58,7 +58,7 @@ function Hero({ v }: { v: HomeView }) {
             <span style={{ width: 9, height: 9, borderRadius: 9, background: "var(--ball)", boxShadow: "0 0 0 4px rgba(215,232,77,.25)" }} />
             <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(255,255,255,.85)" }}>Top perf rating</span>
           </div>
-          {t?.band != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ball-ink)", background: "var(--ball)", padding: "3px 9px", borderRadius: 100 }}>{t.band.toFixed(1)} BAND</span>}
+          {t?.band != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--on-ball)", background: "var(--ball)", padding: "3px 9px", borderRadius: 100 }}>{t.band.toFixed(1)} BAND</span>}
         </div>
         <div style={{ position: "relative" }}>
           <div style={{ fontSize: 13, color: "rgba(255,255,255,.8)", fontWeight: 600 }}>{t ? t.name : "—"} · USTA NorCal</div>

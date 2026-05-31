@@ -94,7 +94,7 @@ function HeroSide({ p, align }: { p: H2HPlayer; align: "left" | "right" }) {
       <div className="mm-disp" style={{ fontSize: "clamp(22px, 6vw, 30px)", lineHeight: 1, textTransform: "uppercase", color: "#fff", textAlign: align, whiteSpace: "nowrap" }}>{p.name}</div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexDirection: align === "right" ? "row" : "row-reverse" }}>
         <span className="mm-num" style={{ fontSize: "clamp(40px, 12vw, 52px)", lineHeight: 1, color: "#fff" }}>{p.perf != null ? p.perf.toFixed(2) : "—"}</span>
-        {p.band != null && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ball-ink)", background: "var(--ball)", padding: "3px 8px", borderRadius: 100 }}>{p.band.toFixed(1)} BAND</span>}
+        {p.band != null && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--on-ball)", background: "var(--ball)", padding: "3px 8px", borderRadius: 100 }}>{p.band.toFixed(1)} BAND</span>}
       </div>
     </div>
   );

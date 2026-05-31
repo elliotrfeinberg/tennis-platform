@@ -111,7 +111,7 @@ function Hero({ d }: { d: ProfileData }) {
         {d.band != null && (
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
             <span style={{ fontSize: 13, color: "rgba(255,255,255,.82)", fontWeight: 600, whiteSpace: "nowrap" }}>In the {d.band.toFixed(1)} band <span className="mm-mono" style={{ color: "rgba(255,255,255,.6)" }}>({d.bandLow}–{d.bandHigh}]</span></span>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".04em", textTransform: "uppercase", padding: "4px 9px", borderRadius: 100, background: "var(--ball)", color: "var(--ball-ink)", whiteSpace: "nowrap" }}>{d.confidence} confidence</span>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".04em", textTransform: "uppercase", padding: "4px 9px", borderRadius: 100, background: "var(--ball)", color: "var(--on-ball)", whiteSpace: "nowrap" }}>{d.confidence} confidence</span>
           </div>
         )}
         {d.band != null && <div style={{ width: "100%", maxWidth: 360 }}><BandMeter d={d} /></div>}
