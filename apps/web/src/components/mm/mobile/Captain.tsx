@@ -57,6 +57,7 @@ function OppProjection({ v }: { v: CaptainView }) {
             <div style={{ fontWeight: 600, fontSize: 13, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.players.map((p) => p.name).join(" + ")}</div>
             <div style={{ fontSize: 11, color: "var(--muted)" }}>{c.players.map((p) => `${Math.round(p.propensity * 100)}%`).join(" · ")}</div>
           </div>
+          <span className="mm-num" style={{ fontSize: 16, color: "var(--court)", width: 42, textAlign: "right" }}>{c.rating != null ? c.rating.toFixed(2) : "—"}</span>
         </div>
       ))}
     </div>
@@ -87,7 +88,10 @@ function LineupCard({ rank, lu, total }: { rank: number; lu: CaptainView["lineup
         <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", borderTop: i ? "1px solid var(--hair-2)" : "none" }}>
           <span className="mm-mono" style={{ fontWeight: 600, fontSize: 12.5, color: "var(--court)", width: 24 }}>{c.c}</span>
           {c.points > 1 && <span style={{ fontSize: 9.5, fontWeight: 700, color: "var(--on-ball, #4a530f)", background: "var(--ball, #d8e36a)", padding: "1px 4px", borderRadius: 4, marginLeft: -6 }}>×{c.points}</span>}
-          <span style={{ flex: 1, minWidth: 0, fontWeight: 600, fontSize: 13.5, color: "var(--ink)" }}>{c.players.join(" + ")}</span>
+          <span style={{ flex: 1, minWidth: 0, fontWeight: 600, fontSize: 13.5, color: "var(--ink)" }}>
+            {c.players.join(" + ")}
+            {c.established && <span title="Regular partners" style={{ marginLeft: 6, fontSize: 9.5, fontWeight: 700, color: "var(--court)", background: "var(--court-tint)", padding: "1px 5px", borderRadius: 4 }}>pair</span>}
+          </span>
           <span className="mm-num" style={{ fontSize: 15, color: c.wp >= 0.5 ? "var(--court)" : "var(--loss)" }}>{Math.round(c.wp * 100)}%</span>
         </div>
       ))}

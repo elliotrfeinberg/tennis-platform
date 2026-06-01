@@ -26,9 +26,16 @@ import {
   ntrpWinProb,
   shrinkToFair,
   singlesWinProb,
+  DOUBLES_SCALE,
   SINGLES_SCALE,
+  PARTNER_CHEMISTRY_BONUS,
   type Doubles,
 } from "./winprob.js";
+
+// Canonical key for an unordered pair of player ids.
+export function pairKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
 
 export interface RosterPlayer {
   id: string;
@@ -58,6 +65,9 @@ export interface CourtAssignment {
   ourPlayerIds: string[]; // [id] for singles, [id, id] for doubles
   winProb: number;
   points: number; // points this court is worth
+  // True for a doubles court whose two players are an established pair (passed
+  // via OptimizeOptions.establishedPairs) — they got the chemistry bonus.
+  established: boolean;
 }
 
 export interface Lineup {
@@ -70,7 +80,8 @@ export interface Lineup {
 function courtWinProb(
   slot: CourtSlot,
   ours: RosterPlayer[],
-  theirs: OpponentCourt
+  theirs: OpponentCourt,
+  chemBonus = 0
 ): number {
   if (slot.kind === "S" && theirs.kind === "S" && ours.length === 1) {
     const base = singlesWinProb(ours[0]!.singlesRating, theirs.player);
@@ -80,7 +91,7 @@ function courtWinProb(
   if (slot.kind === "D" && theirs.kind === "D" && ours.length === 2) {
     const us: Doubles = { a: ours[0]!.doublesRating, b: ours[1]!.doublesRating };
     const them: Doubles = { a: theirs.a, b: theirs.b };
-    const base = doublesWinProb(us, them);
+    const base = doublesWinProb(us, them, DOUBLES_SCALE, chemBonus);
     const conf = courtConfidence([
       ours[0]!.doublesMatches,
       ours[1]!.doublesMatches,
@@ -145,7 +156,8 @@ function lineupFromAssignments(assignments: CourtAssignment[]): Lineup {
 function* enumerateLineups(
   available: RosterPlayer[],
   format: MatchFormat,
-  opponent: OpponentLineup
+  opponent: OpponentLineup,
+  establishedPairs?: ReadonlySet<string>
 ): Generator<Lineup> {
   if (opponent.courts.length !== format.courts.length) {
     throw new Error(
@@ -175,6 +187,7 @@ function* enumerateLineups(
           ourPlayerIds: [us[0]!.id],
           winProb: courtWinProb(slot, us, opp),
           points,
+          established: false,
         });
         yield* fill(courtIdx + 1);
         assignments.pop();
@@ -189,11 +202,13 @@ function* enumerateLineups(
           used[i] = true;
           used[j] = true;
           const us = [available[i]!, available[j]!];
+          const established = establishedPairs?.has(pairKey(us[0]!.id, us[1]!.id)) ?? false;
           assignments.push({
             slot,
             ourPlayerIds: [us[0]!.id, us[1]!.id],
-            winProb: courtWinProb(slot, us, opp),
+            winProb: courtWinProb(slot, us, opp, established ? PARTNER_CHEMISTRY_BONUS : 0),
             points,
+            established,
           });
           yield* fill(courtIdx + 1);
           assignments.pop();
@@ -212,6 +227,10 @@ export interface OptimizeOptions {
   // If true, also rank by expected POINTS (a "play to your numbers" lineup vs.
   // a "swing for the majority" lineup — they can differ).
   includeExpectedPointsRanking?: boolean;
+  // Established doubles pairs (canonical pairKey() of two of OUR player ids,
+  // 3+ matches together). Such pairs get a chemistry bonus, nudging the
+  // optimizer to keep them together.
+  establishedPairs?: ReadonlySet<string>;
 }
 
 export interface OptimizeResult {
@@ -240,7 +259,7 @@ export function optimizeLineup(
   const topN = options.topN ?? 5;
   const all: Lineup[] = [];
   let count = 0;
-  for (const lineup of enumerateLineups(available, format, opponent)) {
+  for (const lineup of enumerateLineups(available, format, opponent, options.establishedPairs)) {
     all.push(lineup);
     count += 1;
   }
@@ -264,7 +283,8 @@ export function evaluateLineup(
   roster: readonly RosterPlayer[],
   format: MatchFormat,
   opponent: OpponentLineup,
-  picks: readonly (readonly string[])[] // one entry per court, [id] or [id,id]
+  picks: readonly (readonly string[])[], // one entry per court, [id] or [id,id]
+  establishedPairs?: ReadonlySet<string>
 ): Lineup {
   if (picks.length !== format.courts.length) {
     throw new Error(`Expected ${format.courts.length} picks, got ${picks.length}`);
@@ -278,11 +298,16 @@ export function evaluateLineup(
       if (!p) throw new Error(`Unknown player id ${id}`);
       return p;
     });
+    const established =
+      slot.kind === "D" && ids.length === 2
+        ? establishedPairs?.has(pairKey(ids[0]!, ids[1]!)) ?? false
+        : false;
     return {
       slot,
       ourPlayerIds: [...ids],
-      winProb: courtWinProb(slot, ours, opp),
+      winProb: courtWinProb(slot, ours, opp, established ? PARTNER_CHEMISTRY_BONUS : 0),
       points: slot.points ?? 1,
+      established,
     };
   });
   return lineupFromAssignments(assignments);

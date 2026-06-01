@@ -152,6 +152,33 @@ export interface RosterPlayerRow {
   doublesMatches: number;
 }
 
+// How many doubles matches each pair of a team's players has played together.
+// Keyed by the two player ids sorted + joined with "|".
+export async function teamPartnerCounts(
+  teamId: string
+): Promise<Map<string, number>> {
+  const rows = (await db().execute(sql`
+    SELECT a AS pa, b AS pb, count(*)::int AS n FROM (
+      SELECT least(cm.home_player1_id, cm.home_player2_id) a,
+             greatest(cm.home_player1_id, cm.home_player2_id) b
+      FROM court_matches cm JOIN team_matches tm ON tm.id = cm.team_match_id
+      WHERE tm.home_team_id = ${teamId} AND cm.court_kind = 'D' AND cm.home_player2_id IS NOT NULL
+      UNION ALL
+      SELECT least(cm.visitor_player1_id, cm.visitor_player2_id),
+             greatest(cm.visitor_player1_id, cm.visitor_player2_id)
+      FROM court_matches cm JOIN team_matches tm ON tm.id = cm.team_match_id
+      WHERE tm.visitor_team_id = ${teamId} AND cm.court_kind = 'D' AND cm.visitor_player2_id IS NOT NULL
+    ) s
+    GROUP BY a, b
+  `)) as unknown as Array<{ pa: string; pb: string; n: number }>;
+  const map = new Map<string, number>();
+  for (const r of rows) {
+    const key = r.pa < r.pb ? `${r.pa}|${r.pb}` : `${r.pb}|${r.pa}`;
+    map.set(key, r.n);
+  }
+  return map;
+}
+
 export interface TeamDetailData {
   id: string;
   name: string;

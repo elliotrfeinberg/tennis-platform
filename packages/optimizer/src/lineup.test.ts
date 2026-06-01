@@ -4,6 +4,7 @@ import { resolveFormat, formatPoints } from "./leagueFormats.js";
 import {
   evaluateLineup,
   optimizeLineup,
+  pairKey,
   teamWinProbability,
   type OpponentLineup,
   type RosterPlayer,
@@ -252,6 +253,31 @@ describe("optimizeLineup", () => {
     // confidence = min(1,20)/5 = 0.2 → 0.5 + 0.2·(0.89 − 0.5) ≈ 0.578.
     expect(p).toBeGreaterThan(0.5);
     expect(p).toBeLessThan(0.65);
+  });
+});
+
+describe("partner chemistry", () => {
+  it("keeps an established pair together over a marginally-better split", () => {
+    // 5D. Four similar players b,c,d,e plus two anchors. Without chemistry the
+    // optimizer is free to pair any of them; with b+c marked as an established
+    // pair, the recommended lineup should keep b and c together.
+    const roster: RosterPlayer[] = [
+      player("a", 4.2), player("b", 3.81), player("c", 3.79),
+      player("d", 3.80), player("e", 3.80), player("f", 3.5),
+      player("g", 3.5), player("h", 3.5), player("i", 3.5), player("j", 3.5),
+    ];
+    const opponent: OpponentLineup = {
+      courts: FORMAT_MIXED_5D.courts.map(() => ({ kind: "D" as const, a: 3.7, b: 3.7 })),
+    };
+    const established = new Set([pairKey("b", "c")]);
+    const result = optimizeLineup(roster, FORMAT_MIXED_5D, opponent, { topN: 1, establishedPairs: established });
+    const top = result.byTeamWinProb[0]!;
+    const bcTogether = top.assignments.some(
+      (a) => a.ourPlayerIds.includes("b") && a.ourPlayerIds.includes("c")
+    );
+    expect(bcTogether).toBe(true);
+    const bcCourt = top.assignments.find((a) => a.ourPlayerIds.includes("b"))!;
+    expect(bcCourt.established).toBe(true);
   });
 });
 

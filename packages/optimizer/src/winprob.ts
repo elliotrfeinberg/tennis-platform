@@ -50,8 +50,18 @@ export function singlesWinProb(us: number, them: number, scale = SINGLES_SCALE):
   return ntrpWinProb(us, them, scale);
 }
 
-export function doublesWinProb(us: Doubles, them: Doubles, scale = DOUBLES_SCALE): number {
-  return ntrpWinProb(teamNtrp(us), teamNtrp(them), scale);
+// Effective-rating bonus applied to an ESTABLISHED doubles pair (partners who
+// have played together enough to have real chemistry). Nudges the optimizer to
+// keep proven pairings together; modest so it only sways genuinely close calls.
+export const PARTNER_CHEMISTRY_BONUS = 0.07;
+
+export function doublesWinProb(
+  us: Doubles,
+  them: Doubles,
+  scale = DOUBLES_SCALE,
+  chemBonus = 0
+): number {
+  return ntrpWinProb(teamNtrp(us) + chemBonus, teamNtrp(them), scale);
 }
 
 // Number of same-kind matches a player needs before their rating is fully

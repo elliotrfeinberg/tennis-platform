@@ -3,6 +3,7 @@ import {
   optimizeLineup,
   resolveFormat,
   formatPoints,
+  teamNtrp,
   type MatchFormat,
   type RosterPlayer,
   type OpponentLineup,
@@ -15,6 +16,7 @@ import {
   flightCourts,
   teamUpcomingMatches,
   teamLineupHistory,
+  teamPartnerCounts,
   teamDetail,
   type StandingRow,
   type RosterPlayerRow,
@@ -52,8 +54,11 @@ export interface OppCourtView {
   c: string;
   kind: "S" | "D";
   points: number;
+  // Effective court rating (singles rating, or the doubles team rating) — the
+  // number the optimizer matches your side against.
+  rating: number | null;
   // Projected opponent player(s) at this court + how often they play here.
-  players: Array<{ id: string; name: string; propensity: number }>;
+  players: Array<{ id: string; name: string; propensity: number; rating: number | null }>;
 }
 
 export interface LineupCourtView {
@@ -63,6 +68,8 @@ export interface LineupCourtView {
   players: string[];
   playerIds: string[];
   wp: number;
+  // True for a doubles court whose two players are an established pair.
+  established: boolean;
 }
 
 export interface LineupView {
@@ -238,17 +245,19 @@ export async function buildCaptain(opts: {
     const projection = projectOpponent(fmt, oppPool, oppHist);
     base.oppProjection = projection.map((c, i) => {
       const slot = fmt.courts[i]!;
-      return {
-        c: `${slot.kind}${slot.index}`,
-        kind: slot.kind,
-        points: slot.points ?? 1,
-        players: c.players.map((p) => {
-          const h = oppHist.get(p.id);
-          const spot = h?.spots.find((x: { court: string }) => x.court === `${slot.kind}${slot.index}`);
-          const propensity = h && h.total > 0 ? (spot?.count ?? 0) / h.total : 0;
-          return { id: p.id, name: p.name, propensity };
-        }),
-      };
+      const label = `${slot.kind}${slot.index}`;
+      const players = c.players.map((p) => {
+        const h = oppHist.get(p.id);
+        const spot = h?.spots.find((x: { court: string }) => x.court === label);
+        const propensity = h && h.total > 0 ? (spot?.count ?? 0) / h.total : 0;
+        return { id: p.id, name: p.name, propensity, rating: ratingFor(p, slot.kind) };
+      });
+      // Effective court rating: the singles rating, or the doubles team rating.
+      let rating: number | null = null;
+      if (slot.kind === "S" && c.players[0]) rating = ratingFor(c.players[0], "S");
+      else if (slot.kind === "D" && c.players[0] && c.players[1])
+        rating = teamNtrp({ a: ratingFor(c.players[0], "D"), b: ratingFor(c.players[1], "D") });
+      return { c: label, kind: slot.kind, points: slot.points ?? 1, rating, players };
     });
   }
 
@@ -297,9 +306,15 @@ export async function buildCaptain(opts: {
   });
   const opponent: OpponentLineup = { courts: oppCourts };
 
+  // Established doubles pairs on my team (3+ matches together) get a chemistry
+  // bonus so the optimizer keeps proven partnerships together.
+  const partnerCounts = myTeamId ? await teamPartnerCounts(myTeamId) : new Map();
+  const establishedPairs = new Set<string>();
+  for (const [k, n] of partnerCounts) if (n >= 3) establishedPairs.add(k);
+
   let result;
   try {
-    result = optimizeLineup(roster, fmt, opponent, { topN: 3 });
+    result = optimizeLineup(roster, fmt, opponent, { topN: 3, establishedPairs });
   } catch (e) {
     base.error = e instanceof Error ? e.message : String(e);
     return base;
@@ -316,6 +331,7 @@ export async function buildCaptain(opts: {
       players: a.ourPlayerIds.map((id) => nameById.get(id) ?? "?"),
       playerIds: [...a.ourPlayerIds],
       wp: a.winProb,
+      established: a.established,
     })),
   }));
   return base;
