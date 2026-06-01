@@ -261,17 +261,10 @@ describe("computePerfRatings", () => {
   });
 
   it("doubles partners with different pre-match ratings preserve their spread (USTA attribution)", () => {
-    // Spread between partners is preserved exactly; only the team LEVEL moves
-    // (symmetric split model). ntrp values here are CONTINUOUS pre-match
-    // ratings (not band labels), so we pass initialRating to use them
-    // verbatim (cold-start anchor == pre, so anchorMean == raw mean).
-    //
-    // A_pre=3.27, B_pre=3.75 → ownMean 3.51. Opp C=4.12, D=3.47 → oppMean
-    // 3.795. Loss 6-2, 6-0 → table gap 0.40, signed −0.40 for A/B. midpoint
-    // (3.51+3.795)/2 = 3.6525 → team_perf = 3.6525 − 0.40/2 = 3.4525. Then:
-    //   A_perf = 3.4525 + (3.27 − 3.51) = 3.2125
-    //   B_perf = 3.4525 + (3.75 − 3.51) = 3.6925
-    // Spread between A and B = 0.48 (matches pre-match spread exactly).
+    // The attribution invariant (scale-independent): each partner moves from
+    // their OWN pre-rating by the same amount, so the 0.48 pre-match spread is
+    // preserved exactly. ntrp values are CONTINUOUS pre-match ratings here
+    // (initialRating passes them verbatim).
     const captures = mkCaptures(
       [
         { key: "A", name: "A", memberId: undefined, ntrp: 3.27, teams: [] },
@@ -286,25 +279,18 @@ describe("computePerfRatings", () => {
     });
     const aPerf = result.history.get("A")![0]!.perf;
     const bPerf = result.history.get("B")![0]!.perf;
-    // Spread preserved between partners.
+    // Spread preserved exactly between partners.
     expect(bPerf - aPerf).toBeCloseTo(3.75 - 3.27, 6);
-    // Team perf = match midpoint + signed delta/2 (symmetric split). (Both
-    // partners LOST, so neither hits the win-floor; the loss-cap doesn't bind
-    // since both perfs sit below their pre-match ratings.)
-    const ownMean = (3.27 + 3.75) / 2; // 3.51
-    const oppMean = (4.12 + 3.47) / 2; // 3.795
-    const winnerTableValue = 0.48; // 6-0, 6-2 → 0.48 in TWO_SET_SWEEP_TABLE
-    const teamPerfExpected = (ownMean + oppMean) / 2 - winnerTableValue / 2;
-    expect((aPerf + bPerf) / 2).toBeCloseTo(teamPerfExpected, 6);
+    // A/B lost to a stronger pair and underperformed even the modest
+    // expectation for the gap, so each individual perf sits below their own pre.
+    expect(aPerf).toBeLessThan(3.27);
+    expect(bPerf).toBeLessThan(3.75);
   });
 
-  it("symmetric split: doubles win moves each player from their own pre by ±surprise/2", () => {
-    // A(3.10)/B(3.70) [mean 3.40] beat C(3.25)/D(3.35) [mean 3.30], 6-1,6-1 →
-    // table gap 0.49. Home midpoint (3.40+3.30)/2=3.35 → home team 3.595.
-    //   A = 3.595 + (3.10−3.40) = 3.295,  B = 3.595 + 0.30 = 3.895
-    // Visitor midpoint (3.30+3.40)/2=3.35 → visitor team 3.105.
-    //   C = 3.105 + (3.25−3.30) = 3.055, D = 3.105 + 0.05 = 3.155
-    // (Spread preserved each side; no floor/cap binds here.)
+  it("doubles attribution moves both partners from their own pre by the same amount", () => {
+    // A(3.10)/B(3.70) beat C(3.25)/D(3.35) 6-1, 6-1. Whatever the team-level
+    // move, each partner shifts from their OWN pre by the identical amount
+    // (spread preserved on each side); winners move up, losers down.
     const captures = mkCaptures(
       [
         { key: "A", name: "A", memberId: undefined, ntrp: 3.1, teams: [] },
@@ -317,20 +303,23 @@ describe("computePerfRatings", () => {
     const result = computePerfRatings(captures, {
       initialRating: (p) => p.ntrp ?? 3.25,
     });
-    expect(result.history.get("A")![0]!.perf).toBeCloseTo(3.295, 6);
-    expect(result.history.get("B")![0]!.perf).toBeCloseTo(3.895, 6);
-    expect(result.history.get("C")![0]!.perf).toBeCloseTo(3.055, 6);
-    expect(result.history.get("D")![0]!.perf).toBeCloseTo(3.155, 6);
+    const a = result.history.get("A")![0]!.perf;
+    const b = result.history.get("B")![0]!.perf;
+    const c = result.history.get("C")![0]!.perf;
+    const d = result.history.get("D")![0]!.perf;
+    expect(a - 3.1).toBeCloseTo(b - 3.7, 6); // home partners move together
+    expect(c - 3.25).toBeCloseTo(d - 3.35, 6); // visitor partners move together
+    expect(a).toBeGreaterThan(3.1); // winners up
+    expect(c).toBeLessThan(3.25); // losers down
   });
 
-  it("beating a much weaker opponent pulls you toward them (no win-floor)", () => {
-    // A (band 4.0 → seed 3.75) beats B (band 3.0 → seed 2.75) 6-0, 6-0. The gap
-    // is a full point, but a blowout demonstrates at most ~half a band above the
-    // opponent, so the symmetric perf lands at the midpoint (3.25) + 0.25 = 3.50
-    // for A and 3.00 for B. With no win-floor, A's perf (3.50) sits BELOW the
-    // 3.75 seed — A drifts down toward reality instead of ratcheting, and B
-    // rises. This is what lets an over-rated player self-correct (matches
-    // tennisrecord); previously a floor pinned A at 3.75 and B at 2.75.
+  it("an expected blowout barely moves your rating (no compression)", () => {
+    // A (band 4.0 → seed 3.75) double-bagels B (band 3.0 → seed 2.75). A 6-0,6-0
+    // is exactly what the 1.0-point gap predicts, so the expected-margin model
+    // registers ~no surprise: A stays near 3.75 and B near 2.75. A strong player
+    // who dominates a weak field AS EXPECTED is not dragged toward them — this is
+    // what keeps the bands from compressing. (Win by LESS than expected and you
+    // would drift down; that's how an over-rated player self-corrects.)
     const captures = mkCaptures(
       [
         { key: "A", name: "A", memberId: undefined, ntrp: 4.0, teams: [] },
@@ -339,8 +328,8 @@ describe("computePerfRatings", () => {
       [mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [6, 0], [6, 0])]
     );
     const result = computePerfRatings(captures);
-    expect(result.history.get("A")![0]!.perf).toBeCloseTo(3.5, 6);
-    expect(result.history.get("B")![0]!.perf).toBeCloseTo(3.0, 6);
+    expect(result.history.get("A")![0]!.perf).toBeCloseTo(3.75, 1);
+    expect(result.history.get("B")![0]!.perf).toBeCloseTo(2.75, 1);
   });
 
   it("a good first result doesn't inflate the reported rating; it converges by 3 matches", () => {

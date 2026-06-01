@@ -18,12 +18,15 @@
 // performance ratings per stream. The CURRENT rating reported back to the
 // caller is a weighted mean of that stream's history.
 //
-// Doubles: side rating = mean of the two partners' current ratings. The
-// per-match team perf is a SYMMETRIC, zero-sum update (winner_team −
-// loser_team == the score-table gap, both centered on the match midpoint),
-// not the old "opponent + full delta" anchor. Individual attribution then
-// moves every partner equally from their own pre-rating, preserving the
-// partner spread. See the teamPerf computation below for the formula.
+// Per-match perf is an EXPECTED-MARGIN (Elo-style) update: a side moves from
+// its own pre-rating by PERF_K × (actual margin-score − expected margin-score
+// given the rating gap). Performing exactly to your gap → no move (so a strong
+// player who dominates a weak field as expected isn't dragged down, and the
+// bands don't compress); over-/under-performing drifts you toward your true
+// level in BOTH directions, with no win-floor ratchet. Doubles: side rating =
+// mean of partners' current ratings; individual attribution then moves every
+// partner equally from their own pre-rating, preserving the partner spread.
+// See the teamPerf computation below.
 
 import { scoreToPerfDelta, type PerfSetScore } from "@tennis/ratings";
 import type { CapturesData, PlayerLabel } from "./loadCaptures.js";
@@ -150,6 +153,28 @@ const DEFAULT_WEIGHT_FN = (k: number): number => (k < 10 ? 1 : 0);
 // their band prior so a mis-rate doesn't contaminate everyone they play.
 const ESTABLISHED_MATCHES = 3;
 const SELF_RATE_MATCHES = 5;
+
+// Expected-margin (Elo-style) per-match model. A player's match perf moves from
+// their pre-rating by PERF_K × (actual result − expected result given the
+// rating gap), where the result is a margin-score in [0,1] (0.5 = dead even,
+// 1 = a double-bagel win). Because the expected-score logistic SATURATES, an
+// established player who performs exactly to their gap gets ~no move — so a
+// genuine blowout-artist isn't dragged toward weaker opponents (no compression)
+// while over-/under-performers drift toward their true level. PERF_K = 0.5
+// reproduces the prior symmetric spread on EVENLY matched courts (gap 0). Both
+// constants are env-overridable for calibration sweeps.
+const envNum = (name: string, fallback: number): number => {
+  const v = Number(process.env[name]);
+  return Number.isFinite(v) ? v : fallback;
+};
+const PERF_K = envNum("PERF_K", 0.5);
+// Lower = steeper expectation = more correction toward the opponent level (and
+// slightly more band compression); higher = closer to the old symmetric model.
+// 0.4 keeps band means on their midpoints while nudging the tails toward their
+// opponents (tennisrecord-ward).
+const PERF_EXPECT_SCALE = envNum("PERF_EXPECT_SCALE", 0.4);
+const expectedScore = (gap: number): number =>
+  1 / (1 + Math.pow(10, -gap / PERF_EXPECT_SCALE));
 
 // NTRP bands are continuous half-open ranges:
 //   3.0 band = (2.5001, 3.0000]  → midpoint 2.75
@@ -431,8 +456,10 @@ export function computePerfRatings(
     const visitorAnchorMean = mean(
       m.visitorPlayerKeys.map((k) => kindAnchor(k, kind))
     );
-    const homePerf = (homeMean + visitorAnchorMean) / 2 + homeDelta / 2;
-    const visitorPerf = (visitorMean + homeAnchorMean) / 2 + visitorDelta / 2;
+    const homePerf =
+      homeMean + PERF_K * (0.5 + homeDelta - expectedScore(homeMean - visitorAnchorMean));
+    const visitorPerf =
+      visitorMean + PERF_K * (0.5 + visitorDelta - expectedScore(visitorMean - homeAnchorMean));
 
     const applySide = (
       keys: string[],
@@ -588,8 +615,14 @@ export function computePerfRatings(
     // opponents pulled toward their band prior); our own side uses raw means.
     const homeDelta = scoreToPerfDelta(homeSets, m.homeWon); // + if home won
     const visitorDelta = scoreToPerfDelta(visitorSets, !m.homeWon); // opposite sign
-    const homePerf = (homeMean + visitorAnchorMean) / 2 + homeDelta / 2;
-    const visitorPerf = (visitorMean + homeAnchorMean) / 2 + visitorDelta / 2;
+    // Expected-margin update: move from your own pre-rating by the surprise
+    // (actual margin-score vs. what the rating gap predicted). Anchored on the
+    // opponent for competitive gaps, but self-preserving when the gap exceeds
+    // what a score can express (saturated expectation → no compression).
+    const homePerf =
+      homeMean + PERF_K * (0.5 + homeDelta - expectedScore(homeMean - visitorAnchorMean));
+    const visitorPerf =
+      visitorMean + PERF_K * (0.5 + visitorDelta - expectedScore(visitorMean - homeAnchorMean));
 
     // Update the hidden per-kind (singles/doubles) streams from this same
     // result. Independent of the category streams and run BEFORE the category
