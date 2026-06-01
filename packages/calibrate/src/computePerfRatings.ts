@@ -78,6 +78,12 @@ export interface PerfMatchEntry {
   line: number;
   kind: "S" | "D";
 
+  // The player's rolling rating in the per-KIND stream (singles or doubles,
+  // per this court's kind) going INTO this match. Only set for rating-affecting
+  // matches. Persisted so the win-prob scales can be calibrated on the real
+  // kind-specific ratings the optimizer actually uses.
+  kindPreRating?: number;
+
   // Category of this match.
   category: MatchCategory;
   // Whether this match updated any rating stream (false for combo/other).
@@ -389,7 +395,9 @@ export function computePerfRatings(
   const rateKindStream = (
     m: CapturesData["matches"][number],
     homeDelta: number,
-    visitorDelta: number
+    visitorDelta: number,
+    // Filled with each participant's kind pre-rating, for the history entry.
+    kindPreOut: Map<string, number>
   ): void => {
     const kind = m.kind;
     const histMap = kind === "S" ? singlesHistory : doublesHistory;
@@ -425,6 +433,7 @@ export function computePerfRatings(
       for (let i = 0; i < keys.length; i++) {
         const key = keys[i]!;
         const partnerPre = pre[i]!;
+        kindPreOut.set(key, partnerPre);
         const rawPerf = sidePerf + (partnerPre - sideMean);
         const individualPerf = sideWon
           ? Math.max(rawPerf, partnerPre)
@@ -576,7 +585,9 @@ export function computePerfRatings(
     // result. Independent of the category streams and run BEFORE the category
     // appendForSide writes below, so kindLookup's display fallback sees
     // pre-match category ratings. Only rating-affecting matches participate.
-    if (affectsRating) rateKindStream(m, homeDelta, visitorDelta);
+    // kindPreByKey captures each participant's kind pre-rating for the entry.
+    const kindPreByKey = new Map<string, number>();
+    if (affectsRating) rateKindStream(m, homeDelta, visitorDelta, kindPreByKey);
 
     // Pre-compute game-diff for diagnostics in history entries.
     let gh = 0;
@@ -683,6 +694,7 @@ export function computePerfRatings(
           opponentTeamName,
           line: m.line,
           kind: m.kind,
+          kindPreRating: kindPreByKey.get(key),
           category,
           affectsRating,
           perfBasis: playerBasis,

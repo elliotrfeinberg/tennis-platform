@@ -14,7 +14,7 @@ export function OddsExplainer() {
           Each court&apos;s win chance comes from the <strong>rating gap</strong> between the two
           sides, run through a logistic curve <em>calibrated on 68,000 past
           NorCal matches</em> — not a guess. A <strong>+0.5</strong> rating edge wins about{" "}
-          <strong>90%</strong> in singles and <strong>92%</strong> in doubles.
+          <strong>89%</strong> in singles and <strong>93%</strong> in doubles.
         </p>
         <p style={{ margin: 0 }}>
           Singles courts use each player&apos;s <strong>singles</strong> rating and doubles courts

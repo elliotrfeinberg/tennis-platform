@@ -262,6 +262,7 @@ export async function computeRatingsFromDb(opts: {
           preRating: e.playerPreRating,
           postRating: e.playerPostRating,
           opponentRating: e.opponentRating,
+          kindPreRating: e.kindPreRating ?? null,
           won: e.won,
           affectsRating: e.affectsRating,
           perfBasis: e.perfBasis,

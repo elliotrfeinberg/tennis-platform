@@ -457,6 +457,10 @@ export const perfMatchResults = pgTable(
     preRating: doublePrecision("pre_rating"),
     postRating: doublePrecision("post_rating"),
     opponentRating: doublePrecision("opponent_rating"),
+    // The player's per-KIND (singles/doubles) rolling rating going into this
+    // match — the rating the optimizer actually uses. Null for combo/other.
+    // Calibration input for the per-kind win-prob scales.
+    kindPreRating: doublePrecision("kind_pre"),
     won: boolean("won").notNull(),
     // false for combo/other (shadow perf that doesn't move a rating stream)
     affectsRating: boolean("affects_rating").notNull().default(true),

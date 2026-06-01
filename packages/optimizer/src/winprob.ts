@@ -4,11 +4,13 @@
 //   P(us beat them) = 1 / (1 + 10^(-(us - them) / SCALE))
 //
 // SCALE sets how decisive a rating edge is. It was CALIBRATED empirically by
-// fitting this logistic against 68k historical rated courts (each side's
-// pre-match perf rating + the court outcome), per court kind:
+// fitting this logistic against the historical rated courts (each side's
+// pre-match perf rating + the court outcome), bucketed by court kind and using
+// the per-KIND rating the optimizer actually applies (singles courts → singles
+// rating, doubles courts → doubles rating; perf_match_results.kind_pre):
 //
-//   singles → 0.55   (a +0.5 NTRP edge ≈ 90%)
-//   doubles → 0.44   (a +0.5 NTRP edge ≈ 92%)
+//   singles → 0.54   (a +0.5 NTRP edge ≈ 89%)   [14.3k courts]
+//   doubles → 0.43   (a +0.5 NTRP edge ≈ 93%)   [47.6k courts]
 //
 // These are far more decisive than the old hand-set 1.0 (which implied +0.5 →
 // 75% and made the optimizer badly under-confident). Doubles is slightly
@@ -20,8 +22,8 @@
 // Court-order skill effects (line 1 vs 2 vs 3) are still ignored for v1.
 
 // Empirically-fit per-kind scales (see header).
-export const SINGLES_SCALE = 0.55;
-export const DOUBLES_SCALE = 0.44;
+export const SINGLES_SCALE = 0.54;
+export const DOUBLES_SCALE = 0.43;
 
 // Legacy generic default, kept for `ntrpWinProb` callers that don't specify a
 // kind. Prefer singlesWinProb / doublesWinProb, which default to the calibrated

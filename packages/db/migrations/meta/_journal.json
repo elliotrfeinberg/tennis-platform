@@ -71,6 +71,13 @@
       "when": 1780290634838,
       "tag": "0009_cold_iron_patriot",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1780292495505,
+      "tag": "0010_amazing_rafael_vega",
+      "breakpoints": true
     }
   ]
 }
