@@ -32,6 +32,27 @@ import {
 
 const SECTION = "USTA/NO. CALIFORNIA";
 
+// Does this flight carry an INDIVIDUAL NTRP level (the player's true band),
+// as opposed to a COMBINED level (Mixed / Combo / Tri-Level / 55&Over /
+// 65&Over, where the flight number is the sum of two partners)? Only
+// individual-level adult leagues (18&Over / 40&Over) tell us the level a
+// player personally registered at. Individual NTRP runs 2.0–5.5; combined
+// flights are ≥6 (or 0 when the level didn't parse, e.g. mislabeled daytime
+// flights). We additionally exclude any league name that screams combined,
+// for defense in depth against an out-of-range parse.
+function isIndividualAdultFlight(leagueName: string, ntrpLevel: number): boolean {
+  if (!(ntrpLevel >= 2.0 && ntrpLevel <= 5.5)) return false;
+  const up = leagueName.toUpperCase();
+  if (up.includes("COMBO") || up.includes("MIXED") || up.includes("TRI")) {
+    return false;
+  }
+  // 55 & Over / 65 & Over are doubles-only combined-rating leagues; their
+  // flight numbers are ≥6 and already excluded by the range, but guard the
+  // name too in case a stray low level slips through.
+  if (up.includes("55") || up.includes("65")) return false;
+  return true;
+}
+
 async function inChunks<T>(
   rows: T[],
   size: number,
@@ -96,6 +117,7 @@ export async function computeRatingsFromDb(opts: {
       homeName: string;
       visitorName: string;
       leagueName: string;
+      ntrpLevel: number;
       year: number;
     }
   >();
@@ -107,6 +129,7 @@ export async function computeRatingsFromDb(opts: {
       homeName: homeT.name,
       visitorName: visT.name,
       leagueName: leagues.name,
+      ntrpLevel: flights.ntrpLevel,
       year: leagues.year,
     })
     .from(teamMatches)
@@ -121,6 +144,7 @@ export async function computeRatingsFromDb(opts: {
       homeName: t.homeName,
       visitorName: t.visitorName,
       leagueName: t.leagueName,
+      ntrpLevel: t.ntrpLevel,
       year: t.year,
     });
   }
@@ -130,6 +154,22 @@ export async function computeRatingsFromDb(opts: {
   // back to the court.
   const matches: CourtMatch[] = [];
   const courtIdByKey = new Map<string, string>();
+  // Per-(player, season year) lowest INDIVIDUAL-adult flight level the player
+  // actually entered. In USTA you can play UP a level but never down, so the
+  // lowest individual-level league a player competed in that season is their
+  // true registration band — and, unlike publishedNtrp (which is the current,
+  // post-bump rating duplicated across years), it is immune to a future bump.
+  // We use it below to re-anchor the perf model's cold-start band.
+  const playedLevelByYear = new Map<string, Map<number, number>>();
+  const recordPlayed = (pid: string, year: number, level: number): void => {
+    let byYear = playedLevelByYear.get(pid);
+    if (!byYear) {
+      byYear = new Map<number, number>();
+      playedLevelByYear.set(pid, byYear);
+    }
+    const cur = byYear.get(year);
+    if (cur === undefined || level < cur) byYear.set(year, level);
+  };
   for (const c of await db
     .select({
       id: courtMatches.id,
@@ -147,6 +187,11 @@ export async function computeRatingsFromDb(opts: {
     const tm = tmMap.get(c.teamMatchId);
     if (!tm) continue;
     courtIdByKey.set(`${tm.matchId}#${c.kind}#${c.line}`, c.id);
+    if (isIndividualAdultFlight(tm.leagueName, tm.ntrpLevel)) {
+      for (const pid of [c.h1, c.h2, c.v1, c.v2]) {
+        if (pid) recordPlayed(pid, tm.year, tm.ntrpLevel);
+      }
+    }
     const sets = (c.sets as Array<{ home: number; visitor: number }>) ?? [];
     let gh = 0;
     let gv = 0;
@@ -176,6 +221,39 @@ export async function computeRatingsFromDb(opts: {
 
   matches.sort((a, b) => a.date.getTime() - b.date.getTime());
 
+  // Snapshot the published band BEFORE re-anchoring, so the calibration
+  // summary below can still bucket players by USTA's published level.
+  const publishedByKey = new Map<string, number | undefined>();
+  for (const [key, pl] of playerMap) publishedByKey.set(key, pl.ntrp);
+
+  // Re-anchor each player's cold-start band on the lowest individual-adult
+  // league they actually played, per season year. This replaces the perf
+  // model's reliance on publishedNtrp (which is the current, post-bump rating
+  // duplicated across years) with the level the player competed at DURING the
+  // season — fixing the symmetric cold-start bias where bumped-down players
+  // ended up rated too low and bumped-up players too high. Players with no
+  // individual-adult court that year (mixed/combo/daytime-only) keep their
+  // published band as the fallback.
+  let reanchored = 0;
+  let overrodePublished = 0;
+  for (const [pid, byYear] of playedLevelByYear) {
+    const pl = playerMap.get(pid);
+    if (!pl) continue;
+    reanchored += 1;
+    for (const [yr, lvl] of byYear) pl.ntrpByYear.set(yr, lvl);
+    // The scalar cold-start (initialRatingFn) fires on the player's FIRST
+    // match; anchor it on the earliest season they have an individual-adult
+    // signal for.
+    const earliestYear = Math.min(...byYear.keys());
+    const earliestLevel = byYear.get(earliestYear)!;
+    if (pl.ntrp !== earliestLevel) overrodePublished += 1;
+    pl.ntrp = earliestLevel;
+  }
+  console.error(
+    `Re-anchored cold-start band from lowest individual-adult league played ` +
+      `for ${reanchored} players (${overrodePublished} differed from publishedNtrp).`
+  );
+
   const captures: CapturesData = {
     year: matches[matches.length - 1]?.seasonYear ?? 0,
     ownTeamName: SECTION,
@@ -201,7 +279,7 @@ export async function computeRatingsFromDb(opts: {
     const total = pr.adultMatches + pr.mixedMatches;
     if (total < opts.minMatches || pr.display === undefined) continue;
     rated += 1;
-    const label = playerMap.get(key)?.ntrp;
+    const label = publishedByKey.get(key);
     if (label === undefined) continue;
     const arr = byBand.get(label) ?? [];
     arr.push(pr.display);
