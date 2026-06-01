@@ -110,15 +110,23 @@ export interface Lineup {
   teamWinProb: number; // probability of winning a majority of the match points
 }
 
+// Court win probability. The DISPLAYED probability is the honest rating-based
+// odds (no `nudges`). When `nudges` is passed, the soft preferences —
+// discipline affinity and partner chemistry — are folded in; that nudged value
+// is used ONLY to rank/recommend lineups, never shown, so a specialist-in-
+// position or an established pair tilts the recommendation without inflating
+// the reported %.
 function courtWinProb(
   slot: CourtSlot,
   ours: RosterPlayer[],
   theirs: OpponentCourt,
-  chemBonus = 0
+  nudges?: { chemBonus: number }
 ): number {
+  const aff = (p: RosterPlayer, k: "S" | "D") =>
+    nudges ? disciplineDelta(p, k) : 0;
   if (slot.kind === "S" && theirs.kind === "S" && ours.length === 1) {
     const base = singlesWinProb(
-      ours[0]!.singlesRating + disciplineDelta(ours[0]!, "S"),
+      ours[0]!.singlesRating + aff(ours[0]!, "S"),
       theirs.player
     );
     const conf = courtConfidence([totalMatches(ours[0]!), theirs.matches]);
@@ -126,11 +134,11 @@ function courtWinProb(
   }
   if (slot.kind === "D" && theirs.kind === "D" && ours.length === 2) {
     const us: Doubles = {
-      a: ours[0]!.doublesRating + disciplineDelta(ours[0]!, "D"),
-      b: ours[1]!.doublesRating + disciplineDelta(ours[1]!, "D"),
+      a: ours[0]!.doublesRating + aff(ours[0]!, "D"),
+      b: ours[1]!.doublesRating + aff(ours[1]!, "D"),
     };
     const them: Doubles = { a: theirs.a, b: theirs.b };
-    const base = doublesWinProb(us, them, DOUBLES_SCALE, chemBonus);
+    const base = doublesWinProb(us, them, DOUBLES_SCALE, nudges?.chemBonus ?? 0);
     const conf = courtConfidence([
       totalMatches(ours[0]!),
       totalMatches(ours[1]!),
@@ -190,6 +198,15 @@ function lineupFromAssignments(assignments: CourtAssignment[]): Lineup {
   };
 }
 
+// One enumerated lineup: the lineup itself (with DISPLAYED, raw win probs) plus
+// a separate `rankScore` — the team win prob computed from the nudged court
+// probs (discipline affinity + partner chemistry). rankScore is used only to
+// order/recommend; the lineup's shown probabilities are the honest odds.
+interface RankedLineup {
+  lineup: Lineup;
+  rankScore: number;
+}
+
 // Enumerate all valid assignments of available players to the format's courts.
 // Backtracking with each player used at most once.
 function* enumerateLineups(
@@ -197,7 +214,7 @@ function* enumerateLineups(
   format: MatchFormat,
   opponent: OpponentLineup,
   establishedPairs?: ReadonlySet<string>
-): Generator<Lineup> {
+): Generator<RankedLineup> {
   if (opponent.courts.length !== format.courts.length) {
     throw new Error(
       `Opponent lineup has ${opponent.courts.length} courts, format has ${format.courts.length}`
@@ -206,10 +223,15 @@ function* enumerateLineups(
 
   const used = new Array(available.length).fill(false);
   const assignments: CourtAssignment[] = [];
+  // Nudged per-court probs, parallel to `assignments`, for ranking only.
+  const rankProbs: Array<{ p: number; points: number }> = [];
 
-  function* fill(courtIdx: number): Generator<Lineup> {
+  function* fill(courtIdx: number): Generator<RankedLineup> {
     if (courtIdx === format.courts.length) {
-      yield lineupFromAssignments(assignments);
+      yield {
+        lineup: lineupFromAssignments(assignments),
+        rankScore: teamWinProbability(rankProbs),
+      };
       return;
     }
     const slot = format.courts[courtIdx]!;
@@ -224,12 +246,14 @@ function* enumerateLineups(
         assignments.push({
           slot,
           ourPlayerIds: [us[0]!.id],
-          winProb: courtWinProb(slot, us, opp),
+          winProb: courtWinProb(slot, us, opp), // raw (displayed)
           points,
           established: false,
         });
+        rankProbs.push({ p: courtWinProb(slot, us, opp, { chemBonus: 0 }), points });
         yield* fill(courtIdx + 1);
         assignments.pop();
+        rankProbs.pop();
         used[i] = false;
       }
     } else {
@@ -245,12 +269,19 @@ function* enumerateLineups(
           assignments.push({
             slot,
             ourPlayerIds: [us[0]!.id, us[1]!.id],
-            winProb: courtWinProb(slot, us, opp, established ? PARTNER_CHEMISTRY_BONUS : 0),
+            winProb: courtWinProb(slot, us, opp), // raw (displayed)
             points,
             established,
           });
+          rankProbs.push({
+            p: courtWinProb(slot, us, opp, {
+              chemBonus: established ? PARTNER_CHEMISTRY_BONUS : 0,
+            }),
+            points,
+          });
           yield* fill(courtIdx + 1);
           assignments.pop();
+          rankProbs.pop();
           used[i] = false;
           used[j] = false;
         }
@@ -296,22 +327,27 @@ export function optimizeLineup(
   }
 
   const topN = options.topN ?? 5;
-  const all: Lineup[] = [];
+  const all: RankedLineup[] = [];
   let count = 0;
-  for (const lineup of enumerateLineups(available, format, opponent, options.establishedPairs)) {
-    all.push(lineup);
+  for (const ranked of enumerateLineups(available, format, opponent, options.establishedPairs)) {
+    all.push(ranked);
     count += 1;
   }
 
+  // Recommend by the nudged rankScore (chemistry/affinity break ties toward
+  // proven pairings and in-discipline play), but return lineups whose shown
+  // probabilities are the honest, un-nudged odds.
   const byTeamWinProb = [...all]
-    .sort((a, b) => b.teamWinProb - a.teamWinProb)
-    .slice(0, topN);
+    .sort((a, b) => b.rankScore - a.rankScore)
+    .slice(0, topN)
+    .map((r) => r.lineup);
 
   const result: OptimizeResult = { byTeamWinProb, evaluated: count };
   if (options.includeExpectedPointsRanking) {
     result.byExpectedPoints = [...all]
-      .sort((a, b) => b.expectedPoints - a.expectedPoints)
-      .slice(0, topN);
+      .sort((a, b) => b.lineup.expectedPoints - a.lineup.expectedPoints)
+      .slice(0, topN)
+      .map((r) => r.lineup);
   }
   return result;
 }
@@ -344,7 +380,9 @@ export function evaluateLineup(
     return {
       slot,
       ourPlayerIds: [...ids],
-      winProb: courtWinProb(slot, ours, opp, established ? PARTNER_CHEMISTRY_BONUS : 0),
+      // Honest, un-nudged odds (matches the sandbox); `established` is just a
+      // display flag here.
+      winProb: courtWinProb(slot, ours, opp),
       points: slot.points ?? 1,
       established,
     };
