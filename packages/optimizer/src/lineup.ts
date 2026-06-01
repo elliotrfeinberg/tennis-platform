@@ -79,9 +79,19 @@ export interface OpponentLineup {
   courts: readonly OpponentCourt[];
 }
 
+// Opponent ratings per court. The *Matches fields are each player's TOTAL
+// rating-affecting matches (singles + doubles) — used only for the confidence
+// shrink, so a well-established opponent isn't treated as an unknown.
 export type OpponentCourt =
   | { kind: "S"; player: number; matches?: number }
   | { kind: "D"; a: number; b: number; aMatches?: number; bMatches?: number };
+
+// A player's total rating-affecting matches, or undefined when no counts are
+// supplied (treated as fully known — e.g. synthetic test players).
+function totalMatches(p: RosterPlayer): number | undefined {
+  if (p.singlesMatches === undefined && p.doublesMatches === undefined) return undefined;
+  return (p.singlesMatches ?? 0) + (p.doublesMatches ?? 0);
+}
 
 export interface CourtAssignment {
   slot: CourtSlot;
@@ -111,7 +121,7 @@ function courtWinProb(
       ours[0]!.singlesRating + disciplineDelta(ours[0]!, "S"),
       theirs.player
     );
-    const conf = courtConfidence([ours[0]!.singlesMatches, theirs.matches]);
+    const conf = courtConfidence([totalMatches(ours[0]!), theirs.matches]);
     return shrinkToFair(base, conf);
   }
   if (slot.kind === "D" && theirs.kind === "D" && ours.length === 2) {
@@ -122,8 +132,8 @@ function courtWinProb(
     const them: Doubles = { a: theirs.a, b: theirs.b };
     const base = doublesWinProb(us, them, DOUBLES_SCALE, chemBonus);
     const conf = courtConfidence([
-      ours[0]!.doublesMatches,
-      ours[1]!.doublesMatches,
+      totalMatches(ours[0]!),
+      totalMatches(ours[1]!),
       theirs.aMatches,
       theirs.bMatches,
     ]);

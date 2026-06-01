@@ -306,6 +306,43 @@ describe("discipline affinity", () => {
   });
 });
 
+describe("confidence shrink is not exploitable (Dana/Stella regression)", () => {
+  it("does not park a doubles veteran in singles to grab a fake coin flip", () => {
+    // Opponent singles is strong (4.0), so our singles courts are underdog.
+    // The OLD bug shrank an out-of-discipline player's court to 0.5, so the
+    // optimizer preferred fielding a 0-singles-match doubles veteran (Dana) at
+    // singles. With total-match confidence she keeps her real (underdog) rating
+    // there, so she stays in doubles and the singles specialist (Stella) plays
+    // singles.
+    const stella: RosterPlayer = {
+      id: "stella", name: "Stella", singlesRating: 3.46, doublesRating: 3.5,
+      singlesMatches: 17, doublesMatches: 0, available: true,
+    };
+    const dana: RosterPlayer = {
+      id: "dana", name: "Dana", singlesRating: 3.36, doublesRating: 3.34,
+      singlesMatches: 0, doublesMatches: 56, available: true,
+    };
+    const fillers: RosterPlayer[] = ["f1", "f2", "f3", "f4", "f5", "f6"].map((id) => ({
+      id, name: id, singlesRating: 3.5, doublesRating: 3.5,
+      singlesMatches: 5, doublesMatches: 5, available: true,
+    }));
+    const roster = [stella, dana, ...fillers];
+    const opponent: OpponentLineup = {
+      courts: FORMAT_ADULT_18.courts.map((c) =>
+        c.kind === "S"
+          ? { kind: "S" as const, player: 4.0, matches: 30 }
+          : { kind: "D" as const, a: 3.5, b: 3.5, aMatches: 30, bMatches: 30 }
+      ),
+    };
+    const result = optimizeLineup(roster, FORMAT_ADULT_18, opponent, { topN: 1 });
+    const top = result.byTeamWinProb[0]!;
+    const danaCourt = top.assignments.find((a) => a.ourPlayerIds.includes("dana"))!;
+    const stellaCourt = top.assignments.find((a) => a.ourPlayerIds.includes("stella"))!;
+    expect(danaCourt.slot.kind).toBe("D"); // doubles veteran stays in doubles
+    expect(stellaCourt.slot.kind).toBe("S"); // singles specialist plays singles
+  });
+});
+
 describe("evaluateLineup", () => {
   it("evaluates a hand-picked lineup", () => {
     const roster: RosterPlayer[] = [

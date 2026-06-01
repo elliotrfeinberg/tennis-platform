@@ -70,10 +70,17 @@ export function doublesWinProb(
   return ntrpWinProb(teamNtrp(us) + chemBonus, teamNtrp(them), scale);
 }
 
-// Number of same-kind matches a player needs before their rating is fully
-// trusted in a win-prob estimate. Below this we shrink the court probability
-// toward a coin flip (see shrinkToFair) — a thin rating shouldn't produce a
-// confident prediction.
+// Number of rating-affecting matches (TOTAL across singles + doubles) a player
+// needs before their rating is fully trusted in a win-prob estimate. Below this
+// we shrink the court probability toward a coin flip (see shrinkToFair) — a
+// brand-new player's rating shouldn't produce a confident prediction.
+//
+// This is deliberately based on TOTAL matches, not same-kind: a 56-match
+// doubles veteran has a well-established level even at singles, so we must NOT
+// treat their singles court as a 50/50 unknown (doing so let the optimizer game
+// the shrink — fielding an established player out of position to convert a
+// likely loss into a fake coin flip). Discipline fit is handled separately by
+// the discipline-affinity term.
 export const CONFIDENCE_RAMP = 5;
 
 // Pull a probability toward 0.5 by `confidence` ∈ [0,1]. confidence 1 leaves

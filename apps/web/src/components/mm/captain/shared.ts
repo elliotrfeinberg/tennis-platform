@@ -117,6 +117,9 @@ export function sandboxCourtProb(
   ours: (CaptainPlayer | undefined)[],
   theirs: (CaptainPlayer | undefined)[]
 ): number | null {
+  // Confidence uses TOTAL matches (how well we know each player's level),
+  // not same-kind — see CONFIDENCE_RAMP in @tennis/optimizer.
+  const tot = (p: CaptainPlayer) => p.singlesMatches + p.doublesMatches;
   if (kind === "S") {
     const a = ours[0];
     const b = theirs[0];
@@ -124,10 +127,7 @@ export function sandboxCourtProb(
     const ra = kindRating(a, "S");
     const rb = kindRating(b, "S");
     if (ra == null || rb == null) return null;
-    return shrinkToFair(
-      singlesWinProb(ra, rb),
-      courtConfidence([a.singlesMatches, b.singlesMatches])
-    );
+    return shrinkToFair(singlesWinProb(ra, rb), courtConfidence([tot(a), tot(b)]));
   }
   const [a1, a2] = ours;
   const [b1, b2] = theirs;
@@ -137,6 +137,6 @@ export function sandboxCourtProb(
   if (rs.some((x) => x == null)) return null;
   return shrinkToFair(
     doublesWinProb({ a: rs[0]!, b: rs[1]! }, { a: rs[2]!, b: rs[3]! }),
-    courtConfidence([a1.doublesMatches, a2.doublesMatches, b1.doublesMatches, b2.doublesMatches])
+    courtConfidence([tot(a1), tot(a2), tot(b1), tot(b2)])
   );
 }

@@ -293,15 +293,15 @@ export async function buildCaptain(opts: {
       .filter(Boolean);
     if (slot.kind === "S") {
       const p = players[0]!;
-      return { kind: "S", player: ratingFor(p, "S"), matches: p.singlesMatches };
+      return { kind: "S", player: ratingFor(p, "S"), matches: p.singlesMatches + p.doublesMatches };
     }
     const [a, b] = players;
     return {
       kind: "D",
       a: ratingFor(a!, "D"),
       b: ratingFor(b!, "D"),
-      aMatches: a!.doublesMatches,
-      bMatches: b!.doublesMatches,
+      aMatches: a!.singlesMatches + a!.doublesMatches,
+      bMatches: b!.singlesMatches + b!.doublesMatches,
     };
   });
   const opponent: OpponentLineup = { courts: oppCourts };
