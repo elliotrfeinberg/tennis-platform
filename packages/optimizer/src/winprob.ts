@@ -55,6 +55,12 @@ export function singlesWinProb(us: number, them: number, scale = SINGLES_SCALE):
 // keep proven pairings together; modest so it only sways genuinely close calls.
 export const PARTNER_CHEMISTRY_BONUS = 0.07;
 
+// Effective-rating adjustment for a player who mostly plays ONE discipline.
+// A singles specialist gets +bonus at singles and −bonus at doubles (and vice
+// versa), so the optimizer slots people into the discipline they actually play
+// — and doesn't over-trust a specialist's thin rating in the other one.
+export const DISCIPLINE_AFFINITY_BONUS = 0.1;
+
 export function doublesWinProb(
   us: Doubles,
   them: Doubles,

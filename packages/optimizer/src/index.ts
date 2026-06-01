@@ -18,6 +18,7 @@ export {
   DOUBLES_SCALE,
   CONFIDENCE_RAMP,
   PARTNER_CHEMISTRY_BONUS,
+  DISCIPLINE_AFFINITY_BONUS,
   ntrpWinProb,
   teamNtrp,
   doublesWinProb,

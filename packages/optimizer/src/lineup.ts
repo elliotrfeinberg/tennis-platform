@@ -29,12 +29,35 @@ import {
   DOUBLES_SCALE,
   SINGLES_SCALE,
   PARTNER_CHEMISTRY_BONUS,
+  DISCIPLINE_AFFINITY_BONUS,
   type Doubles,
 } from "./winprob.js";
 
 // Canonical key for an unordered pair of player ids.
 export function pairKey(a: string, b: string): string {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
+// Discipline-affinity rating delta for placing a player at a court of the given
+// kind. A player with a clear lean (≥80% of ≥3 rating-affecting matches in one
+// discipline) gets +bonus in their discipline and −bonus in the other, so the
+// optimizer keeps singles specialists in singles and doubles specialists in
+// doubles. Neutral / low-history players are unaffected.
+function disciplineDelta(p: RosterPlayer, kind: "S" | "D"): number {
+  const s = p.singlesMatches ?? 0;
+  const d = p.doublesMatches ?? 0;
+  const total = s + d;
+  if (total < 3) return 0;
+  const singlesSpecialist = s / total >= 0.8;
+  const doublesSpecialist = d / total >= 0.8;
+  if (kind === "S") {
+    if (singlesSpecialist) return DISCIPLINE_AFFINITY_BONUS;
+    if (doublesSpecialist) return -DISCIPLINE_AFFINITY_BONUS;
+  } else {
+    if (doublesSpecialist) return DISCIPLINE_AFFINITY_BONUS;
+    if (singlesSpecialist) return -DISCIPLINE_AFFINITY_BONUS;
+  }
+  return 0;
 }
 
 export interface RosterPlayer {
@@ -84,12 +107,18 @@ function courtWinProb(
   chemBonus = 0
 ): number {
   if (slot.kind === "S" && theirs.kind === "S" && ours.length === 1) {
-    const base = singlesWinProb(ours[0]!.singlesRating, theirs.player);
+    const base = singlesWinProb(
+      ours[0]!.singlesRating + disciplineDelta(ours[0]!, "S"),
+      theirs.player
+    );
     const conf = courtConfidence([ours[0]!.singlesMatches, theirs.matches]);
     return shrinkToFair(base, conf);
   }
   if (slot.kind === "D" && theirs.kind === "D" && ours.length === 2) {
-    const us: Doubles = { a: ours[0]!.doublesRating, b: ours[1]!.doublesRating };
+    const us: Doubles = {
+      a: ours[0]!.doublesRating + disciplineDelta(ours[0]!, "D"),
+      b: ours[1]!.doublesRating + disciplineDelta(ours[1]!, "D"),
+    };
     const them: Doubles = { a: theirs.a, b: theirs.b };
     const base = doublesWinProb(us, them, DOUBLES_SCALE, chemBonus);
     const conf = courtConfidence([

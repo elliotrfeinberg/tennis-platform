@@ -281,6 +281,31 @@ describe("partner chemistry", () => {
   });
 });
 
+describe("discipline affinity", () => {
+  it("slots a singles specialist into a singles court", () => {
+    // 8 players, all equal ratings vs an equal opponent. One player ("spec")
+    // almost exclusively plays singles — they should land at S1/S2, not in a
+    // doubles court.
+    const spec: RosterPlayer = {
+      id: "spec", name: "SPEC", singlesRating: 3.8, doublesRating: 3.8,
+      singlesMatches: 12, doublesMatches: 0, available: true,
+    };
+    const others = ["b", "c", "d", "e", "f", "g", "h"].map((id) => ({
+      id, name: id.toUpperCase(), singlesRating: 3.8, doublesRating: 3.8,
+      singlesMatches: 6, doublesMatches: 6, available: true,
+    }));
+    const roster: RosterPlayer[] = [spec, ...others];
+    const opponent: OpponentLineup = {
+      courts: FORMAT_ADULT_18.courts.map((c) =>
+        c.kind === "S" ? { kind: "S" as const, player: 3.6 } : { kind: "D" as const, a: 3.6, b: 3.6 }
+      ),
+    };
+    const result = optimizeLineup(roster, FORMAT_ADULT_18, opponent, { topN: 1 });
+    const specCourt = result.byTeamWinProb[0]!.assignments.find((a) => a.ourPlayerIds.includes("spec"))!;
+    expect(specCourt.slot.kind).toBe("S");
+  });
+});
+
 describe("evaluateLineup", () => {
   it("evaluates a hand-picked lineup", () => {
     const roster: RosterPlayer[] = [
