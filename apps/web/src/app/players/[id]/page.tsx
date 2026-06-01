@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Profile, type ProfileData, type ProfileLogRow } from "@/components/mm/screens/Profile";
 import { MobileProfile } from "@/components/mm/mobile/Profile";
-import { findPlayer, confidenceFromMatches } from "@/lib/players";
+import { findPlayer, confidenceFromMatches, computeBumpOutlook, currentSeasonYear } from "@/lib/players";
 import type { Named } from "@/lib/demo";
 import type { ChartPoint, ChartSeries } from "@/components/mm/RatingChart";
 
@@ -15,7 +15,7 @@ export default async function Page({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const p = await findPlayer(id);
+  const [p, seasonYear] = await Promise.all([findPlayer(id), currentSeasonYear()]);
   if (!p) notFound();
 
   const band = p.latestNtrp;
@@ -87,6 +87,34 @@ export default async function Page({
     (p.perfFull?.mixedMatches ?? 0) +
     (p.perfFull?.otherMatches ?? 0);
 
+  // Bump outlook: chance their TRUE level is in an adjacent band, from the
+  // computed rating + recent-match spread. Gated to the player's most recent
+  // rating year having 3+ rating-affecting (adult/mixed) matches.
+  const affecting = p.matchLog.filter(
+    (m) => m.affectsRating && m.perf != null && m.playedOn
+  );
+  let bump = null as ReturnType<typeof computeBumpOutlook>;
+  if (affecting.length) {
+    const yearOf = (m: (typeof affecting)[number]) =>
+      new Date(m.playedOn as Date).getFullYear();
+    // Gate on the data-derived current season (advances when a new year's
+    // matches are ingested), NOT the player's own latest year — an idle player
+    // with no matches this season won't show a bump outlook.
+    const matchesThisYear = affecting.filter((m) => yearOf(m) === seasonYear).length;
+    // The display rating is the adult track when present, else mixed; estimate
+    // its standard error from that same track's recent perfs.
+    const primaryIsMixed = (p.perfFull?.adult ?? null) == null;
+    const primaryPerfs = affecting
+      .filter((m) => (primaryIsMixed ? m.category === "mixed" : m.category !== "mixed"))
+      .map((m) => m.perf as number);
+    bump = computeBumpOutlook({
+      display: p.perfFull?.display ?? p.perf,
+      band,
+      primaryPerfs,
+      matchesThisYear,
+    });
+  }
+
   const data: ProfileData = {
     name: p.name,
     gender: p.gender,
@@ -109,6 +137,15 @@ export default async function Page({
     series,
     log,
     bands: p.bands.map((b) => ({ year: b.year, ntrp: b.ntrp, type: b.ratingType })),
+    bump: bump
+      ? {
+          band: bump.band,
+          up: bump.up,
+          down: bump.down,
+          upTarget: bump.upTarget,
+          downTarget: bump.downTarget,
+        }
+      : null,
   };
 
   return (

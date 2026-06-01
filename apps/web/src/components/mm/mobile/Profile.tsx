@@ -3,7 +3,7 @@
 // full interactive rating chart, and stacked match-log cards. Same ProfileData
 // the desktop profile consumes.
 import Link from "next/link";
-import type { ProfileData } from "@/components/mm/screens/Profile";
+import { BumpChips, type ProfileData } from "@/components/mm/screens/Profile";
 import { TrendArrow } from "@/components/mm/ui";
 import { RatingChart } from "@/components/mm/RatingChart";
 import { fmtDate, score, type Named } from "@/lib/demo";
@@ -62,6 +62,11 @@ export function MobileProfile({ data }: { data: ProfileData }) {
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5, fontSize: 10.5, fontFamily: "var(--font-mono)", color: "rgba(255,255,255,.7)" }}>
               <span>{d.bandLow.toFixed(2)}</span><span>mid {d.midpoint.toFixed(2)}</span><span>{d.bandHigh.toFixed(2)}</span>
             </div>
+          </div>
+        )}
+        {d.bump && (
+          <div style={{ display: "flex", justifyContent: "flex-start", marginTop: 10 }}>
+            <BumpChips bump={d.bump} />
           </div>
         )}
       </MHero>

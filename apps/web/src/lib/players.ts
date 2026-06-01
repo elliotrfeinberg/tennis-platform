@@ -59,6 +59,100 @@ export function confidenceFromMatches(n: number): "High" | "Med" | "Low" {
   return "Low";
 }
 
+// Standard-normal CDF via the Abramowitz–Stegun 7.1.26 tail approximation
+// (|error| < 7.5e-8). Φ(z) = P(Z ≤ z). No external dependency.
+function normCdf(z: number): number {
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = 0.3989422804014327 * Math.exp((-z * z) / 2);
+  const p =
+    d *
+    t *
+    (0.319381530 +
+      t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  return z >= 0 ? 1 - p : p;
+}
+
+// Minimum rating-affecting (adult/mixed) matches in the active rating year
+// before we'll show a bump outlook — mirrors USTA's 3-match threshold.
+export const BUMP_MIN_YEAR_MATCHES = 3;
+
+// The "current" rating season, derived from the DATA rather than the wall clock:
+// the latest calendar year for which we have any rated match. It advances to
+// 2027 automatically once 2027 matches are ingested — so the bump gate always
+// tracks "what years exist in the DB," not the system date.
+let _seasonYear: { v: number; at: number } | undefined;
+export async function currentSeasonYear(): Promise<number> {
+  // Memoize briefly — it only changes when a new season's matches land, and the
+  // profile page would otherwise re-query it on every view.
+  if (_seasonYear && Date.now() - _seasonYear.at < 60_000) return _seasonYear.v;
+  const d = db();
+  const r = await d
+    .select({ y: sql<number>`max(extract(year from ${perfMatchResults.playedOn}))::int` })
+    .from(perfMatchResults);
+  const v = r[0]?.y ?? new Date().getUTCFullYear();
+  _seasonYear = { v, at: Date.now() };
+  return v;
+}
+
+export interface BumpOutlook {
+  band: number; // reference published band (the band they're registered in)
+  up: number; // P(true level is above the band ceiling → a higher band)
+  down: number; // P(true level is at/below the band floor → a lower band)
+  upTarget: number; // most-likely destination band if bumped up
+  downTarget: number; // most-likely destination band if bumped down
+  matchesThisYear: number; // rating-affecting matches in the active year
+  se: number; // standard error of the rating estimate (for diagnostics)
+}
+
+// Likelihood the player's TRUE level sits in an adjacent NTRP band, given their
+// computed rating and the spread of their recent rating-affecting matches.
+//
+// We model the true level as Normal(display, SE), where SE is the standard
+// error of the rating estimate — the spread of recent per-match perfs divided
+// by √(matches used). A player camped on their band midpoint with many matches
+// has a tiny SE (≈0% bump); one near a band edge, or with few/volatile results,
+// has real mass spilling into the neighbouring band.
+//
+// Returns null when there isn't enough current-season signal (USTA needs 3+
+// adult/mixed matches in the rating year) or there's no reference band.
+export function computeBumpOutlook(args: {
+  display: number | null;
+  band: number | null;
+  // Recent PRIMARY-track (the track `display` reflects) rating-affecting perfs,
+  // chronological. Used to estimate the rating's standard error.
+  primaryPerfs: number[];
+  // Count of ALL rating-affecting (adult+mixed) matches in the active year.
+  matchesThisYear: number;
+}): BumpOutlook | null {
+  const { display, band, primaryPerfs, matchesThisYear } = args;
+  if (display == null || band == null) return null;
+  if (matchesThisYear < BUMP_MIN_YEAR_MATCHES) return null;
+
+  // Standard error from the spread of the last ~10 perfs (the rating window).
+  const recent = primaryPerfs.slice(-10);
+  const k = recent.length;
+  const mean = k ? recent.reduce((s, x) => s + x, 0) / k : display;
+  // Fall back to a typical single-match sd (~0.4) when we can't measure one.
+  const variance =
+    k > 1 ? recent.reduce((s, x) => s + (x - mean) ** 2, 0) / (k - 1) : 0.16;
+  const se = Math.max(Math.sqrt(variance) / Math.sqrt(Math.max(k, 1)), 0.05);
+
+  const ceil = band; // band range is (band-0.5, band]
+  const floor = band - 0.5;
+  const up = 1 - normCdf((ceil - display) / se);
+  const down = normCdf((floor - display) / se);
+
+  // Most-likely destination band. When the rating already sits OUTSIDE the
+  // published band (a player whose computed level is one or more bands off),
+  // point at the band the rating is actually in — clamped to NTRP [2.0, 7.0] —
+  // rather than always the immediately-adjacent band, so the label isn't
+  // understated for a 2.5-published / 4.0-rated player.
+  const ratedBand = Math.min(7.0, Math.max(2.0, Math.ceil(display * 2) / 2));
+  const upTarget = ratedBand > band ? ratedBand : band + 0.5;
+  const downTarget = ratedBand < band ? ratedBand : band - 0.5;
+  return { band, up, down, upTarget, downTarget, matchesThisYear, se };
+}
+
 export interface PlayerListResult {
   rows: PlayerRow[];
   total: number;
@@ -404,6 +498,7 @@ const RATING_TYPE_LABEL: Record<string, string> = {
   M: "Mixed",
   T: "Tournament",
   D: "Dynamic",
+  E: "Estimate", // our best-guess past-season band (lowest individual-adult league played)
 };
 export function ratingTypeLabel(t: string | null | undefined): string {
   if (!t) return "—";

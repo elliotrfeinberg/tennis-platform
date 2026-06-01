@@ -13,6 +13,12 @@ export interface ProfileLogRow {
   won: boolean; sets: Array<[number, number]>; perf: number | null; post: number | null;
 }
 
+// Chance the player's true level sits in another band (up / down), from the
+// computed rating + recent-match spread. null when not enough signal.
+export interface ProfileBump {
+  band: number; up: number; down: number; upTarget: number; downTarget: number;
+}
+
 export interface ProfileData {
   name: string; gender: string | null; memberId: string | null;
   section: string; homeTeam: string;
@@ -25,6 +31,32 @@ export interface ProfileData {
   series: ChartSeries[];
   log: ProfileLogRow[];
   bands: Array<{ year: number; ntrp: number | null; type: string | null }>;
+  bump?: ProfileBump | null;
+}
+
+// Only surface a bump direction when its probability clears this bar.
+const BUMP_THRESHOLD = 0.1;
+
+// Pills shown on the hero when an adjacent band is a live possibility.
+export function BumpChips({ bump }: { bump: ProfileBump }) {
+  const chips: Array<{ dir: "up" | "down"; prob: number; target: number }> = [];
+  if (bump.up > BUMP_THRESHOLD) chips.push({ dir: "up", prob: bump.up, target: bump.upTarget });
+  if (bump.down > BUMP_THRESHOLD) chips.push({ dir: "down", prob: bump.down, target: bump.downTarget });
+  if (!chips.length) return null;
+  return (
+    <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+      {chips.map((c) => (
+        <span
+          key={c.dir}
+          title={`Estimated ${Math.round(c.prob * 100)}% chance this player's true level is in the ${c.target.toFixed(1)} band, from their performance rating and the spread of recent matches.`}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, padding: "4px 11px", borderRadius: 100, background: "rgba(255,255,255,.14)", color: "#fff", whiteSpace: "nowrap" }}
+        >
+          <span style={{ color: "var(--ball)", fontSize: 11 }}>{c.dir === "up" ? "▲" : "▼"}</span>
+          {Math.round(c.prob * 100)}% chance of {c.target.toFixed(1)}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function demoData(): ProfileData {
@@ -49,6 +81,10 @@ function demoData(): ProfileData {
 
 const n2 = (v: number | null, d = "—") => (v == null ? d : v.toFixed(2));
 const n1 = (v: number | null, d = "—") => (v == null ? d : v.toFixed(1));
+
+// Short published-rating-type label for the band tables.
+const bandTypeWord = (t: string | null) =>
+  t === "S" ? "Self" : t === "A" ? "Appeal" : t === "E" ? "Estimate" : "Computer";
 
 // A match-log player name, linked to their profile when an id is present.
 function PName({ p }: { p: Named }) {
@@ -115,6 +151,7 @@ function Hero({ d }: { d: ProfileData }) {
           </div>
         )}
         {d.band != null && <div style={{ width: "100%", maxWidth: 360 }}><BandMeter d={d} /></div>}
+        {d.bump && <BumpChips bump={d.bump} />}
       </div>
     </div>
   );
@@ -134,7 +171,7 @@ function StatRow({ d }: { d: ProfileData }) {
   const total = d.record.w + d.record.l;
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
-      <Stat label="Roster band" value={n1(d.band)} sub={d.bands.length ? `${d.bands[d.bands.length - 1]!.year} · Computer` : ""} />
+      <Stat label="Roster band" value={n1(d.band)} sub={d.bands.length ? `${d.bands[d.bands.length - 1]!.year} · ${bandTypeWord(d.bands[d.bands.length - 1]!.type)}` : ""} />
       <Stat label="Adult" value={n2(d.adult)} sub={d.adultMatches + " matches"} accent />
       <Stat label="Mixed" value={n2(d.mixed)} sub={d.mixedMatches + " matches"} accent />
       <Stat label="Record" value={d.record.w + "–" + d.record.l} sub={total ? Math.round((d.record.w / total) * 100) + "% courts won" : "—"} />
@@ -267,7 +304,7 @@ function SideColumn({ d }: { d: ProfileData }) {
               {[...d.bands].reverse().map((b, i) => (
                 <tr key={i} style={{ borderTop: i ? "1px solid var(--hair-2)" : "none" }}>
                   <td style={{ padding: "12px 18px", fontWeight: 700, fontSize: 14 }}>{b.year}</td>
-                  <td style={{ padding: "12px 8px", fontSize: 12.5, color: "var(--muted)" }}>{b.type === "S" ? "Self" : b.type === "A" ? "Appeal" : "Computer"}</td>
+                  <td style={{ padding: "12px 8px", fontSize: 12.5, color: "var(--muted)" }}>{bandTypeWord(b.type)}</td>
                   <td className="mm-num" style={{ padding: "12px 18px", textAlign: "right", fontSize: 20, color: "var(--court)" }}>{n1(b.ntrp)}</td>
                 </tr>
               ))}
