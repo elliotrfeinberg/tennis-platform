@@ -193,19 +193,6 @@ export async function buildCaptain(opts: {
   }
   if (!oppTeamId) oppTeamId = teams.find((t) => t.id !== myTeamId)?.id ?? "";
 
-  // Resolve the league's real court format (lines + points) from the league
-  // name, using the flight's empirical lines as the authoritative court set.
-  const empirical = await flightCourts(flightId);
-  const fmt = resolveFormat(flight.league, empirical);
-  const { total, toClinch } = formatPoints(fmt);
-  const formatView: FormatView = {
-    name: fmt.name,
-    total,
-    toClinch,
-    courts: fmt.courts.map((c) => ({ c: `${c.kind}${c.index}`, kind: c.kind, points: c.points ?? 1 })),
-  };
-  const slotsNeeded = fmt.courts.reduce((n, c) => n + (c.kind === "S" ? 1 : 2), 0);
-
   const flightList = flights.map((f) => ({ id: f.id, label: `${f.league} · ${f.name}` }));
   const toCaptainPlayer = (r: RosterPlayerRow): CaptainPlayer => ({
     id: r.id, name: r.name, perf: r.perf, band: r.band,
@@ -220,9 +207,26 @@ export async function buildCaptain(opts: {
   const myRoster = (mine?.roster ?? []).map(toCaptainPlayer);
   const oppRoster = (opp?.roster ?? []).map(toCaptainPlayer);
 
+  // Resolve the court format from the SELECTED TEAM's real flight/league — not
+  // the dropdown's flightId, which can point elsewhere when a subflight scope
+  // is active (e.g. a Men's 5.0 flight that plays only S1+D1+D2). Falls back to
+  // the dropdown flight when no team is selected.
+  const fmtFlightId = mine?.flightId ?? flightId;
+  const fmtLeague = mine?.league ?? flight.league;
+  const empirical = await flightCourts(fmtFlightId);
+  const fmt = resolveFormat(fmtLeague, empirical);
+  const { total, toClinch } = formatPoints(fmt);
+  const formatView: FormatView = {
+    name: fmt.name,
+    total,
+    toClinch,
+    courts: fmt.courts.map((c) => ({ c: `${c.kind}${c.index}`, kind: c.kind, points: c.points ?? 1 })),
+  };
+  const slotsNeeded = fmt.courts.reduce((n, c) => n + (c.kind === "S" ? 1 : 2), 0);
+
   const base: CaptainView = {
     flights: flightList,
-    flightId,
+    flightId: fmtFlightId,
     teams,
     myTeamId,
     oppTeamId,
@@ -274,65 +278,69 @@ export async function buildCaptain(opts: {
     return base;
   }
 
-  const roster: RosterPlayer[] = availPool.map((p) => ({
-    id: p.id,
-    name: p.name,
-    singlesRating: ratingFor(p, "S"),
-    doublesRating: ratingFor(p, "D"),
-    singlesMatches: p.singlesMatches,
-    doublesMatches: p.doublesMatches,
-    available: true,
-  }));
-
-  // Opponent lineup for the optimizer, from the projection (kind-specific
-  // ratings + match counts for the confidence shrink).
-  const oppCourts: OpponentCourt[] = fmt.courts.map((slot, i) => {
-    const proj = base.oppProjection[i]!;
-    const players = proj.players
-      .map((pp) => oppRoster.find((r) => r.id === pp.id)!)
-      .filter(Boolean);
-    if (slot.kind === "S") {
-      const p = players[0]!;
-      return { kind: "S", player: ratingFor(p, "S"), matches: p.singlesMatches + p.doublesMatches };
-    }
-    const [a, b] = players;
-    return {
-      kind: "D",
-      a: ratingFor(a!, "D"),
-      b: ratingFor(b!, "D"),
-      aMatches: a!.singlesMatches + a!.doublesMatches,
-      bMatches: b!.singlesMatches + b!.doublesMatches,
-    };
-  });
-  const opponent: OpponentLineup = { courts: oppCourts };
-
-  // Established doubles pairs on my team (2+ matches together) get a chemistry
-  // bonus so the optimizer keeps proven partnerships together.
-  const partnerCounts = myTeamId ? await teamPartnerCounts(myTeamId) : new Map();
-  const establishedPairs = new Set<string>();
-  for (const [k, n] of partnerCounts) if (n >= 2) establishedPairs.add(k);
-
-  let result;
+  // Everything from here through the optimize is wrapped so a data hiccup
+  // degrades to a friendly message instead of crashing the page.
   try {
-    result = optimizeLineup(roster, fmt, opponent, { topN: 3, establishedPairs });
+    const roster: RosterPlayer[] = availPool.map((p) => ({
+      id: p.id,
+      name: p.name,
+      singlesRating: ratingFor(p, "S"),
+      doublesRating: ratingFor(p, "D"),
+      singlesMatches: p.singlesMatches,
+      doublesMatches: p.doublesMatches,
+      available: true,
+    }));
+
+    // Opponent lineup for the optimizer, from the projection (kind-specific
+    // ratings + match counts for the confidence shrink).
+    const oppCourts: OpponentCourt[] = fmt.courts.map((slot, i) => {
+      const proj = base.oppProjection[i]!;
+      const players = proj.players
+        .map((pp) => oppRoster.find((r) => r.id === pp.id))
+        .filter((p): p is CaptainPlayer => !!p && p.perf != null);
+      const need = slot.kind === "S" ? 1 : 2;
+      if (players.length < need) {
+        throw new Error("Not enough rated opponent players to fill every court.");
+      }
+      if (slot.kind === "S") {
+        const p = players[0]!;
+        return { kind: "S", player: ratingFor(p, "S"), matches: p.singlesMatches + p.doublesMatches };
+      }
+      const [a, b] = players;
+      return {
+        kind: "D",
+        a: ratingFor(a!, "D"),
+        b: ratingFor(b!, "D"),
+        aMatches: a!.singlesMatches + a!.doublesMatches,
+        bMatches: b!.singlesMatches + b!.doublesMatches,
+      };
+    });
+    const opponent: OpponentLineup = { courts: oppCourts };
+
+    // Established doubles pairs on my team (2+ matches together) get a
+    // chemistry bonus so the optimizer keeps proven partnerships together.
+    const partnerCounts = myTeamId ? await teamPartnerCounts(myTeamId) : new Map();
+    const establishedPairs = new Set<string>();
+    for (const [k, n] of partnerCounts) if (n >= 2) establishedPairs.add(k);
+
+    const result = optimizeLineup(roster, fmt, opponent, { topN: 3, establishedPairs });
+    const nameById = new Map(roster.map((p) => [p.id, p.name]));
+    base.evaluated = result.evaluated;
+    base.lineups = result.byTeamWinProb.map((lu) => ({
+      teamWin: lu.teamWinProb,
+      expPoints: lu.expectedPoints,
+      courts: lu.assignments.map((a) => ({
+        c: `${a.slot.kind}${a.slot.index}`,
+        kind: a.slot.kind,
+        points: a.points,
+        players: a.ourPlayerIds.map((id) => nameById.get(id) ?? "?"),
+        playerIds: [...a.ourPlayerIds],
+        wp: a.winProb,
+        established: a.established,
+      })),
+    }));
   } catch (e) {
     base.error = e instanceof Error ? e.message : String(e);
-    return base;
   }
-  const nameById = new Map(roster.map((p) => [p.id, p.name]));
-  base.evaluated = result.evaluated;
-  base.lineups = result.byTeamWinProb.map((lu) => ({
-    teamWin: lu.teamWinProb,
-    expPoints: lu.expectedPoints,
-    courts: lu.assignments.map((a) => ({
-      c: `${a.slot.kind}${a.slot.index}`,
-      kind: a.slot.kind,
-      points: a.points,
-      players: a.ourPlayerIds.map((id) => nameById.get(id) ?? "?"),
-      playerIds: [...a.ourPlayerIds],
-      wp: a.winProb,
-      established: a.established,
-    })),
-  }));
   return base;
 }

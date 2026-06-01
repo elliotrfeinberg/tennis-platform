@@ -182,6 +182,7 @@ export async function teamPartnerCounts(
 export interface TeamDetailData {
   id: string;
   name: string;
+  flightId: string;
   flightName: string;
   league: string;
   year: number;
@@ -249,13 +250,13 @@ export async function teamLineupHistory(
 
 export async function teamDetail(teamId: string): Promise<TeamDetailData | null> {
   const meta = (await db().execute(sql`
-    SELECT t.id, t.name, t.year, f.name AS flight, l.name AS league
+    SELECT t.id, t.name, t.year, f.id AS flight_id, f.name AS flight, l.name AS league
     FROM teams t
     JOIN subflights sf ON sf.id = t.subflight_id
     JOIN flights f ON f.id = sf.flight_id
     JOIN leagues l ON l.id = f.league_id
     WHERE t.id = ${teamId} LIMIT 1
-  `)) as unknown as Array<{ id: string; name: string; year: number; flight: string; league: string }>;
+  `)) as unknown as Array<{ id: string; name: string; year: number; flight_id: string; flight: string; league: string }>;
   const m = meta[0];
   if (!m) return null;
 
@@ -303,7 +304,7 @@ export async function teamDetail(teamId: string): Promise<TeamDetailData | null>
   });
 
   return {
-    id: m.id, name: m.name, flightName: m.flight, league: m.league, year: m.year,
+    id: m.id, name: m.name, flightId: m.flight_id, flightName: m.flight, league: m.league, year: m.year,
     record: { w, l, cw, cl },
     roster: roster.map((r) => ({
       id: r.id,

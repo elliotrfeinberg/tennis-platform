@@ -106,15 +106,30 @@ function archetypeCourts(leagueName: string): CourtRef[] {
   ];
 }
 
-function displayName(leagueName: string | undefined): string {
+// Short archetype label (age division / type) without the court breakdown.
+function archetypeLabel(leagueName: string | undefined): string {
   const s = norm(leagueName);
-  if (isDaytime(s)) return "Daytime (1S + 2D)";
-  if (isMixedOrCombo(s)) return "Mixed / Combo (3D)";
+  if (isDaytime(s)) return "Daytime";
+  if (isMixedOrCombo(s)) return "Mixed / Combo";
   const age = ageDivision(s);
-  if (age !== undefined && age >= 55) return `${age} & Over (3D)`;
-  if (age === 40) return "40 & Over (1S + 3D, D1 ×2)";
-  if (age === 18) return "18 & Over (2S + 3D)";
-  return "Adult (2S + 3D)";
+  if (age !== undefined) return `${age} & Over`;
+  return "Adult";
+}
+
+// Full display name built from the ACTUAL resolved courts, so the label always
+// matches what's played (e.g. "18 & Over (1S + 2D)" for a small high-NTRP
+// flight), plus any weighted courts ("40 & Over (1S + 3D, D1 ×2)").
+function displayName(leagueName: string | undefined, courts: CourtSlot[]): string {
+  const sCount = courts.filter((c) => c.kind === "S").length;
+  const dCount = courts.filter((c) => c.kind === "D").length;
+  const parts: string[] = [];
+  if (sCount) parts.push(`${sCount}S`);
+  if (dCount) parts.push(`${dCount}D`);
+  const weighted = courts
+    .filter((c) => (c.points ?? 1) > 1)
+    .map((c) => `${c.kind}${c.index} ×${c.points}`);
+  const suffix = weighted.length ? `, ${weighted.join(", ")}` : "";
+  return `${archetypeLabel(leagueName)} (${parts.join(" + ")}${suffix})`;
 }
 
 // Resolve a league name to its full court format with per-court points.
@@ -134,7 +149,7 @@ export function resolveFormat(
     index: c.index,
     points: pointsFor(leagueName ?? "", c),
   }));
-  return { name: displayName(leagueName), courts };
+  return { name: displayName(leagueName, courts), courts };
 }
 
 // Total match points and the points needed to clinch (strict majority).
