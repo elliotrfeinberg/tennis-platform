@@ -306,11 +306,11 @@ export async function buildCaptain(opts: {
   });
   const opponent: OpponentLineup = { courts: oppCourts };
 
-  // Established doubles pairs on my team (3+ matches together) get a chemistry
+  // Established doubles pairs on my team (2+ matches together) get a chemistry
   // bonus so the optimizer keeps proven partnerships together.
   const partnerCounts = myTeamId ? await teamPartnerCounts(myTeamId) : new Map();
   const establishedPairs = new Set<string>();
-  for (const [k, n] of partnerCounts) if (n >= 3) establishedPairs.add(k);
+  for (const [k, n] of partnerCounts) if (n >= 2) establishedPairs.add(k);
 
   let result;
   try {

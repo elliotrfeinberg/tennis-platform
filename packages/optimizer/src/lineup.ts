@@ -267,7 +267,7 @@ export interface OptimizeOptions {
   // a "swing for the majority" lineup — they can differ).
   includeExpectedPointsRanking?: boolean;
   // Established doubles pairs (canonical pairKey() of two of OUR player ids,
-  // 3+ matches together). Such pairs get a chemistry bonus, nudging the
+  // 2+ matches together). Such pairs get a chemistry bonus, nudging the
   // optimizer to keep them together.
   establishedPairs?: ReadonlySet<string>;
 }
