@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  macOS launchd job: WEEKLY flight refresh (Stage 0 of docs/DEPLOYMENT.md).
+  Companion to com.matchmetric.incremental.plist (the daily 06:00 delta).
+
+  Where the daily job only fetches scorecards for matches ALREADY on a known
+  flight schedule, this job re-scans active flights' Match Summaries first
+  (--refresh-flights) to DISCOVER newly-scheduled / rescheduled matches, then
+  runs the same fetch → normalize → recompute. Browser-driven, so it's slower
+  (~30 min); run it weekly, ahead of Sunday's daily delta.
+
+  INSTALL (edit the two absolute paths below to your checkout first):
+    cp scripts/com.matchmetric.incremental.refresh.plist ~/Library/LaunchAgents/
+    launchctl load -w ~/Library/LaunchAgents/com.matchmetric.incremental.refresh.plist
+
+  RUN NOW (test):   launchctl start com.matchmetric.incremental.refresh
+  LOGS:             tail -f /tmp/matchmetric-incremental-refresh.log
+  UNINSTALL:        launchctl unload -w ~/Library/LaunchAgents/com.matchmetric.incremental.refresh.plist
+
+  Notes:
+    - Runs weekly, Sunday at 05:00 (one hour before the daily delta). If the Mac
+      is asleep, launchd runs it at the next wake (unlike cron, which skips it).
+    - DATABASE_URL + TENNIS_CONTACT_EMAIL are read from <repo>/.env by
+      incremental.sh, so no secrets live in this plist.
+    - Update --year each new league season (2026 -> 2027 -> ...).
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.matchmetric.incremental.refresh</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <!-- EDIT: absolute path to your checkout -->
+        <string>/Users/elliotfeinberg/tennis-platform/scripts/incremental.sh</string>
+        <string>--year</string>
+        <string>2026</string>
+        <string>--refresh-flights</string>
+    </array>
+
+    <!-- EDIT: absolute path to your checkout -->
+    <key>WorkingDirectory</key>
+    <string>/Users/elliotfeinberg/tennis-platform</string>
+
+    <!-- Give launchd a usable PATH so node/Playwright resolve. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <!-- Weekly: Sunday (Weekday 0) at 05:00, ahead of the daily 06:00 delta. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>0</integer>
+        <key>Hour</key>
+        <integer>5</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/matchmetric-incremental-refresh.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/matchmetric-incremental-refresh.log</string>
+
+    <!-- Don't relaunch on exit; this is a scheduled batch job, not a daemon. -->
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
