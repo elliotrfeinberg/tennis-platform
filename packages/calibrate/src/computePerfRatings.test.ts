@@ -91,8 +91,12 @@ describe("computePerfRatings", () => {
       [mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [6, 0], [6, 0])]
     );
     const result = computePerfRatings(captures);
-    expect(result.ratings.get("A")!).toBeCloseTo(3.0, 6);
-    expect(result.ratings.get("B")!).toBeCloseTo(2.5, 6);
+    // The per-match perf splits the gap around the midpoint…
+    expect(result.history.get("A")![0]!.perf).toBeCloseTo(3.0, 6);
+    expect(result.history.get("B")![0]!.perf).toBeCloseTo(2.5, 6);
+    // …but the REPORTED (aggregate) rating is shrunk toward the band prior for a
+    // 1-match player: 1/3 of the way from the 2.75 seed to the 3.0 match perf.
+    expect(result.ratings.get("A")!).toBeCloseTo(2.75 + (3.0 - 2.75) / 3, 6);
   });
 
   it("a 7-6, 7-6 sweep splits the ±0.05 table gap around the midpoint", () => {
@@ -106,8 +110,8 @@ describe("computePerfRatings", () => {
       [mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [7, 6], [7, 6])]
     );
     const result = computePerfRatings(captures);
-    expect(result.ratings.get("A")!).toBeCloseTo(3.275, 6);
-    expect(result.ratings.get("B")!).toBeCloseTo(3.225, 6);
+    expect(result.history.get("A")![0]!.perf).toBeCloseTo(3.275, 6);
+    expect(result.history.get("B")![0]!.perf).toBeCloseTo(3.225, 6);
   });
 
   it("winning by retirement after losing more games still credits the winner", () => {
@@ -319,12 +323,14 @@ describe("computePerfRatings", () => {
     expect(result.history.get("D")![0]!.perf).toBeCloseTo(3.155, 6);
   });
 
-  it("a win never lowers you and a loss never raises you (playing up/down)", () => {
-    // A (band 4.0 → seed 3.75) beats B (band 3.0 → seed 2.75) 6-0,6-0. The
-    // symmetric formula would DROP A to (3.75+2.75)/2 + 0.25 = 3.50 and RAISE
-    // B to 3.00 — punishing A for playing down. The floor/cap pin them: a win
-    // can't fall below your pre (A stays 3.75), a loss can't rise above it
-    // (B stays 2.75).
+  it("beating a much weaker opponent pulls you toward them (no win-floor)", () => {
+    // A (band 4.0 → seed 3.75) beats B (band 3.0 → seed 2.75) 6-0, 6-0. The gap
+    // is a full point, but a blowout demonstrates at most ~half a band above the
+    // opponent, so the symmetric perf lands at the midpoint (3.25) + 0.25 = 3.50
+    // for A and 3.00 for B. With no win-floor, A's perf (3.50) sits BELOW the
+    // 3.75 seed — A drifts down toward reality instead of ratcheting, and B
+    // rises. This is what lets an over-rated player self-correct (matches
+    // tennisrecord); previously a floor pinned A at 3.75 and B at 2.75.
     const captures = mkCaptures(
       [
         { key: "A", name: "A", memberId: undefined, ntrp: 4.0, teams: [] },
@@ -333,8 +339,30 @@ describe("computePerfRatings", () => {
       [mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [6, 0], [6, 0])]
     );
     const result = computePerfRatings(captures);
-    expect(result.history.get("A")![0]!.perf).toBeCloseTo(3.75, 6);
-    expect(result.history.get("B")![0]!.perf).toBeCloseTo(2.75, 6);
+    expect(result.history.get("A")![0]!.perf).toBeCloseTo(3.5, 6);
+    expect(result.history.get("B")![0]!.perf).toBeCloseTo(3.0, 6);
+  });
+
+  it("a good first result doesn't inflate the reported rating; it converges by 3 matches", () => {
+    // A and B both 3.5 (seed 3.25); A wins 6-1, 6-1 each time. With one match the
+    // reported rating is held near the band prior (3.25); as matches accumulate
+    // the prior washes out and the rating reflects the (rising) rolling mean.
+    const mk = (n: number) =>
+      mkCaptures(
+        [
+          { key: "A", name: "A", memberId: undefined, ntrp: 3.5, teams: [] },
+          { key: "B", name: "B", memberId: undefined, ntrp: 3.5, teams: [] },
+        ],
+        Array.from({ length: n }, (_, i) =>
+          mkMatch(new Date(2026, 0, 1 + i), ["A"], ["B"], [6, 1], [6, 1])
+        )
+      );
+    const one = computePerfRatings(mk(1)).playerRatings.get("A")!;
+    const three = computePerfRatings(mk(3)).playerRatings.get("A")!;
+    // After 1 match the report stays near the 3.25 band prior despite a strong
+    // performance; by 3 matches it's fully trusted and higher.
+    expect(one.display!).toBeLessThan(3.4);
+    expect(one.display!).toBeLessThan(three.display!);
   });
 
   it("a wild upset across a big rating gap is heavily down-weighted", () => {

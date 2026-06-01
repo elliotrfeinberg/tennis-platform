@@ -314,6 +314,18 @@ export function computePerfRatings(
     return den > 0 ? num / den : fallback;
   };
 
+  // Shrink a rolling rating toward the player's band prior (cold-start
+  // midpoint) while they have few rating-affecting matches, so one lucky or
+  // unlucky early result can't define them. Fully trusts the rolling mean once
+  // established (3 matches; 5 for self-rates), mirroring tennisrecord's
+  // "unrated until 3, then average". Applied to the reported aggregate rating.
+  const withPrior = (value: number, key: string, count: number): number => {
+    const isSelfRate = captures.players.get(key)?.ratingType === "S";
+    const threshold = isSelfRate ? SELF_RATE_MATCHES : ESTABLISHED_MATCHES;
+    const c = Math.min(count / threshold, 1);
+    return c >= 1 ? value : c * value + (1 - c) * coldStart(key);
+  };
+
   // Cross a player's stream into `seasonYear`. On the first year-to-year
   // step we snapshot the prior year's rolling rating, clamp it into the
   // new year's band, and reseed the stream history with a single synthetic
@@ -435,9 +447,7 @@ export function computePerfRatings(
         const partnerPre = pre[i]!;
         kindPreOut.set(key, partnerPre);
         const rawPerf = sidePerf + (partnerPre - sideMean);
-        const individualPerf = sideWon
-          ? Math.max(rawPerf, partnerPre)
-          : Math.min(rawPerf, partnerPre);
+        const individualPerf = rawPerf; // no win-floor / loss-cap (see appendForSide)
         const entries = histMap.get(key) ?? [];
         const provisional = {
           perf: individualPerf,
@@ -638,13 +648,14 @@ export function computePerfRatings(
         const key = sideKeys[i]!;
         const partnerPre = sidePre[i]!;
         const rawPerf = sidePerf + (partnerPre - sideMean);
-        // You only move on a surprise: a WIN never drops your perf below your
-        // pre-match rating, and a LOSS never lifts it above. This binds only
-        // when you beat a weaker opponent (floored to no-change) or lose to a
-        // stronger one (capped to no-change); upsets still move you fully.
-        const individualPerf = sideWon
-          ? Math.max(rawPerf, partnerPre)
-          : Math.min(rawPerf, partnerPre);
+        // No win-floor / loss-cap. The symmetric, margin-aware perf already
+        // encodes whether you met the level your rating gap predicts: you rise
+        // on a better-than-expected result and drift DOWN on a worse one — even
+        // on a win, if you only beat a much weaker opponent by less than the gap
+        // implies (you can demonstrate at most ~half a band above whoever you
+        // played). This lets an over-rated player self-correct over time instead
+        // of ratcheting, matching tennisrecord's dynamic rating.
+        const individualPerf = rawPerf;
         const partners = sideRefs.filter((_, j) => j !== i);
 
         const playerBasis = basisFor(key);
@@ -777,9 +788,13 @@ export function computePerfRatings(
     const aHist = adultHistory.get(key);
     const mHist = mixedHistory.get(key);
     const adult =
-      adultMatches > 0 ? computeCurrent(aHist ?? [], coldStart(key)) : undefined;
+      adultMatches > 0
+        ? withPrior(computeCurrent(aHist ?? [], coldStart(key)), key, adultMatches)
+        : undefined;
     const mixed =
-      mixedMatches > 0 ? computeCurrent(mHist ?? [], coldStart(key)) : undefined;
+      mixedMatches > 0
+        ? withPrior(computeCurrent(mHist ?? [], coldStart(key)), key, mixedMatches)
+        : undefined;
     const display = adult ?? mixed;
     // Hidden per-kind streams (optimizer-only). Match counts use the public
     // history (real, rating-affecting courts only) so a synthetic year-boundary
@@ -794,11 +809,11 @@ export function computePerfRatings(
     const dHist = doublesHistory.get(key);
     const singles =
       singlesMatches > 0
-        ? computeCurrent(sHist ?? [], coldStart(key))
+        ? withPrior(computeCurrent(sHist ?? [], coldStart(key)), key, singlesMatches)
         : undefined;
     const doubles =
       doublesMatches > 0
-        ? computeCurrent(dHist ?? [], coldStart(key))
+        ? withPrior(computeCurrent(dHist ?? [], coldStart(key)), key, doublesMatches)
         : undefined;
     playerRatings.set(key, {
       adult,
