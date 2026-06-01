@@ -169,6 +169,13 @@ export const players = pgTable(
   (t) => [
     index("players_section_idx").on(t.sectionCode),
     index("players_display_name_idx").on(t.displayName),
+    // Trigram GIN for the autocomplete: makes case-insensitive ILIKE prefix /
+    // substring name search index-served instead of a full table scan.
+    // Requires the pg_trgm extension (created in the migration).
+    index("players_display_name_trgm_idx").using(
+      "gin",
+      sql`${t.displayName} gin_trgm_ops`
+    ),
   ]
 );
 
@@ -337,6 +344,11 @@ export const courtMatches = pgTable(
     ),
     index("court_matches_home_p1_idx").on(t.homePlayer1Id),
     index("court_matches_visitor_p1_idx").on(t.visitorPlayer1Id),
+    // Slot 2 (doubles partner) lookups — needed so a player's full set of
+    // courts (h2h "faced"/meetings) is a bitmap-OR over all four slots, not a
+    // seq scan of court_matches.
+    index("court_matches_home_p2_idx").on(t.homePlayer2Id),
+    index("court_matches_visitor_p2_idx").on(t.visitorPlayer2Id),
   ]
 );
 
