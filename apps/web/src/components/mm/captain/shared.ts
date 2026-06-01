@@ -5,7 +5,7 @@
 // server optimizer via the recomputeLineups action — it is never persisted to
 // the database (who's available is competitive intel).
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   courtConfidence,
   doublesWinProb,
@@ -46,16 +46,15 @@ export function useAvailability(view: CaptainView) {
     [view.flightId, view.myTeamId, view.oppTeamId]
   );
 
-  // Hydrate availability from localStorage on mount; re-optimize if anyone is
-  // marked out.
+  // Hydrate availability from localStorage on mount (only sets state if anyone
+  // is marked out, so the no-availability case never triggers a recompute).
   useEffect(() => {
     try {
       const raw = localStorage.getItem(key);
       if (raw) {
         const ids: string[] = JSON.parse(raw);
         const s = new Set(ids.filter((id) => view.myRoster.some((p) => p.id === id)));
-        setOut(s);
-        if (s.size > 0) void recompute(s);
+        if (s.size > 0) setOut(s);
       }
     } catch {
       /* ignore malformed storage */
@@ -63,23 +62,33 @@ export function useAvailability(view: CaptainView) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  const toggle = useCallback(
-    (id: string) => {
-      setOut((prev) => {
-        const s = new Set(prev);
-        if (s.has(id)) s.delete(id);
-        else s.add(id);
-        try {
-          localStorage.setItem(key, JSON.stringify([...s]));
-        } catch {
-          /* ignore */
-        }
-        void recompute(s);
-        return s;
-      });
-    },
-    [key, recompute]
-  );
+  // Persist + re-optimize whenever availability changes (after the initial
+  // mount). This runs in an effect — NOT inside the setState updater — so the
+  // server action never fires during render.
+  const firstRun = useRef(true);
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
+    try {
+      localStorage.setItem(key, JSON.stringify([...out]));
+    } catch {
+      /* ignore */
+    }
+    void recompute(out);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [out]);
+
+  // Pure updater: just flip the player's availability.
+  const toggle = useCallback((id: string) => {
+    setOut((prev) => {
+      const s = new Set(prev);
+      if (s.has(id)) s.delete(id);
+      else s.add(id);
+      return s;
+    });
+  }, []);
 
   return { out, toggle, lineups, evaluated, error, loading };
 }
