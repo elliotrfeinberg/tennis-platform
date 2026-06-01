@@ -54,12 +54,20 @@ function pct(p: number | null): string {
 
 export function Sandbox({ view }: { view: CaptainView }) {
   const fmt = view.format;
-  const allPlayers = useMemo(() => {
+  // Each column only offers players from its own team, sorted by name.
+  const myPlayers = useMemo(
+    () => [...view.myRoster].sort((a, b) => a.name.localeCompare(b.name)),
+    [view.myRoster]
+  );
+  const oppPlayers = useMemo(
+    () => [...view.oppRoster].sort((a, b) => a.name.localeCompare(b.name)),
+    [view.oppRoster]
+  );
+  const byId = useMemo(() => {
     const m = new Map<string, CaptainPlayer>();
     for (const p of [...view.myRoster, ...view.oppRoster]) if (!m.has(p.id)) m.set(p.id, p);
-    return [...m.values()].sort((a, b) => (b.perf ?? 0) - (a.perf ?? 0));
+    return m;
   }, [view.myRoster, view.oppRoster]);
-  const byId = useMemo(() => new Map(allPlayers.map((p) => [p.id, p])), [allPlayers]);
 
   const initial: Picks[] = useMemo(
     () =>
@@ -143,13 +151,13 @@ export function Sandbox({ view }: { view: CaptainView }) {
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 {Array.from({ length: n }, (_, s) => (
-                  <PlayerSelect key={s} value={picks[i]?.ours[s] ?? ""} players={allPlayers} onChange={(id) => setPick(i, "ours", s, id)} />
+                  <PlayerSelect key={s} value={picks[i]?.ours[s] ?? ""} players={myPlayers} onChange={(id) => setPick(i, "ours", s, id)} />
                 ))}
               </div>
               <div className="mm-num" style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: r.wp == null ? "var(--muted)" : r.wp >= 0.5 ? "var(--court)" : "var(--loss)" }}>{pct(r.wp)}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 {Array.from({ length: n }, (_, s) => (
-                  <PlayerSelect key={s} value={picks[i]?.theirs[s] ?? ""} players={allPlayers} onChange={(id) => setPick(i, "theirs", s, id)} />
+                  <PlayerSelect key={s} value={picks[i]?.theirs[s] ?? ""} players={oppPlayers} onChange={(id) => setPick(i, "theirs", s, id)} />
                 ))}
               </div>
             </div>
