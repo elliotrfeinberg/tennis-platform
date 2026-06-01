@@ -222,7 +222,7 @@ describe("optimizeLineup", () => {
     expect(() => optimizeLineup(roster, FORMAT_MIXED_5D, opponent, { topN: 1 })).toThrow();
   });
 
-  it("a +0.5 NTRP edge in singles is ~89% (calibrated scale 0.55)", () => {
+  it("a +0.5 NTRP edge in singles is ~91% (calibrated scale 0.50)", () => {
     const roster: RosterPlayer[] = [
       player("s", 4.0), player("x1", 3.5), player("x2", 3.5), player("x3", 3.5),
       player("x4", 3.5), player("x5", 3.5), player("x6", 3.5), player("x7", 3.5),
@@ -233,8 +233,8 @@ describe("optimizeLineup", () => {
       ),
     };
     const lineup = evaluateLineup(roster, FORMAT_ADULT_18, opponent, [["s"], ["x1"], ["x2", "x3"], ["x4", "x5"], ["x6", "x7"]]);
-    // S1: our 4.0 vs their 3.5 → 0.5 edge at scale 0.55 → ~0.89.
-    expect(lineup.assignments[0]!.winProb).toBeCloseTo(0.89, 1);
+    // S1: our 4.0 vs their 3.5 → 0.5 edge at scale 0.50 → ~0.91.
+    expect(lineup.assignments[0]!.winProb).toBeCloseTo(0.91, 1);
   });
 
   it("shrinks a court toward 50% when a participant has a thin same-kind record", () => {

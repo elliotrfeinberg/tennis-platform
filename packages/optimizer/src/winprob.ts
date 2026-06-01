@@ -9,8 +9,11 @@
 // the per-KIND rating the optimizer actually applies (singles courts → singles
 // rating, doubles courts → doubles rating; perf_match_results.kind_pre):
 //
-//   singles → 0.54   (a +0.5 NTRP edge ≈ 89%)   [14.3k courts]
-//   doubles → 0.43   (a +0.5 NTRP edge ≈ 93%)   [47.6k courts]
+//   singles → 0.50   (a +0.5 NTRP edge ≈ 91%)   [14.4k courts]
+//   doubles → 0.40   (a +0.5 NTRP edge ≈ 95%)   [46.8k courts]
+//
+// (Re-fit after the expected-margin rating engine landed; the self-correcting
+// ratings are slightly more decisive than the earlier symmetric ones.)
 //
 // These are far more decisive than the old hand-set 1.0 (which implied +0.5 →
 // 75% and made the optimizer badly under-confident). Doubles is slightly
@@ -22,8 +25,8 @@
 // Court-order skill effects (line 1 vs 2 vs 3) are still ignored for v1.
 
 // Empirically-fit per-kind scales (see header).
-export const SINGLES_SCALE = 0.54;
-export const DOUBLES_SCALE = 0.43;
+export const SINGLES_SCALE = 0.5;
+export const DOUBLES_SCALE = 0.4;
 
 // Legacy generic default, kept for `ntrpWinProb` callers that don't specify a
 // kind. Prefer singlesWinProb / doublesWinProb, which default to the calibrated
