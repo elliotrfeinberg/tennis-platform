@@ -12,6 +12,10 @@ export type CourtKind = "S" | "D";
 export interface CourtSlot {
   index: number; // 1..N (line 1, line 2, ...)
   kind: CourtKind;
+  // Match points this court is worth. Most leagues weight every court 1, but
+  // some don't — e.g. NorCal Adult 40 & Over scores D1 as 2 points. Omitted
+  // means 1. The team match is won by majority of POINTS, not courts.
+  points?: number;
 }
 
 export interface MatchFormat {

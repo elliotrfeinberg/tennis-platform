@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FORMAT_ADULT_18, FORMAT_MIXED_5D } from "./format.js";
+import { resolveFormat, formatPoints } from "./leagueFormats.js";
 import {
   evaluateLineup,
   optimizeLineup,
@@ -8,12 +9,19 @@ import {
   type RosterPlayer,
 } from "./lineup.js";
 
-// Ratings are NTRP perf ratings (e.g. 3.5, 4.0, 4.5).
+// Ratings are NTRP perf ratings. Same value for both kinds unless a test needs
+// a split.
 function player(id: string, r: number): RosterPlayer {
-  return { id, name: id.toUpperCase(), rating: r, available: true };
+  return {
+    id,
+    name: id.toUpperCase(),
+    singlesRating: r,
+    doublesRating: r,
+    available: true,
+  };
 }
 
-describe("teamWinProbability", () => {
+describe("teamWinProbability (equal-weight courts)", () => {
   it("returns ~1 when all courts favored", () => {
     expect(teamWinProbability([0.99, 0.99, 0.99, 0.99, 0.99])).toBeGreaterThan(0.99);
   });
@@ -28,6 +36,91 @@ describe("teamWinProbability", () => {
 
   it("3-of-5 win probs", () => {
     expect(teamWinProbability([0.6, 0.6, 0.6, 0.6, 0.6])).toBeCloseTo(0.68256, 3);
+  });
+});
+
+describe("teamWinProbability (weighted points)", () => {
+  it("winning a 2-point court counts double toward the majority", () => {
+    // points [2,1,1] total 4, need >2 → 3. Win the 2-pt court for sure, then
+    // need at least one of two coin flips: 1 − 0.5·0.5 = 0.75.
+    const p = teamWinProbability([
+      { p: 1, points: 2 },
+      { p: 0.5, points: 1 },
+      { p: 0.5, points: 1 },
+    ]);
+    expect(p).toBeCloseTo(0.75, 6);
+  });
+
+  it("losing the 2-point court makes the rest insufficient to clinch", () => {
+    // Lose D1 (2 pts) → max 2 points from the two 1-pt courts < 3 needed.
+    const p = teamWinProbability([
+      { p: 0, points: 2 },
+      { p: 0.9, points: 1 },
+      { p: 0.9, points: 1 },
+    ]);
+    expect(p).toBe(0);
+  });
+
+  it("all-1-point reduces exactly to the majority-of-courts case", () => {
+    const weighted = teamWinProbability([
+      { p: 0.6, points: 1 },
+      { p: 0.6, points: 1 },
+      { p: 0.6, points: 1 },
+      { p: 0.6, points: 1 },
+      { p: 0.6, points: 1 },
+    ]);
+    expect(weighted).toBeCloseTo(teamWinProbability([0.6, 0.6, 0.6, 0.6, 0.6]), 9);
+  });
+});
+
+describe("resolveFormat", () => {
+  it("40 & Over is 1S + 3D with D1 worth 2 points (win at 3 of 5)", () => {
+    const f = resolveFormat("2026 ADULT 40&Over");
+    expect(f.courts.filter((c) => c.kind === "S")).toHaveLength(1);
+    expect(f.courts.filter((c) => c.kind === "D")).toHaveLength(3);
+    const d1 = f.courts.find((c) => c.kind === "D" && c.index === 1)!;
+    expect(d1.points).toBe(2);
+    const { total, toClinch } = formatPoints(f);
+    expect(total).toBe(5);
+    expect(toClinch).toBe(3);
+  });
+
+  it("18 & Over is 2S + 3D, every court 1 point (win at 3 of 5)", () => {
+    const f = resolveFormat("2025 ADULT 18&Over");
+    expect(f.courts.filter((c) => c.kind === "S")).toHaveLength(2);
+    expect(f.courts.filter((c) => c.kind === "D")).toHaveLength(3);
+    expect(f.courts.every((c) => (c.points ?? 1) === 1)).toBe(true);
+    expect(formatPoints(f)).toEqual({ total: 5, toClinch: 3 });
+  });
+
+  it("55 & Over and Mixed are 3 doubles (win at 2 of 3)", () => {
+    for (const name of ["2026 ADULT 55&Over", "2026 MIXED 18&Over"]) {
+      const f = resolveFormat(name);
+      expect(f.courts).toHaveLength(3);
+      expect(f.courts.every((c) => c.kind === "D")).toBe(true);
+      expect(formatPoints(f)).toEqual({ total: 3, toClinch: 2 });
+    }
+  });
+
+  it("Daytime is 1S + 2D regardless of age division", () => {
+    const f = resolveFormat("2026 ADULT 40&Over - Daytime");
+    expect(f.courts.filter((c) => c.kind === "S")).toHaveLength(1);
+    expect(f.courts.filter((c) => c.kind === "D")).toHaveLength(2);
+    // Daytime weights everything 1 (no D1×2 even at 40 & Over).
+    expect(f.courts.every((c) => (c.points ?? 1) === 1)).toBe(true);
+  });
+
+  it("uses empirical lines when provided (odd out-of-section layouts)", () => {
+    const f = resolveFormat("2026 DALLAS TENNIS 40 & Over ADULT W Friday", [
+      { kind: "D", index: 1 },
+      { kind: "D", index: 2 },
+      { kind: "D", index: 3 },
+      { kind: "D", index: 4 },
+      { kind: "S", index: 1 },
+    ]);
+    expect(f.courts).toHaveLength(5);
+    // 40 & Over rule still applies points to D1.
+    expect(f.courts.find((c) => c.kind === "D" && c.index === 1)!.points).toBe(2);
   });
 });
 
@@ -62,7 +155,7 @@ describe("optimizeLineup", () => {
     expect(usedIds.length).toBe(10);
   });
 
-  it("expected-wins ranking can differ from team-win-prob ranking", () => {
+  it("expected-points ranking can differ from team-win-prob ranking", () => {
     const roster: RosterPlayer[] = [
       player("strong1", 5.0), player("strong2", 4.9), player("strong3", 4.8),
       player("mid1", 3.5), player("mid2", 3.5), player("mid3", 3.5),
@@ -71,10 +164,10 @@ describe("optimizeLineup", () => {
     const opponent: OpponentLineup = {
       courts: FORMAT_MIXED_5D.courts.map(() => ({ kind: "D" as const, a: 3.5, b: 3.5 })),
     };
-    const result = optimizeLineup(roster, FORMAT_MIXED_5D, opponent, { topN: 5, includeExpectedWinsRanking: true });
-    expect(result.byExpectedWins).toBeDefined();
+    const result = optimizeLineup(roster, FORMAT_MIXED_5D, opponent, { topN: 5, includeExpectedPointsRanking: true });
+    expect(result.byExpectedPoints).toBeDefined();
     for (const l of result.byTeamWinProb) expect(l.assignments.length).toBe(FORMAT_MIXED_5D.courts.length);
-    for (const l of result.byExpectedWins!) expect(l.assignments.length).toBe(FORMAT_MIXED_5D.courts.length);
+    for (const l of result.byExpectedPoints!) expect(l.assignments.length).toBe(FORMAT_MIXED_5D.courts.length);
   });
 
   it("Adult 18+ format mixes 2 singles + 3 doubles correctly", () => {
@@ -95,6 +188,26 @@ describe("optimizeLineup", () => {
     expect(new Set(allIds).size).toBe(8);
   });
 
+  it("optimizes a real 40 & Over format (1S + 3D, D1 ×2)", () => {
+    const format = resolveFormat("2026 ADULT 40&Over");
+    const roster: RosterPlayer[] = [
+      player("a", 4.2), player("b", 4.1), player("c", 4.0), player("d", 3.9),
+      player("e", 3.8), player("f", 3.7), player("g", 3.6),
+    ];
+    const opponent: OpponentLineup = {
+      courts: format.courts.map((c) =>
+        c.kind === "S" ? { kind: "S" as const, player: 3.5 } : { kind: "D" as const, a: 3.5, b: 3.5 }
+      ),
+    };
+    const result = optimizeLineup(roster, format, opponent, { topN: 1 });
+    const top = result.byTeamWinProb[0]!;
+    expect(top.assignments).toHaveLength(4); // 1S + 3D
+    // The 2-point court is present and labelled.
+    expect(top.assignments.find((a) => a.slot.kind === "D" && a.slot.index === 1)!.points).toBe(2);
+    // Stronger roster vs a 3.5 wall → strong favorite.
+    expect(top.teamWinProb).toBeGreaterThan(0.8);
+  });
+
   it("respects available=false", () => {
     const roster: RosterPlayer[] = [
       { ...player("a", 4.5), available: false },
@@ -108,7 +221,7 @@ describe("optimizeLineup", () => {
     expect(() => optimizeLineup(roster, FORMAT_MIXED_5D, opponent, { topN: 1 })).toThrow();
   });
 
-  it("a +0.5 NTRP edge in singles is ~75% (default scale)", () => {
+  it("a +0.5 NTRP edge in singles is ~89% (calibrated scale 0.55)", () => {
     const roster: RosterPlayer[] = [
       player("s", 4.0), player("x1", 3.5), player("x2", 3.5), player("x3", 3.5),
       player("x4", 3.5), player("x5", 3.5), player("x6", 3.5), player("x7", 3.5),
@@ -119,8 +232,26 @@ describe("optimizeLineup", () => {
       ),
     };
     const lineup = evaluateLineup(roster, FORMAT_ADULT_18, opponent, [["s"], ["x1"], ["x2", "x3"], ["x4", "x5"], ["x6", "x7"]]);
-    // S1: our 4.0 vs their 3.5 → 0.5 edge → ~0.75.
-    expect(lineup.assignments[0]!.winProb).toBeCloseTo(0.76, 1);
+    // S1: our 4.0 vs their 3.5 → 0.5 edge at scale 0.55 → ~0.89.
+    expect(lineup.assignments[0]!.winProb).toBeCloseTo(0.89, 1);
+  });
+
+  it("shrinks a court toward 50% when a participant has a thin same-kind record", () => {
+    // Same +0.5 singles edge, but our player has only 1 singles match → the
+    // confidence shrink pulls the ~0.89 toward a coin flip.
+    const us: RosterPlayer = { id: "s", name: "S", singlesRating: 4.0, doublesRating: 4.0, singlesMatches: 1, available: true };
+    const fillers = ["x1", "x2", "x3", "x4", "x5", "x6", "x7"].map((id) => player(id, 3.5));
+    const roster = [us, ...fillers];
+    const opponent: OpponentLineup = {
+      courts: FORMAT_ADULT_18.courts.map((c) =>
+        c.kind === "S" ? { kind: "S" as const, player: 3.5, matches: 20 } : { kind: "D" as const, a: 3.5, b: 3.5 }
+      ),
+    };
+    const lineup = evaluateLineup(roster, FORMAT_ADULT_18, opponent, [["s"], ["x1"], ["x2", "x3"], ["x4", "x5"], ["x6", "x7"]]);
+    const p = lineup.assignments[0]!.winProb;
+    // confidence = min(1,20)/5 = 0.2 → 0.5 + 0.2·(0.89 − 0.5) ≈ 0.578.
+    expect(p).toBeGreaterThan(0.5);
+    expect(p).toBeLessThan(0.65);
   });
 });
 

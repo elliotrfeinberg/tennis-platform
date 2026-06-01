@@ -2,37 +2,45 @@
 //
 // Problem: assign N available players from our roster to the format's courts
 // (singles or doubles), maximizing the probability of winning the team match
-// (= winning more individual courts than the opponent).
+// (= winning a majority of the match POINTS, not just courts — some leagues
+// weight courts unequally, e.g. NorCal 40 & Over scores D1 as 2 points).
 //
 // Why we don't just use Hungarian / linear assignment:
 // - Doubles courts pair two of our players to two of theirs. The pairing on
 //   our side is a choice (which players partner up).
 // - "Maximize team match win probability" is non-linear in court outcomes
-//   (we want >50% chance of winning the *majority* of courts), so a sum-of-
+//   (we want >50% chance of winning the majority of POINTS), so a sum-of-
 //   wins objective is only an approximation.
 //
-// Approach: enumerate. The combinatorics are tractable:
-// - Adult 18+: 2S+3D from a typical ~10-player available roster. Number of
-//   ways to pick 2 singles + 3 doubles pairings ≈ C(10,2)*((8 choose 2,2,2,2))
-//   ≈ low hundreds of thousands. Fast on a laptop.
-// - 5D: pick 5 pairings from up to 10-12 players. Similar order of magnitude.
+// Each player carries SEPARATE singles and doubles ratings — many league
+// players only play one discipline — and the win-prob for a court uses the
+// kind-appropriate rating, the calibrated per-kind logistic scale, and a
+// confidence shrink toward 50% when a participant has a thin same-kind record.
 //
-// For larger rosters or unusual formats we fall back to a greedy heuristic
-// (assign weakest court first, etc).
+// Approach: enumerate. The combinatorics are tractable for league rosters.
 
 import type { CourtSlot, MatchFormat } from "./format.js";
 import {
-  DEFAULT_NTRP_SCALE,
+  courtConfidence,
   doublesWinProb,
   ntrpWinProb,
+  shrinkToFair,
   singlesWinProb,
+  SINGLES_SCALE,
   type Doubles,
 } from "./winprob.js";
 
 export interface RosterPlayer {
   id: string;
   name: string;
-  rating: number; // NTRP perf rating
+  // Separate per-kind ratings. When a caller has only a single blended rating,
+  // pass it for both. singlesMatches/doublesMatches drive the confidence
+  // shrink (a thin record → court pulled toward a coin flip); omit when
+  // unknown (treated as fully confident).
+  singlesRating: number;
+  doublesRating: number;
+  singlesMatches?: number;
+  doublesMatches?: number;
   available: boolean;
 }
 
@@ -42,74 +50,102 @@ export interface OpponentLineup {
 }
 
 export type OpponentCourt =
-  | { kind: "S"; player: number }
-  | { kind: "D"; a: number; b: number };
+  | { kind: "S"; player: number; matches?: number }
+  | { kind: "D"; a: number; b: number; aMatches?: number; bMatches?: number };
 
 export interface CourtAssignment {
   slot: CourtSlot;
   ourPlayerIds: string[]; // [id] for singles, [id, id] for doubles
   winProb: number;
+  points: number; // points this court is worth
 }
 
 export interface Lineup {
   assignments: CourtAssignment[];
-  expectedWins: number;
-  teamWinProb: number; // probability of winning majority of courts
+  // Expected match POINTS won (Σ winProb × court points).
+  expectedPoints: number;
+  teamWinProb: number; // probability of winning a majority of the match points
 }
 
 function courtWinProb(
   slot: CourtSlot,
   ours: RosterPlayer[],
-  theirs: OpponentCourt,
-  scale = DEFAULT_NTRP_SCALE
+  theirs: OpponentCourt
 ): number {
   if (slot.kind === "S" && theirs.kind === "S" && ours.length === 1) {
-    return singlesWinProb(ours[0]!.rating, theirs.player, scale);
+    const base = singlesWinProb(ours[0]!.singlesRating, theirs.player);
+    const conf = courtConfidence([ours[0]!.singlesMatches, theirs.matches]);
+    return shrinkToFair(base, conf);
   }
   if (slot.kind === "D" && theirs.kind === "D" && ours.length === 2) {
-    const us: Doubles = { a: ours[0]!.rating, b: ours[1]!.rating };
+    const us: Doubles = { a: ours[0]!.doublesRating, b: ours[1]!.doublesRating };
     const them: Doubles = { a: theirs.a, b: theirs.b };
-    return doublesWinProb(us, them, scale);
+    const base = doublesWinProb(us, them);
+    const conf = courtConfidence([
+      ours[0]!.doublesMatches,
+      ours[1]!.doublesMatches,
+      theirs.aMatches,
+      theirs.bMatches,
+    ]);
+    return shrinkToFair(base, conf);
   }
   throw new Error(
     `Court/lineup kind mismatch: slot=${slot.kind} ours=${ours.length} theirs=${theirs.kind}`
   );
 }
 
-// Probability that we win >= ceil(N/2) of N courts, given per-court win probs.
-// Computed exactly via the Poisson binomial distribution (small N, fine to
-// dynamic-program in O(N^2)).
-export function teamWinProbability(courtProbs: readonly number[]): number {
-  const n = courtProbs.length;
-  const needed = Math.floor(n / 2) + 1;
-  // dp[k] = P(exactly k wins after processing some prefix)
-  let dp = new Array(n + 1).fill(0);
+// Probability that we win MORE THAN HALF of the total match points, given each
+// court's win prob and point value. Exact via a subset-sum dynamic program over
+// points won — the weighted generalization of the Poisson binomial.
+//
+// Accepts either a plain number[] of win probs (every court worth 1 point — the
+// classic "win the majority of courts" case) or {p, points} objects. With all
+// points = 1 it reduces exactly to needing ⌊n/2⌋+1 court wins.
+export function teamWinProbability(
+  courts: readonly number[] | ReadonlyArray<{ p: number; points: number }>
+): number {
+  const items = courts.map((c) =>
+    typeof c === "number" ? { p: c, points: 1 } : c
+  );
+  const total = items.reduce((s, c) => s + c.points, 0);
+  if (total === 0) return 0;
+  // dp[s] = P(exactly s points won so far). Points are small integers.
+  let dp = new Array(total + 1).fill(0);
   dp[0] = 1;
-  for (const p of courtProbs) {
-    const next = new Array(n + 1).fill(0);
-    for (let k = 0; k <= n; k++) {
-      if (dp[k] === 0) continue;
-      next[k] += dp[k] * (1 - p);
-      next[k + 1] += dp[k] * p;
+  for (const { p, points } of items) {
+    const next = new Array(total + 1).fill(0);
+    for (let s = 0; s <= total; s++) {
+      if (dp[s] === 0) continue;
+      next[s] += dp[s] * (1 - p); // lose this court
+      next[s + points] += dp[s] * p; // win it → +points
     }
     dp = next;
   }
-  let total = 0;
-  for (let k = needed; k <= n; k++) total += dp[k]!;
-  return total;
+  // Win = strictly more than half the points (a tie clinches nothing).
+  let win = 0;
+  for (let s = 0; s <= total; s++) if (s * 2 > total) win += dp[s]!;
+  return win;
 }
 
-// Enumerate all valid assignments of available players to the format's
-// courts. Yields one Lineup per arrangement.
-//
-// Implementation: backtracking with pruning. We fill courts in order; at
-// each step we pick the player(s) for that court from the remaining pool.
-// Each player can play at most once.
+function lineupFromAssignments(assignments: CourtAssignment[]): Lineup {
+  return {
+    assignments: assignments.map((a) => ({
+      ...a,
+      ourPlayerIds: [...a.ourPlayerIds],
+    })),
+    expectedPoints: assignments.reduce((s, a) => s + a.winProb * a.points, 0),
+    teamWinProb: teamWinProbability(
+      assignments.map((a) => ({ p: a.winProb, points: a.points }))
+    ),
+  };
+}
+
+// Enumerate all valid assignments of available players to the format's courts.
+// Backtracking with each player used at most once.
 function* enumerateLineups(
   available: RosterPlayer[],
   format: MatchFormat,
-  opponent: OpponentLineup,
-  scale = DEFAULT_NTRP_SCALE
+  opponent: OpponentLineup
 ): Generator<Lineup> {
   if (opponent.courts.length !== format.courts.length) {
     throw new Error(
@@ -122,34 +158,30 @@ function* enumerateLineups(
 
   function* fill(courtIdx: number): Generator<Lineup> {
     if (courtIdx === format.courts.length) {
-      const probs = assignments.map((a) => a.winProb);
-      yield {
-        assignments: assignments.map((a) => ({ ...a, ourPlayerIds: [...a.ourPlayerIds] })),
-        expectedWins: probs.reduce((s, p) => s + p, 0),
-        teamWinProb: teamWinProbability(probs),
-      };
+      yield lineupFromAssignments(assignments);
       return;
     }
     const slot = format.courts[courtIdx]!;
     const opp = opponent.courts[courtIdx]!;
+    const points = slot.points ?? 1;
 
     if (slot.kind === "S") {
       for (let i = 0; i < available.length; i++) {
         if (used[i]) continue;
         used[i] = true;
         const us = [available[i]!];
-        const winProb = courtWinProb(slot, us, opp, scale);
         assignments.push({
           slot,
           ourPlayerIds: [us[0]!.id],
-          winProb,
+          winProb: courtWinProb(slot, us, opp),
+          points,
         });
         yield* fill(courtIdx + 1);
         assignments.pop();
         used[i] = false;
       }
     } else {
-      // Pick unordered pair {i, j} with i < j to avoid permutation dupes.
+      // Unordered pair {i, j} with i < j to avoid permutation dupes.
       for (let i = 0; i < available.length; i++) {
         if (used[i]) continue;
         for (let j = i + 1; j < available.length; j++) {
@@ -157,11 +189,11 @@ function* enumerateLineups(
           used[i] = true;
           used[j] = true;
           const us = [available[i]!, available[j]!];
-          const winProb = courtWinProb(slot, us, opp, scale);
           assignments.push({
             slot,
             ourPlayerIds: [us[0]!.id, us[1]!.id],
-            winProb,
+            winProb: courtWinProb(slot, us, opp),
+            points,
           });
           yield* fill(courtIdx + 1);
           assignments.pop();
@@ -177,17 +209,14 @@ function* enumerateLineups(
 
 export interface OptimizeOptions {
   topN?: number;
-  // If true, also rank by sum of individual court win probs (useful when
-  // captain wants a "play to your numbers" lineup vs. a "swing for majority"
-  // lineup — they can differ).
-  includeExpectedWinsRanking?: boolean;
-  // NTRP win-prob scale (see winprob.ts). Lower = rating edges more decisive.
-  scale?: number;
+  // If true, also rank by expected POINTS (a "play to your numbers" lineup vs.
+  // a "swing for the majority" lineup — they can differ).
+  includeExpectedPointsRanking?: boolean;
 }
 
 export interface OptimizeResult {
   byTeamWinProb: Lineup[];
-  byExpectedWins?: Lineup[];
+  byExpectedPoints?: Lineup[];
   evaluated: number;
 }
 
@@ -209,10 +238,9 @@ export function optimizeLineup(
   }
 
   const topN = options.topN ?? 5;
-  const scale = options.scale ?? DEFAULT_NTRP_SCALE;
   const all: Lineup[] = [];
   let count = 0;
-  for (const lineup of enumerateLineups(available, format, opponent, scale)) {
+  for (const lineup of enumerateLineups(available, format, opponent)) {
     all.push(lineup);
     count += 1;
   }
@@ -222,22 +250,21 @@ export function optimizeLineup(
     .slice(0, topN);
 
   const result: OptimizeResult = { byTeamWinProb, evaluated: count };
-  if (options.includeExpectedWinsRanking) {
-    result.byExpectedWins = [...all]
-      .sort((a, b) => b.expectedWins - a.expectedWins)
+  if (options.includeExpectedPointsRanking) {
+    result.byExpectedPoints = [...all]
+      .sort((a, b) => b.expectedPoints - a.expectedPoints)
       .slice(0, topN);
   }
   return result;
 }
 
-// Helper: compute win probability for a given lineup (no enumeration).
-// Useful for the "what's my current lineup's win prob?" UX.
+// Compute win probability for a given lineup (no enumeration). Useful for the
+// "what's my current lineup's win prob?" UX (e.g. the sandbox).
 export function evaluateLineup(
   roster: readonly RosterPlayer[],
   format: MatchFormat,
   opponent: OpponentLineup,
-  picks: readonly (readonly string[])[], // one entry per court, [id] or [id,id]
-  scale = DEFAULT_NTRP_SCALE
+  picks: readonly (readonly string[])[] // one entry per court, [id] or [id,id]
 ): Lineup {
   if (picks.length !== format.courts.length) {
     throw new Error(`Expected ${format.courts.length} picks, got ${picks.length}`);
@@ -254,18 +281,14 @@ export function evaluateLineup(
     return {
       slot,
       ourPlayerIds: [...ids],
-      winProb: courtWinProb(slot, ours, opp, scale),
+      winProb: courtWinProb(slot, ours, opp),
+      points: slot.points ?? 1,
     };
   });
-  const probs = assignments.map((a) => a.winProb);
-  return {
-    assignments,
-    expectedWins: probs.reduce((s, p) => s + p, 0),
-    teamWinProb: teamWinProbability(probs),
-  };
+  return lineupFromAssignments(assignments);
 }
 
-// Quick win-prob check between two singles NTRP ratings — for UI explorations.
-export function singlesProbExplain(us: number, them: number, scale = DEFAULT_NTRP_SCALE): number {
+// Quick singles win-prob check between two NTRP ratings — for UI explorations.
+export function singlesProbExplain(us: number, them: number, scale = SINGLES_SCALE): number {
   return ntrpWinProb(us, them, scale);
 }

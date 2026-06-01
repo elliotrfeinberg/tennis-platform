@@ -140,6 +140,18 @@ export async function teamUpcomingMatches(teamId: string): Promise<UpcomingMatch
   return { matchId: r.matchId, oppTeamId: r.oppTeamId, oppName: r.oppName, date: r.d ? new Date(r.d).toISOString().slice(0, 10) : null };
 }
 
+export interface RosterPlayerRow {
+  id: string;
+  name: string;
+  perf: number | null;
+  band: number | null;
+  // Hidden per-kind ratings (optimizer-only; never shown on main pages).
+  singles: number | null;
+  doubles: number | null;
+  singlesMatches: number;
+  doublesMatches: number;
+}
+
 export interface TeamDetailData {
   id: string;
   name: string;
@@ -147,8 +159,65 @@ export interface TeamDetailData {
   league: string;
   year: number;
   record: { w: number; l: number; cw: number; cl: number };
-  roster: Array<{ id: string; name: string; perf: number | null; band: number | null }>;
+  roster: RosterPlayerRow[];
   schedule: Array<{ matchId: string; at: "vs" | "@"; opp: string; cw: number; cl: number; date: string | null; won: boolean }>;
+}
+
+// Distinct courts (kind + line) actually played in a flight — the empirical
+// court set used to resolve a league's format robustly.
+export async function flightCourts(
+  flightId: string
+): Promise<Array<{ kind: "S" | "D"; index: number }>> {
+  const rows = (await db().execute(sql`
+    SELECT DISTINCT cm.court_kind AS kind, cm.line AS index
+    FROM court_matches cm
+    JOIN team_matches tm ON tm.id = cm.team_match_id
+    JOIN teams t ON t.id = tm.home_team_id
+    JOIN subflights sf ON sf.id = t.subflight_id
+    WHERE sf.flight_id = ${flightId}
+  `)) as unknown as Array<{ kind: "S" | "D"; index: number }>;
+  return rows.map((r) => ({ kind: r.kind, index: Number(r.index) }));
+}
+
+export interface PlayerLineHistory {
+  playerId: string;
+  // Courts this player has played, e.g. "D1", desc by count.
+  spots: Array<{ court: string; count: number }>;
+  total: number;
+}
+
+// How often each player on a team has played at each court (kind+line) — the
+// signal for projecting where an opponent's players are likely to line up.
+export async function teamLineupHistory(
+  teamId: string
+): Promise<Map<string, PlayerLineHistory>> {
+  const rows = (await db().execute(sql`
+    SELECT pid, kind, line, count(*)::int AS n FROM (
+      SELECT unnest(ARRAY[cm.home_player1_id, cm.home_player2_id]) AS pid,
+             cm.court_kind AS kind, cm.line AS line
+      FROM court_matches cm JOIN team_matches tm ON tm.id = cm.team_match_id
+      WHERE tm.home_team_id = ${teamId}
+      UNION ALL
+      SELECT unnest(ARRAY[cm.visitor_player1_id, cm.visitor_player2_id]) AS pid,
+             cm.court_kind AS kind, cm.line AS line
+      FROM court_matches cm JOIN team_matches tm ON tm.id = cm.team_match_id
+      WHERE tm.visitor_team_id = ${teamId}
+    ) s WHERE pid IS NOT NULL
+    GROUP BY pid, kind, line
+  `)) as unknown as Array<{ pid: string; kind: "S" | "D"; line: number; n: number }>;
+  const map = new Map<string, PlayerLineHistory>();
+  for (const r of rows) {
+    const court = `${r.kind}${r.line}`;
+    let e = map.get(r.pid);
+    if (!e) {
+      e = { playerId: r.pid, spots: [], total: 0 };
+      map.set(r.pid, e);
+    }
+    e.spots.push({ court, count: r.n });
+    e.total += r.n;
+  }
+  for (const e of map.values()) e.spots.sort((a, b) => b.count - a.count);
+  return map;
 }
 
 export async function teamDetail(teamId: string): Promise<TeamDetailData | null> {
@@ -165,7 +234,10 @@ export async function teamDetail(teamId: string): Promise<TeamDetailData | null>
 
   // Roster: distinct players who appeared on this team's side of a court.
   const roster = (await db().execute(sql`
-    SELECT p.id, p.display_name AS name, ppr.display AS perf, p.published_ntrp AS band
+    SELECT p.id, p.display_name AS name, ppr.display AS perf, p.published_ntrp AS band,
+           ppr.singles, ppr.doubles,
+           coalesce(ppr.singles_matches, 0)::int AS "singlesMatches",
+           coalesce(ppr.doubles_matches, 0)::int AS "doublesMatches"
     FROM (
       SELECT DISTINCT pid FROM (
         SELECT unnest(ARRAY[cm.home_player1_id, cm.home_player2_id]) AS pid
@@ -180,7 +252,7 @@ export async function teamDetail(teamId: string): Promise<TeamDetailData | null>
     JOIN players p ON p.id = rp.pid
     LEFT JOIN player_perf_ratings ppr ON ppr.player_id = p.id
     ORDER BY ppr.display DESC NULLS LAST, p.display_name
-  `)) as unknown as Array<{ id: string; name: string; perf: number | null; band: number | null }>;
+  `)) as unknown as RosterPlayerRow[];
 
   const sched = (await db().execute(sql`
     SELECT tm.id AS "matchId", tm.played_on AS played,
@@ -206,7 +278,16 @@ export async function teamDetail(teamId: string): Promise<TeamDetailData | null>
   return {
     id: m.id, name: m.name, flightName: m.flight, league: m.league, year: m.year,
     record: { w, l, cw, cl },
-    roster: roster.map((r) => ({ id: r.id, name: r.name, perf: r.perf, band: r.band })),
+    roster: roster.map((r) => ({
+      id: r.id,
+      name: r.name,
+      perf: r.perf,
+      band: r.band,
+      singles: r.singles,
+      doubles: r.doubles,
+      singlesMatches: r.singlesMatches,
+      doublesMatches: r.doublesMatches,
+    })),
     schedule,
   };
 }

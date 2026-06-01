@@ -424,6 +424,14 @@ export const playerPerfRatings = pgTable("player_perf_ratings", {
   adultMatches: integer("adult_matches").notNull().default(0),
   mixedMatches: integer("mixed_matches").notNull().default(0),
   otherMatches: integer("other_matches").notNull().default(0),
+  // Hidden per-court-kind ratings consumed only by the lineup optimizer —
+  // NOT surfaced on any main page. singles = singles-court stream, doubles =
+  // doubles-court stream (adult + mixed blended). null when no matches in
+  // that kind.
+  singles: doublePrecision("singles"),
+  doubles: doublePrecision("doubles"),
+  singlesMatches: integer("singles_matches").notNull().default(0),
+  doublesMatches: integer("doubles_matches").notNull().default(0),
   computedAt: timestamp("computed_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

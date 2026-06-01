@@ -20,10 +20,13 @@ export default async function Page({
       </div>
     );
   }
+  // Key on the matchup so switching team/opponent/flight remounts the client
+  // components with fresh availability + lineup state.
+  const k = `${view.flightId}:${view.myTeamId}:${view.oppTeamId}`;
   return (
     <>
-      <div className="mm-desktop-only"><Captain view={view} /></div>
-      <div className="mm-mobile-only"><MobileCaptain view={view} /></div>
+      <div className="mm-desktop-only"><Captain key={k} view={view} /></div>
+      <div className="mm-mobile-only"><MobileCaptain key={k} view={view} /></div>
     </>
   );
 }

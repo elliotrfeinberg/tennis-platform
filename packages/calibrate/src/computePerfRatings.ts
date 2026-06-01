@@ -97,6 +97,16 @@ export interface PlayerPerfRatings {
   adultMatches: number;
   mixedMatches: number;
   otherMatches: number;
+  // Hidden per-court-kind streams used only by the lineup optimizer — NOT
+  // shown on any main page. `singles` aggregates singles courts, `doubles`
+  // aggregates doubles courts (adult + mixed blended), across the same
+  // rating-affecting universe as adult/mixed. undefined when no matches in
+  // that kind. A player good at one and weak at the other no longer has the
+  // two averaged together.
+  singles: number | undefined;
+  doubles: number | undefined;
+  singlesMatches: number;
+  doublesMatches: number;
 }
 
 export interface PerfRatingsResult {
@@ -198,6 +208,20 @@ export function computePerfRatings(
   const adultCount = new Map<string, number>();
   const mixedCount = new Map<string, number>();
 
+  // Per-court-kind streams (hidden; optimizer-only). Parallel machinery to the
+  // category streams, but partitioned by S vs D instead of adult vs mixed.
+  // Updated only by rating-affecting (adult/mixed) matches, same as the
+  // category streams. History entries here are lightweight — only the fields
+  // computeCurrent reads (perf, playerPreRating, opponentRating).
+  const singlesRating = new Map<string, number>();
+  const doublesRating = new Map<string, number>();
+  const singlesHistory = new Map<string, PerfMatchEntry[]>();
+  const doublesHistory = new Map<string, PerfMatchEntry[]>();
+  const singlesCount = new Map<string, number>();
+  const doublesCount = new Map<string, number>();
+  const singlesYear = new Map<string, number>();
+  const doublesYear = new Map<string, number>();
+
   const coldStart = (key: string): number => {
     const p = captures.players.get(key);
     return p ? initialRatingFn(p) : 3.25;
@@ -291,23 +315,153 @@ export function computePerfRatings(
   // the new year and ages out of the last-10 window after ~10 real
   // matches. The synthetic entry is NEVER pushed to the public `history`
   // map, so the match log and per-stream match counts stay accurate.
+  // Generic year-boundary crossing for any one stream's (year, history,
+  // rating) maps. On the first step into a later season, snapshot the prior
+  // rolling rating, clamp it into the new band, and reseed history with a
+  // single synthetic carry-in entry. Used by both the category and the
+  // per-kind streams.
+  const advanceStreamYear = (
+    yearMap: Map<string, number>,
+    histMap: Map<string, PerfMatchEntry[]>,
+    ratingMap: Map<string, number>,
+    key: string,
+    seasonYear: number
+  ): void => {
+    const prev = yearMap.get(key);
+    if (prev !== undefined && seasonYear > prev) {
+      const entries = histMap.get(key) ?? [];
+      const current = computeCurrent(entries, coldStart(key));
+      const clamped = clampToBand(current, bandForYear(key, seasonYear));
+      histMap.set(key, [{ perf: clamped } as PerfMatchEntry]);
+      ratingMap.set(key, clamped);
+    }
+    yearMap.set(key, Math.max(prev ?? seasonYear, seasonYear));
+  };
+
   const applyYearBoundary = (
     key: string,
     stream: "adult" | "mixed",
     seasonYear: number
   ): void => {
     const yearMap = stream === "adult" ? adultYear : mixedYear;
-    const prev = yearMap.get(key);
-    if (prev !== undefined && seasonYear > prev) {
-      const hist = stream === "adult" ? adultHistory : mixedHistory;
-      const ratingMap = stream === "adult" ? adultRating : mixedRating;
-      const entries = hist.get(key) ?? [];
-      const current = computeCurrent(entries, coldStart(key));
-      const clamped = clampToBand(current, bandForYear(key, seasonYear));
-      hist.set(key, [{ perf: clamped } as PerfMatchEntry]);
-      ratingMap.set(key, clamped);
+    const histMap = stream === "adult" ? adultHistory : mixedHistory;
+    const ratingMap = stream === "adult" ? adultRating : mixedRating;
+    advanceStreamYear(yearMap, histMap, ratingMap, key, seasonYear);
+  };
+
+  // --- Per-kind (singles/doubles) stream helpers ---
+
+  // Current kind rating, falling back to the player's display rating
+  // (adult ?? mixed ?? cold-start band midpoint) before they have any
+  // same-kind history — a sensible prior for, e.g., a doubles veteran's
+  // first singles match.
+  const kindLookup = (key: string, kind: "S" | "D"): number => {
+    const r = (kind === "S" ? singlesRating : doublesRating).get(key);
+    if (r !== undefined) return r;
+    return lookupForBasis(key, "adult");
+  };
+
+  const kindAnchorConfidence = (key: string, kind: "S" | "D"): number => {
+    const count =
+      (kind === "S" ? singlesCount : doublesCount).get(key) ?? 0;
+    const isSelfRate = captures.players.get(key)?.ratingType === "S";
+    const threshold = isSelfRate ? SELF_RATE_MATCHES : ESTABLISHED_MATCHES;
+    return Math.min(count / threshold, 1);
+  };
+
+  // The rating this player uses to ANCHOR an opponent's kind perf: rolling
+  // kind rating blended toward the band prior by kind confidence (provisional
+  // players pulled toward their band so a thin kind history can't contaminate
+  // opponents). Mirrors anchorRating for the category streams.
+  const kindAnchor = (key: string, kind: "S" | "D"): number => {
+    const rolling = kindLookup(key, kind);
+    const c = kindAnchorConfidence(key, kind);
+    if (c >= 1) return rolling;
+    return c * rolling + (1 - c) * coldStart(key);
+  };
+
+  // Rate one match into its kind stream (S or D). Same symmetric, zero-sum
+  // update as the category streams, but each side reads its own kind rolling
+  // pre-ratings/anchors. Reuses the already-computed score deltas. Must run
+  // while the category rolling ratings are still pre-match (before the
+  // category appendForSide writes), so kindLookup's display fallback is
+  // pre-match consistent.
+  const rateKindStream = (
+    m: CapturesData["matches"][number],
+    homeDelta: number,
+    visitorDelta: number
+  ): void => {
+    const kind = m.kind;
+    const histMap = kind === "S" ? singlesHistory : doublesHistory;
+    const ratingMap = kind === "S" ? singlesRating : doublesRating;
+    const countMap = kind === "S" ? singlesCount : doublesCount;
+    const yearMap = kind === "S" ? singlesYear : doublesYear;
+
+    for (const key of [...m.homePlayerKeys, ...m.visitorPlayerKeys]) {
+      advanceStreamYear(yearMap, histMap, ratingMap, key, m.seasonYear);
     }
-    yearMap.set(key, Math.max(prev ?? seasonYear, seasonYear));
+
+    const homePre = m.homePlayerKeys.map((k) => kindLookup(k, kind));
+    const visitorPre = m.visitorPlayerKeys.map((k) => kindLookup(k, kind));
+    const homeMean = mean(homePre);
+    const visitorMean = mean(visitorPre);
+    const homeAnchorMean = mean(
+      m.homePlayerKeys.map((k) => kindAnchor(k, kind))
+    );
+    const visitorAnchorMean = mean(
+      m.visitorPlayerKeys.map((k) => kindAnchor(k, kind))
+    );
+    const homePerf = (homeMean + visitorAnchorMean) / 2 + homeDelta / 2;
+    const visitorPerf = (visitorMean + homeAnchorMean) / 2 + visitorDelta / 2;
+
+    const applySide = (
+      keys: string[],
+      pre: number[],
+      sideMean: number,
+      sidePerf: number,
+      oppMean: number,
+      sideWon: boolean
+    ): void => {
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i]!;
+        const partnerPre = pre[i]!;
+        const rawPerf = sidePerf + (partnerPre - sideMean);
+        const individualPerf = sideWon
+          ? Math.max(rawPerf, partnerPre)
+          : Math.min(rawPerf, partnerPre);
+        const entries = histMap.get(key) ?? [];
+        const provisional = {
+          perf: individualPerf,
+          playerPreRating: partnerPre,
+          opponentRating: oppMean,
+        } as PerfMatchEntry;
+        const newRating = computeCurrent(
+          [...entries, provisional],
+          coldStart(key)
+        );
+        entries.push(provisional);
+        histMap.set(key, entries);
+        ratingMap.set(key, newRating);
+        countMap.set(key, (countMap.get(key) ?? 0) + 1);
+      }
+    };
+
+    applySide(
+      m.homePlayerKeys,
+      homePre,
+      homeMean,
+      homePerf,
+      visitorAnchorMean,
+      m.homeWon!
+    );
+    applySide(
+      m.visitorPlayerKeys,
+      visitorPre,
+      visitorMean,
+      visitorPerf,
+      homeAnchorMean,
+      !m.homeWon!
+    );
   };
 
   for (const m of captures.matches) {
@@ -417,6 +571,12 @@ export function computePerfRatings(
     const visitorDelta = scoreToPerfDelta(visitorSets, !m.homeWon); // opposite sign
     const homePerf = (homeMean + visitorAnchorMean) / 2 + homeDelta / 2;
     const visitorPerf = (visitorMean + homeAnchorMean) / 2 + visitorDelta / 2;
+
+    // Update the hidden per-kind (singles/doubles) streams from this same
+    // result. Independent of the category streams and run BEFORE the category
+    // appendForSide writes below, so kindLookup's display fallback sees
+    // pre-match category ratings. Only rating-affecting matches participate.
+    if (affectsRating) rateKindStream(m, homeDelta, visitorDelta);
 
     // Pre-compute game-diff for diagnostics in history entries.
     let gh = 0;
@@ -609,6 +769,25 @@ export function computePerfRatings(
     const mixed =
       mixedMatches > 0 ? computeCurrent(mHist ?? [], coldStart(key)) : undefined;
     const display = adult ?? mixed;
+    // Hidden per-kind streams (optimizer-only). Match counts use the public
+    // history (real, rating-affecting courts only) so a synthetic year-boundary
+    // carry-in seed in the kind history is never counted as a played match.
+    const singlesMatches = allH.filter(
+      (e) => e.kind === "S" && e.affectsRating
+    ).length;
+    const doublesMatches = allH.filter(
+      (e) => e.kind === "D" && e.affectsRating
+    ).length;
+    const sHist = singlesHistory.get(key);
+    const dHist = doublesHistory.get(key);
+    const singles =
+      singlesMatches > 0
+        ? computeCurrent(sHist ?? [], coldStart(key))
+        : undefined;
+    const doubles =
+      doublesMatches > 0
+        ? computeCurrent(dHist ?? [], coldStart(key))
+        : undefined;
     playerRatings.set(key, {
       adult,
       mixed,
@@ -616,6 +795,10 @@ export function computePerfRatings(
       adultMatches,
       mixedMatches,
       otherMatches,
+      singles,
+      doubles,
+      singlesMatches,
+      doublesMatches,
     });
   }
 

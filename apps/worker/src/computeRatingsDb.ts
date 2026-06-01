@@ -236,6 +236,10 @@ export async function computeRatingsFromDb(opts: {
       adultMatches: pr.adultMatches,
       mixedMatches: pr.mixedMatches,
       otherMatches: pr.otherMatches,
+      singles: pr.singles ?? null,
+      doubles: pr.doubles ?? null,
+      singlesMatches: pr.singlesMatches,
+      doublesMatches: pr.doublesMatches,
     }));
     await inChunks(prRows, 500, async (chunk) => {
       await db.insert(playerPerfRatings).values(chunk);

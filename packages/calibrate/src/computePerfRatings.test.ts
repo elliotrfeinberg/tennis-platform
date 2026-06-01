@@ -782,4 +782,115 @@ describe("computePerfRatings", () => {
       expect(selfAnchor).toBeGreaterThan(3.25);
     });
   });
+
+  describe("hidden singles/doubles streams", () => {
+    const P = (key: string, ntrp = 3.5) => ({
+      key,
+      name: key,
+      memberId: undefined,
+      ntrp,
+      teams: [],
+    });
+
+    it("splits a player's courts into separate singles and doubles streams", () => {
+      const captures = mkCaptures(
+        [P("A"), P("B"), P("C"), P("D")],
+        [
+          mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [6, 3], [6, 3]), // S
+          mkMatch(new Date(2026, 0, 5), ["A", "C"], ["B", "D"], [6, 3], [6, 3]), // D
+        ]
+      );
+      const pr = computePerfRatings(captures).playerRatings.get("A")!;
+      expect(pr.singles).toBeDefined();
+      expect(pr.doubles).toBeDefined();
+      expect(pr.singlesMatches).toBe(1);
+      expect(pr.doublesMatches).toBe(1);
+      // The blended adult stream still counts both courts.
+      expect(pr.adultMatches).toBe(2);
+    });
+
+    it("a singles-only player gets a singles rating and no doubles rating", () => {
+      const captures = mkCaptures(
+        [P("A"), P("B")],
+        [mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [6, 0], [6, 0])]
+      );
+      const pr = computePerfRatings(captures).playerRatings.get("A")!;
+      expect(pr.singles).toBeDefined();
+      expect(pr.doubles).toBeUndefined();
+      expect(pr.doublesMatches).toBe(0);
+      // For a player's first/only singles court, the kind stream and the
+      // category stream see identical pre-ratings/anchors → identical value.
+      expect(pr.singles!).toBeCloseTo(pr.adult!, 6);
+    });
+
+    it("a doubles-only player gets a doubles rating and no singles rating", () => {
+      const captures = mkCaptures(
+        [P("A"), P("B"), P("C"), P("D")],
+        [mkMatch(new Date(2026, 0, 1), ["A", "C"], ["B", "D"], [6, 2], [6, 2])]
+      );
+      const pr = computePerfRatings(captures).playerRatings.get("A")!;
+      expect(pr.doubles).toBeDefined();
+      expect(pr.singles).toBeUndefined();
+      expect(pr.singlesMatches).toBe(0);
+    });
+
+    it("a player strong at singles but weak at doubles ends with singles > doubles", () => {
+      const captures = mkCaptures(
+        [P("A"), P("B"), P("C"), P("D")],
+        [
+          // A dominates singles vs an equal B.
+          mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [6, 0], [6, 0]),
+          // A (with C) is crushed in doubles by an equal B/D.
+          mkMatch(new Date(2026, 0, 5), ["A", "C"], ["B", "D"], [0, 6], [0, 6]),
+        ]
+      );
+      const pr = computePerfRatings(captures).playerRatings.get("A")!;
+      expect(pr.singles!).toBeGreaterThan(pr.doubles!);
+    });
+
+    it("the doubles stream blends adult and mixed doubles courts", () => {
+      const captures = mkCaptures(
+        [P("A"), P("B"), P("C"), P("D")],
+        [
+          mkMatch(new Date(2026, 0, 1), ["A", "C"], ["B", "D"], [6, 3], [6, 3]),
+          mkMatch(
+            new Date(2026, 0, 5),
+            ["A", "C"],
+            ["B", "D"],
+            [6, 3],
+            [6, 3],
+            undefined,
+            "Mixed 18&Over"
+          ),
+        ]
+      );
+      const pr = computePerfRatings(captures).playerRatings.get("A")!;
+      expect(pr.doublesMatches).toBe(2); // adult + mixed doubles both counted
+      expect(pr.singlesMatches).toBe(0);
+    });
+
+    it("combo/other doubles does NOT update the doubles stream", () => {
+      const captures = mkCaptures(
+        [P("A"), P("B"), P("C"), P("D")],
+        [
+          // Establish A with an adult singles court first.
+          mkMatch(new Date(2026, 0, 1), ["A"], ["B"], [6, 3], [6, 3]),
+          // A combo doubles court — excluded from rating streams.
+          mkMatch(
+            new Date(2026, 0, 5),
+            ["A", "C"],
+            ["B", "D"],
+            [6, 2],
+            [6, 2],
+            undefined,
+            "Combo 7.5"
+          ),
+        ]
+      );
+      const pr = computePerfRatings(captures).playerRatings.get("A")!;
+      expect(pr.singlesMatches).toBe(1);
+      expect(pr.doublesMatches).toBe(0); // combo excluded, same as adult/mixed
+      expect(pr.doubles).toBeUndefined();
+    });
+  });
 });

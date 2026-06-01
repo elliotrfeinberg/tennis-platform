@@ -1,8 +1,13 @@
 "use client";
-// Captain workspace / lineup optimizer — Center Court. Prop-driven: real team
-// rosters fed to the optimizer, ranked lineups out.
+// Captain workspace / lineup optimizer — Center Court. Real rosters → ranked
+// lineups, weighted by the league's actual court scoring. Availability is held
+// in localStorage and passed transiently to the server optimizer (never stored).
+import { useState } from "react";
 import { PageHero, Avatar, Chip } from "@/components/mm/ui";
 import type { CaptainView } from "@/lib/captain";
+import { useAvailability } from "@/components/mm/captain/shared";
+import { Sandbox } from "@/components/mm/captain/Sandbox";
+import { OddsExplainer } from "@/components/mm/captain/OddsExplainer";
 
 function Controls({ v }: { v: CaptainView }) {
   const sel = { padding: "11px 13px", border: "1px solid var(--hair)", borderRadius: 9, background: "var(--paper)", fontSize: 14, fontWeight: 600, color: "var(--ink)", fontFamily: "var(--font-body)", minWidth: 200 } as const;
@@ -27,38 +32,72 @@ function Controls({ v }: { v: CaptainView }) {
         </select>
       </label>
       <div style={{ flex: 1 }} />
-      <button type="submit" style={{ padding: "12px 22px", border: "none", borderRadius: 10, background: "var(--court)", color: "#fff", fontSize: 14.5, fontWeight: 700, cursor: "pointer", alignSelf: "flex-end" }}>Optimize</button>
+      <button type="submit" style={{ padding: "12px 22px", border: "none", borderRadius: 10, background: "var(--court)", color: "#fff", fontSize: 14.5, fontWeight: 700, cursor: "pointer", alignSelf: "flex-end" }}>Load</button>
     </form>
   );
 }
 
-function RosterPanel({ title, sub, players, opponent }: { title: string; sub: string; players: CaptainView["myRoster"]; opponent?: boolean }) {
+function MyRosterPanel({ v, out, toggle }: { v: CaptainView; out: Set<string>; toggle: (id: string) => void }) {
+  return (
+    <div className="mm-card" style={{ overflow: "hidden", flex: "1 1 0" }}>
+      <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--hair)" }}>
+        <div style={{ fontSize: 15, fontWeight: 700, whiteSpace: "nowrap" }}>{v.myName} — your roster</div>
+        <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 1 }}>{v.myRoster.length} players · tap to mark out (stays on this device)</div>
+      </div>
+      {v.myRoster.length === 0 ? (
+        <div style={{ padding: "22px 18px", color: "var(--muted)", fontSize: 13.5 }}>No roster yet.</div>
+      ) : v.myRoster.map((p, i) => {
+        const isOut = out.has(p.id);
+        return (
+          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 18px", borderTop: i ? "1px solid var(--hair-2)" : "none", opacity: isOut ? 0.45 : 1 }}>
+            <Avatar name={p.name} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--ink)", textDecoration: isOut ? "line-through" : "none" }}>{p.name}</div>
+            </div>
+            {p.band != null && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-2)", background: "var(--hair-2)", padding: "2px 7px", borderRadius: 6 }}>{p.band.toFixed(1)}</span>}
+            <span className="mm-num" style={{ fontSize: 18, color: "var(--court)", width: 46, textAlign: "right" }}>{p.perf != null ? p.perf.toFixed(2) : "—"}</span>
+            <button
+              onClick={() => toggle(p.id)}
+              style={{ marginLeft: 4, padding: "4px 10px", borderRadius: 7, border: "1px solid var(--hair)", background: isOut ? "var(--loss-tint, color-mix(in oklab, var(--loss) 12%, var(--card)))" : "var(--paper)", color: isOut ? "var(--loss)" : "var(--ink-2)", fontSize: 11.5, fontWeight: 700, cursor: "pointer", width: 52 }}
+            >
+              {isOut ? "Out" : "In"}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function OppProjectionPanel({ v }: { v: CaptainView }) {
   return (
     <div className="mm-card" style={{ overflow: "hidden", flex: "1 1 0" }}>
       <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--hair)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, whiteSpace: "nowrap" }}>{title}</div>
-          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 1 }}>{sub}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, whiteSpace: "nowrap" }}>{v.oppName} — likely lineup</div>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 1 }}>projected from who they usually play where</div>
         </div>
-        {opponent && <Chip tone="mute">Projected</Chip>}
+        <Chip tone="mute">Projected</Chip>
       </div>
-      {players.length === 0 ? (
-        <div style={{ padding: "22px 18px", color: "var(--muted)", fontSize: 13.5 }}>No roster yet.</div>
-      ) : players.map((p, i) => (
-        <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 18px", borderTop: i ? "1px solid var(--hair-2)" : "none" }}>
-          <Avatar name={p.name} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--ink)" }}>{p.name}</div>
+      {v.oppProjection.length === 0 ? (
+        <div style={{ padding: "22px 18px", color: "var(--muted)", fontSize: 13.5 }}>Not enough opponent history yet.</div>
+      ) : v.oppProjection.map((c, i) => (
+        <div key={c.c} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 18px", borderTop: i ? "1px solid var(--hair-2)" : "none" }}>
+          <span className="mm-mono" style={{ fontWeight: 700, fontSize: 13, color: "var(--court)", width: 30 }}>{c.c}</span>
+          {c.points > 1 && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--on-ball, #4a530f)", background: "var(--ball, #d8e36a)", padding: "1px 5px", borderRadius: 5 }}>×{c.points}</span>}
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+            <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--ink)" }}>{c.players.map((p) => p.name).join("  +  ")}</div>
+            <div style={{ fontSize: 11, color: "var(--muted)" }}>
+              {c.players.map((p) => `${Math.round(p.propensity * 100)}% here`).join(" · ")}
+            </div>
           </div>
-          {p.band != null && <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-2)", background: "var(--hair-2)", padding: "2px 7px", borderRadius: 6 }}>{p.band.toFixed(1)}</span>}
-          <span className="mm-num" style={{ fontSize: 18, color: "var(--court)", width: 46, textAlign: "right" }}>{p.perf != null ? p.perf.toFixed(2) : "—"}</span>
         </div>
       ))}
     </div>
   );
 }
 
-function LineupCard({ rank, lu }: { rank: number; lu: CaptainView["lineups"][number] }) {
+function LineupCard({ rank, lu, total }: { rank: number; lu: CaptainView["lineups"][number]; total: number }) {
   const best = rank === 1;
   return (
     <div className="mm-card" style={{ overflow: "hidden", border: best ? "1.5px solid var(--court)" : "1px solid var(--hair)" }}>
@@ -73,8 +112,8 @@ function LineupCard({ rank, lu }: { rank: number; lu: CaptainView["lineups"][num
             <span className="mm-num" style={{ fontSize: 34, color: "var(--court)" }}>{Math.round(lu.teamWin * 100)}%</span>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)" }}>Exp. courts</div>
-            <span className="mm-num" style={{ fontSize: 34, color: "var(--ink)" }}>{lu.exp.toFixed(1)}<span style={{ fontSize: 16, color: "var(--muted)" }}>/{lu.courts.length}</span></span>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted)" }}>Exp. points</div>
+            <span className="mm-num" style={{ fontSize: 34, color: "var(--ink)" }}>{lu.expPoints.toFixed(1)}<span style={{ fontSize: 16, color: "var(--muted)" }}>/{total}</span></span>
           </div>
         </div>
       </div>
@@ -82,6 +121,7 @@ function LineupCard({ rank, lu }: { rank: number; lu: CaptainView["lineups"][num
         {lu.courts.map((c, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "9px 22px" }}>
             <span className="mm-mono" style={{ fontWeight: 600, fontSize: 13, color: "var(--court)", width: 28 }}>{c.c}</span>
+            {c.points > 1 && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--on-ball, #4a530f)", background: "var(--ball, #d8e36a)", padding: "1px 5px", borderRadius: 5, marginLeft: -8 }}>×{c.points}</span>}
             <span style={{ flex: 1, fontWeight: 600, fontSize: 14, color: "var(--ink)" }}>{c.players.join("  +  ")}</span>
             <div style={{ width: 160, height: 8, borderRadius: 5, background: "var(--hair-2)", overflow: "hidden" }}>
               <div style={{ height: "100%", width: c.wp * 100 + "%", background: c.wp >= 0.5 ? "var(--court)" : "var(--loss)" }} />
@@ -130,40 +170,66 @@ function StandingsPanel({ v }: { v: CaptainView }) {
   );
 }
 
+function ModeTabs({ mode, setMode }: { mode: "optimize" | "sandbox"; setMode: (m: "optimize" | "sandbox") => void }) {
+  const tab = (m: "optimize" | "sandbox", label: string) => (
+    <button
+      onClick={() => setMode(m)}
+      style={{ padding: "9px 18px", borderRadius: 9, border: "1px solid " + (mode === m ? "var(--court)" : "var(--hair)"), background: mode === m ? "var(--court)" : "var(--paper)", color: mode === m ? "#fff" : "var(--ink-2)", fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}
+    >
+      {label}
+    </button>
+  );
+  return <div style={{ display: "flex", gap: 8 }}>{tab("optimize", "Optimize")}{tab("sandbox", "Sandbox")}</div>;
+}
+
 export function Captain({ view }: { view: CaptainView }) {
   const v = view;
+  const [mode, setMode] = useState<"optimize" | "sandbox">("optimize");
+  const { out, toggle, lineups, evaluated, error, loading } = useAvailability(v);
   const right = (
     <div style={{ background: "rgba(255,255,255,.14)", borderRadius: 12, padding: "12px 18px", textAlign: "left" }}>
       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,.7)" }}>Optimizing</div>
       <div style={{ fontSize: 19, fontWeight: 700, color: "#fff", marginTop: 4 }}>{v.myName} vs {v.oppName}</div>
       <div className="mm-mono" style={{ fontSize: 12.5, color: "rgba(255,255,255,.8)", marginTop: 2 }}>
-        USTA Adult · 2S + 3D{v.oppFromSchedule ? " · next match" : ""}
+        {v.format.name} · win {v.format.toClinch} of {v.format.total}{v.oppFromSchedule ? " · next match" : ""}
       </div>
     </div>
   );
   return (
     <div className="mm-screen" style={{ maxWidth: 1320, margin: "0 auto", padding: "30px 44px 56px", display: "flex", flexDirection: "column", gap: 18 }}>
       <PageHero kicker="Lineup optimizer" title="Captain workspace" right={right}
-        sub="Pick your team and opponent — we rank lineups by team win probability, not just the sum of court odds." />
+        sub="Pick your team and opponent — lineups ranked by the chance of winning the match's points, using each player's singles/doubles rating." />
       <Controls v={v} />
-      <div className="mm-stack" style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
-        <RosterPanel title={`${v.myName} — your roster`} sub={`${v.myRoster.length} players`} players={v.myRoster} />
-        <RosterPanel title={`${v.oppName} — projected`} sub={`${v.oppRoster.length} players · strongest-first`} players={v.oppRoster} opponent />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+        <ModeTabs mode={mode} setMode={setMode} />
+        {loading && <span className="mm-mono" style={{ fontSize: 12.5, color: "var(--muted)" }}>Re-optimizing…</span>}
       </div>
-      {v.standings.length > 1 && <StandingsPanel v={v} />}
-      {v.error ? (
-        <div className="mm-card" style={{ padding: "22px 24px", color: "var(--ink-2)", fontSize: 14, lineHeight: 1.5 }}>
-          <span style={{ fontWeight: 700, color: "var(--ink)" }}>Can't optimize yet.</span> {v.error}
-        </div>
+
+      {mode === "sandbox" ? (
+        <Sandbox view={v} />
       ) : (
         <>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 4 }}>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>Top {v.lineups.length} lineups by team win probability</div>
-            <span className="mm-mono" style={{ fontSize: 12.5, color: "var(--muted)" }}>Evaluated {v.evaluated.toLocaleString("en-US")} possible lineups</span>
+          <div className="mm-stack" style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
+            <MyRosterPanel v={v} out={out} toggle={toggle} />
+            <OppProjectionPanel v={v} />
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {v.lineups.map((lu, i) => <LineupCard key={i} rank={i + 1} lu={lu} />)}
-          </div>
+          {v.standings.length > 1 && <StandingsPanel v={v} />}
+          {error ? (
+            <div className="mm-card" style={{ padding: "22px 24px", color: "var(--ink-2)", fontSize: 14, lineHeight: 1.5 }}>
+              <span style={{ fontWeight: 700, color: "var(--ink)" }}>Can&apos;t optimize yet.</span> {error}
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 4 }}>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>Top {lineups.length} lineups by team win probability</div>
+                <span className="mm-mono" style={{ fontSize: 12.5, color: "var(--muted)" }}>Evaluated {evaluated.toLocaleString("en-US")} possible lineups</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {lineups.map((lu, i) => <LineupCard key={i} rank={i + 1} lu={lu} total={v.format.total} />)}
+              </div>
+              <OddsExplainer />
+            </>
+          )}
         </>
       )}
     </div>

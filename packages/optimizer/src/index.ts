@@ -7,11 +7,22 @@ export {
 } from "./format.js";
 
 export {
+  resolveFormat,
+  formatPoints,
+  type CourtRef,
+} from "./leagueFormats.js";
+
+export {
   DEFAULT_NTRP_SCALE,
+  SINGLES_SCALE,
+  DOUBLES_SCALE,
+  CONFIDENCE_RAMP,
   ntrpWinProb,
   teamNtrp,
   doublesWinProb,
   singlesWinProb,
+  shrinkToFair,
+  courtConfidence,
   type Doubles,
 } from "./winprob.js";
 
